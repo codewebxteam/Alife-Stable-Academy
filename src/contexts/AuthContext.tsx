@@ -1,24 +1,39 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
-  signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
+  signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  User
+  onAuthStateChanged
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { ref, set, get } from 'firebase/database';
+import { auth, db } from '@/lib/firebase';
+
+type UserRole = 'partner' | 'student';
+
+interface User {
+  id: string;
+  email: string;
+  role: UserRole;
+  fullName: string;
+  mobile: string;
+  instituteName?: string;
+}
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  signup: (data: SignupData) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserRole>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+}
+
+interface SignupData {
+  email: string;
+  password: string;
+  role: UserRole;
+  fullName: string;
+  mobile: string;
+  instituteName?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,43 +48,79 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setIsAuthenticated(!!user);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = await getUserData(firebaseUser.uid);
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
     });
     return unsubscribe;
   }, []);
 
-  const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const getUserData = async (uid: string): Promise<User | null> => {
+    try {
+      const userRef = ref(db, `users/${uid}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        return snapshot.val() as User;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
   };
 
-  const signup = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+  const signup = async (data: SignupData) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const uid = userCredential.user.uid;
+
+      const userData: User = {
+        id: uid,
+        email: data.email,
+        role: data.role,
+        fullName: data.fullName,
+        mobile: data.mobile,
+        ...(data.role === 'partner' && { instituteName: data.instituteName })
+      };
+
+      await set(ref(db, `users/${uid}`), userData);
+      setUser(userData);
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      throw error;
+    }
   };
 
-  const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+  const login = async (email: string, password: string): Promise<UserRole> => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userData = await getUserData(userCredential.user.uid);
+      
+      if (!userData) {
+        await signOut(auth);
+        throw new Error('User data not found');
+      }
+      
+      return userData.role;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const logout = async () => {
     await signOut(auth);
-  };
-
-  const resetPassword = async (email: string) => {
-    const actionCodeSettings = {
-      url: window.location.origin + '/login',
-      handleCodeInApp: false,
-    };
-    await sendPasswordResetEmail(auth, email, actionCodeSettings);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, signup, loginWithGoogle, logout, resetPassword }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, signup, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

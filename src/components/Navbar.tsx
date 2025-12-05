@@ -1,13 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Menu, X, GraduationCap, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Menu, X, GraduationCap, User, LogOut } from "lucide-react";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,6 +20,24 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    if (showDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
+
+  const handleLogout = async () => {
+    await logout();
+    setShowDropdown(false);
+    navigate("/");
+  };
 
   const navLinks = [
     { to: "/", label: "Home" },
@@ -63,14 +85,41 @@ const Navbar = () => {
           {/* CTA Buttons / User Profile */}
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated ? (
-              <NavLink to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
-                  {user?.email?.[0].toUpperCase() || <User className="h-5 w-5" />}
+              user?.role === 'partner' ? (
+                <NavLink to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                  <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
+                    {user?.email?.[0].toUpperCase() || <User className="h-5 w-5" />}
+                  </div>
+                  <span className="font-semibold text-[#0B1A2A]">
+                    {user?.email?.split('@')[0] || 'User'}
+                  </span>
+                </NavLink>
+              ) : (
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
+                      {user?.email?.[0].toUpperCase() || <User className="h-5 w-5" />}
+                    </div>
+                    <span className="font-semibold text-[#0B1A2A]">
+                      {user?.email?.split('@')[0] || 'User'}
+                    </span>
+                  </button>
+                  {showDropdown && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors text-red-600"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span className="text-sm">Logout</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <span className="font-semibold text-[#0B1A2A]">
-                  {user?.email?.split('@')[0] || 'User'}
-                </span>
-              </NavLink>
+              )
             ) : (
               <>
                 <NavLink to="/login">

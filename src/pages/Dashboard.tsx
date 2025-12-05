@@ -26,6 +26,12 @@ const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (user && user.role !== 'partner') {
+      navigate('/');
+    }
+  }, [user, navigate]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -55,7 +61,7 @@ const Dashboard = () => {
   }, [showDropdown, showMobileUserMenu]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || user.role !== 'partner') return;
 
     const unsubscribers: (() => void)[] = [];
 
@@ -202,18 +208,28 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="py-2">
-                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                      <User className="h-4 w-4" />
-                      <span className="text-sm">My Profile</span>
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                      <ShoppingBag className="h-4 w-4" />
-                      <span className="text-sm">Purchase History</span>
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                      <Award className="h-4 w-4" />
-                      <span className="text-sm">My Certificates</span>
-                    </button>
+                    {user?.role === 'partner' && (
+                      <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                        <ShoppingBag className="h-4 w-4" />
+                        <span className="text-sm">Resell</span>
+                      </button>
+                    )}
+                    {user?.role !== 'partner' && (
+                      <>
+                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                          <User className="h-4 w-4" />
+                          <span className="text-sm">My Profile</span>
+                        </button>
+                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                          <ShoppingBag className="h-4 w-4" />
+                          <span className="text-sm">Purchase History</span>
+                        </button>
+                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                          <Award className="h-4 w-4" />
+                          <span className="text-sm">My Certificates</span>
+                        </button>
+                      </>
+                    )}
                     <div className="border-t border-gray-100 my-2"></div>
                     <button
                       onClick={handleLogout}
