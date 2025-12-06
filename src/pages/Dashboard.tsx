@@ -209,7 +209,10 @@ const Dashboard = () => {
                   </div>
                   <div className="py-2">
                     {user?.role === 'partner' && (
-                      <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                      <button 
+                        onClick={() => { setShowDropdown(false); navigate('/resell'); }}
+                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                      >
                         <ShoppingBag className="h-4 w-4" />
                         <span className="text-sm">Resell</span>
                       </button>
