@@ -16,6 +16,7 @@ const Signup = () => {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   
   const { signup } = useAuth();
@@ -32,7 +33,8 @@ const Signup = () => {
         role,
         fullName,
         mobile,
-        ...(role === 'partner' && { instituteName })
+        ...(role === 'partner' && { instituteName }),
+        ...(role === 'student' && referralCode && { referralCode })
       });
       
       toast.success('Account created successfully!');
@@ -164,6 +166,20 @@ const Signup = () => {
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
+
+            {/* Referral Code - Only for Students */}
+            {role === 'student' && (
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5 group-focus-within:text-orange-500 transition-colors" />
+                <Input
+                  type="text"
+                  placeholder="Referral code (optional)"
+                  className="pl-12 h-14 bg-white/5 border border-white/20 text-white placeholder:text-gray-500 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/40 focus:bg-white/10 transition-all"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                />
+              </div>
+            )}
 
             <Button
               type="submit"

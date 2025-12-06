@@ -17,6 +17,7 @@ interface User {
   fullName: string;
   mobile: string;
   instituteName?: string;
+  referralCode?: string;
 }
 
 interface AuthContextType {
@@ -34,6 +35,7 @@ interface SignupData {
   fullName: string;
   mobile: string;
   instituteName?: string;
+  referralCode?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,7 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         role: data.role,
         fullName: data.fullName,
         mobile: data.mobile,
-        ...(data.role === 'partner' && { instituteName: data.instituteName })
+        ...(data.role === 'partner' && { instituteName: data.instituteName }),
+        ...(data.role === 'student' && data.referralCode && { referralCode: data.referralCode })
       };
 
       await set(ref(db, `users/${uid}`), userData);
