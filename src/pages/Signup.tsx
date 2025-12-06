@@ -41,7 +41,6 @@ const Signup = () => {
         })
       };
       
-      console.log('Signup data:', signupData);
       await signup(signupData);
       
       toast.success('Account created successfully!');

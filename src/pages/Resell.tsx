@@ -25,7 +25,6 @@ const Resell = () => {
                  user.email?.split('@')[0].toLowerCase();
     const fullSubdomain = `${name}.learnsphere.com`;
     setReferralCode(name);
-    console.log('Partner referral code:', fullSubdomain);
 
     // Listen to real-time student count
     const usersRef = ref(db, 'users');
@@ -37,7 +36,6 @@ const Resell = () => {
         count++;
       });
       setStudentCount(count);
-      console.log('Student count:', count);
     });
 
     return () => unsubscribe();
