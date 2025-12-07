@@ -69,12 +69,12 @@ const Navbar = () => {
           </NavLink>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden xl:flex items-center gap-6">
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm"
                 activeClassName="text-primary"
               >
                 {link.label}
@@ -83,7 +83,7 @@ const Navbar = () => {
           </div>
 
           {/* CTA Buttons / User Profile */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden xl:flex items-center gap-4">
             {isAuthenticated ? (
               user?.role === 'partner' ? (
                 <NavLink to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -139,7 +139,7 @@ const Navbar = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-foreground hover:text-primary transition-colors"
+            className="xl:hidden p-2 text-foreground hover:text-primary transition-colors"
           >
             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -148,7 +148,7 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden glass border-t border-border">
+        <div className="xl:hidden glass border-t border-border">
           <div className="container mx-auto px-4 py-6 space-y-4">
             {navLinks.map((link) => (
               <NavLink

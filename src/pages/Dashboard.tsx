@@ -162,19 +162,19 @@ const Dashboard = () => {
           </NavLink>
 
           {/* Center: Navigation Links (Desktop) */}
-          <nav className="hidden lg:flex items-center gap-8 flex-1 justify-center">
-            <NavLink to="/" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Home</NavLink>
-            <NavLink to="/courses" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Courses</NavLink>
-            <NavLink to="/books" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Books</NavLink>
-            <NavLink to="/pre-recorded" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Pre-Recorded</NavLink>
-            <NavLink to="/study-material" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Study Material</NavLink>
-            <NavLink to="/consultation" className="text-muted-foreground hover:text-foreground transition-colors font-medium">1:1 Consultation</NavLink>
-            <NavLink to="/webinar" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Webinar</NavLink>
-            <NavLink to="/blogs" className="text-muted-foreground hover:text-foreground transition-colors font-medium">Blogs</NavLink>
+          <nav className="hidden xl:flex items-center gap-6 flex-1 justify-center">
+            <NavLink to="/" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Home</NavLink>
+            <NavLink to="/courses" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Courses</NavLink>
+            <NavLink to="/books" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Books</NavLink>
+            <NavLink to="/pre-recorded" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Pre-Recorded</NavLink>
+            <NavLink to="/study-material" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Study Material</NavLink>
+            <NavLink to="/consultation" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">1:1 Consultation</NavLink>
+            <NavLink to="/webinar" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Webinar</NavLink>
+            <NavLink to="/blogs" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm">Blogs</NavLink>
           </nav>
 
           {/* Right: Desktop Icons & User Menu */}
-          <div className="hidden lg:flex items-center gap-4">
+          <div className="hidden xl:flex items-center gap-4">
             <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <MessageCircle className="h-5 w-5 text-gray-600" />
             </button>
@@ -250,7 +250,7 @@ const Dashboard = () => {
           {/* Right: Menu Button for Right Sidebar (Mobile/Tablet) */}
           <button
             onClick={() => setShowRightSidebar(true)}
-            className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="xl:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu className="h-6 w-6 text-gray-600" />
           </button>
