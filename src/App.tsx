@@ -25,6 +25,7 @@ import Webinar from "./pages/Webinar";
 import Blogs from "./pages/Blogs";
 import Resell from "./pages/Resell";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="/webinar" element={<Webinar />} />
               <Route path="/blogs" element={<Blogs />} />
               <Route path="/resell" element={<Resell />} />
+              <Route path="/admindashboard" element={<AdminDashboard />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -137,7 +137,13 @@ const Signup = () => {
                 placeholder="Mobile number"
                 className="pl-16 h-14 bg-white/5 border border-white/20 text-white placeholder:text-gray-500 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/40 focus:bg-white/10 transition-all"
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                onChange={(e) => {
+      const value = e.target.value.replace(/\D/g, "");
+      if (value.length <= 10) setMobile(value);
+    }}
+    maxLength={10}
+    pattern="[0-9]{10}"
+    title="Enter a valid 10-digit mobile number"
                 required
               />
             </div>
