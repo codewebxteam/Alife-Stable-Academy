@@ -23,7 +23,7 @@ const Resell = () => {
 
     const name = user.fullName?.toLowerCase().replace(/\s+/g, '') || 
                  user.email?.split('@')[0].toLowerCase();
-    const fullSubdomain = `${name}.learnsphere.com`;
+    const fullSubdomain = `${name}.alife-stable-academy.com`;
     setReferralCode(name);
 
     // Listen to real-time student count
@@ -42,7 +42,7 @@ const Resell = () => {
   }, [user, navigate]);
 
   const handleCopy = () => {
-    const subdomain = `${referralCode}.learnsphere.com`;
+    const subdomain = `${referralCode}.alife-stable-academy.com`;
     navigator.clipboard.writeText(subdomain);
     setCopied(true);
     toast.success("Subdomain copied!");
@@ -50,12 +50,12 @@ const Resell = () => {
   };
 
   const handleShare = async () => {
-    const subdomain = `${referralCode}.learnsphere.com`;
-    const message = `Join LearnSphere using my link: ${subdomain}`;
+    const subdomain = `${referralCode}.alife-stable-academy.com`;
+    const message = `Join alife-stable-academy using my link: ${subdomain}`;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'LearnSphere Partner Link',
+          title: 'alife-stable-academy Partner Link',
           text: message,
         });
       } catch (error) {
@@ -96,7 +96,7 @@ const Resell = () => {
             <label className="text-xs font-semibold text-gray-400 mb-2 block">Your Subdomain</label>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-3 font-mono text-sm font-bold text-orange-400 text-center break-all">
-                {referralCode}.learnsphere.com
+                {referralCode}.alife-stable-academy.com
               </div>
               <Button
                 onClick={handleCopy}

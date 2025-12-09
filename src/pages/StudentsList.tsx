@@ -28,7 +28,7 @@ const StudentsList = () => {
 
     const name = user.fullName?.toLowerCase().replace(/\s+/g, '') || 
                  user.email?.split('@')[0].toLowerCase();
-    const fullSubdomain = `${name}.learnsphere.com`;
+    const fullSubdomain = `${name}.alife-stable-academy.com`;
 
     const usersRef = ref(db, 'users');
     const studentsQuery = query(usersRef, orderByChild('referralCode'), equalTo(fullSubdomain));

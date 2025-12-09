@@ -119,7 +119,7 @@ const Footer = () => {
         <div className="pt-6 sm:pt-8 border-t border-border">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
             <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-              © {new Date().getFullYear()} LearnSphere. All rights reserved.
+              © {new Date().getFullYear()} alife-stable-academy. All rights reserved.
             </p>
             <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm">
               <NavLink to="/terms" className="text-muted-foreground hover:text-primary transition-colors">

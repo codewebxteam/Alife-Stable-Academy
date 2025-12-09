@@ -249,7 +249,7 @@ const Home = () => {
             Ready to Transform Your <span className="text-gradient">Career?</span>
           </h2>
           <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-white/80 max-w-2xl mx-auto px-4">
-            Join thousands of successful students who have achieved their dreams with LearnSphere
+            Join thousands of successful students who have achieved their dreams with alife-stable-academy
           </p>
           <Button 
             size="lg" 

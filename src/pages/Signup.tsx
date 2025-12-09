@@ -35,9 +35,9 @@ const Signup = () => {
         mobile,
         ...(role === 'partner' && { instituteName }),
         ...(role === 'student' && referralCode && { 
-          referralCode: referralCode.toLowerCase().includes('.learnsphere.com') 
+          referralCode: referralCode.toLowerCase().includes('.alife-stable-academy.com') 
             ? referralCode.toLowerCase() 
-            : `${referralCode.toLowerCase()}.learnsphere.com`
+            : `${referralCode.toLowerCase()}.alife-stable-academy.com`
         })
       };
       
