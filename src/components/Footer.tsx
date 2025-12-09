@@ -19,7 +19,7 @@ const Footer = () => {
       { label: "Help Center", to: "/help" },
       { label: "Terms of Service", to: "/terms" },
       { label: "Privacy Policy", to: "/privacy" },
-      { label: "Cookie Policy", to: "/cookies" },
+      { label: "Admin Dashboard", to: "/adminDashboard" },
     ],
   };
 

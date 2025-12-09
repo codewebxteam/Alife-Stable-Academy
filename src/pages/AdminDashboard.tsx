@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Users,
   BookOpen,
   ShoppingBag,
-  DollarSign,
   ChevronRight,
   TrendingUp,
   TrendingDown,
@@ -115,10 +114,7 @@ export default function AdminDashboard() {
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
-            <button className="px-4 py-2 rounded-lg bg-white border border-gray-100 shadow-sm hover:shadow-md">Export</button>
-            <button className="px-4 py-2 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md">
-              Create Report
-            </button>
+            <button className="px-4 py-2 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md">Export</button>
           </div>
         </div>
 
