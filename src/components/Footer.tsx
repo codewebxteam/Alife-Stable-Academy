@@ -45,7 +45,7 @@ const Footer = () => {
                 </div>
               </div>
               <span className="font-display text-lg sm:text-xl font-bold">
-                Learn<span className="gradient-text">Sphere</span>
+                <span className="gradient-text">alife-stable-academy</span>
               </span>
             </NavLink>
             <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 max-w-sm">
