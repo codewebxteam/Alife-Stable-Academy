@@ -172,13 +172,6 @@ const Dashboard = () => {
 
           {/* Right: Desktop Icons & User Menu */}
           <div className="hidden xl:flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <MessageCircle className="h-5 w-5 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors relative">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
             <div className="relative" ref={dropdownRef}>
             <button
               onClick={(e) => {
