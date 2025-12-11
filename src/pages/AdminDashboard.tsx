@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Users,
   BookOpen,
@@ -67,6 +68,13 @@ const TableRow = ({ cols }) => (
 );
 
 export default function AdminDashboard() {
+  const location = useLocation();
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [location.pathname]);
+
   // mock data — replace with API calls
   const [stats, setStats] = useState({
     revenue: 1298650,
