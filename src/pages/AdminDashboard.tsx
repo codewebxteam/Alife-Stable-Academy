@@ -281,11 +281,7 @@
 // }
 
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
-import { useNavigate } from "react-router-dom";
-=======
-import { useLocation } from "react-router-dom";
->>>>>>> ebd0331a9fbe45c41601f7eac44ea874f7093bfb
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Users,
   BookOpen,
@@ -364,16 +360,13 @@ const formatCurrency = (v) =>
 
 /* ---------- Main Component ---------- */
 export default function AdminDashboard() {
-<<<<<<< HEAD
   const navigate = useNavigate();
-=======
   const location = useLocation();
 
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
->>>>>>> ebd0331a9fbe45c41601f7eac44ea874f7093bfb
 
   // mock data — replace with API calls
   const [stats, setStats] = useState({
