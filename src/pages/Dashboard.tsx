@@ -172,13 +172,6 @@ const Dashboard = () => {
 
           {/* Right: Desktop Icons & User Menu */}
           <div className="hidden xl:flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <MessageCircle className="h-5 w-5 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors relative">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
             <div className="relative" ref={dropdownRef}>
             <button
               onClick={(e) => {
@@ -244,13 +237,47 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Right: Menu Button for Right Sidebar (Mobile/Tablet) */}
-          <button
-            onClick={() => setShowRightSidebar(true)}
-            className="xl:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <Menu className="h-6 w-6 text-gray-600" />
-          </button>
+          {/* Right: User Avatar (Mobile/Tablet) */}
+          <div className="xl:hidden relative" ref={mobileUserMenuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMobileUserMenu(!showMobileUserMenu);
+              }}
+              className="p-1"
+            >
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold">
+                {user?.email?.[0].toUpperCase() || "U"}
+              </div>
+            </button>
+            {showMobileUserMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[100]">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm text-gray-500">Hi,</p>
+                  <p className="font-semibold text-gray-800">
+                    {user?.email?.split("@")[0] || "User"}
+                  </p>
+                </div>
+                <div className="py-2">
+                  <button 
+                    onClick={() => { setShowMobileUserMenu(false); navigate('/resell'); }}
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    <span className="text-sm">Resell</span>
+                  </button>
+                  <div className="border-t border-gray-100 my-2"></div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-sm">Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
