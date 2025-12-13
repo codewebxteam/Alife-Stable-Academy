@@ -10,7 +10,7 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // ✅ ONLY CHANGE: get referralName from context
+  // ✅ ONLY CHANGE: referralName from context
   const { user, isAuthenticated, logout, referralName } = useAuth();
 
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ const Navbar = () => {
       document.removeEventListener("mousedown", handleClickOutside);
   }, [showDropdown]);
 
-  // Logout (no hard reload)
+  // Logout (NO hard reload)
   const handleLogout = async () => {
     await logout();
     navigate("/");
@@ -65,7 +65,8 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* LOGO */}
+
+          {/* ✅ LOGO — NOW REACTIVE */}
           <NavLink to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-orange flex items-center justify-center group-hover:scale-110 transition-transform">
               <GraduationCap className="h-6 w-6 text-white" />
