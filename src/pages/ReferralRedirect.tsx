@@ -8,39 +8,51 @@ export default function ReferralRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!refCode) return;
+
     const handleReferral = async () => {
-      if (!refCode) return;
-
-      console.log("➡️ Referral detected:", refCode);
-
-      // Check if referral belongs to a partner
-      const usersRef = ref(db, "users");
-      const q = query(usersRef, orderByChild("referralCode"), equalTo(refCode));
-      const snapshot = await get(q);
-
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const partner = Object.values(data)[0] as { fullName: string };
-
-        console.log("🔥 Referral belongs to:", partner.fullName);
-
-        // Save partner name
-        localStorage.setItem("ref_by_name", partner.fullName);
-      } else {
-        console.log("⚠️ No partner found for referral:", refCode);
-      }
-
       // Always save referral code
       localStorage.setItem("pendingReferral", refCode);
 
-      console.log("📌 pendingReferral saved:", refCode);
+      try {
+        const usersRef = ref(db, "users");
+        const q = query(
+          usersRef,
+          orderByChild("referralCode"),
+          equalTo(refCode)
+        );
 
-      // Delay to ensure storage completes before redirect
-      setTimeout(() => navigate("/signup"), 300);
+        const snapshot = await get(q);
+
+        if (snapshot.exists()) {
+          const partner = Object.values(snapshot.val())[0] as {
+            fullName?: string;
+          };
+
+          if (partner?.fullName) {
+            localStorage.setItem("ref_by_name", partner.fullName);
+          }
+        }
+      } catch (err) {
+        console.error("Referral lookup failed", err);
+      }
+
+      // Small delay for smooth UX
+      setTimeout(() => {
+        navigate("/signup", { replace: true });
+      }, 500);
     };
 
     handleReferral();
   }, [refCode, navigate]);
 
-  return null;
+  // ✅ LOADING UI (NO MORE WHITE SCREEN)
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mb-4"></div>
+      <p className="text-sm text-gray-300">
+        Redirecting you to signup…
+      </p>
+    </div>
+  );
 }
