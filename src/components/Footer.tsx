@@ -19,7 +19,7 @@ const Footer = () => {
       { label: "Help Center", to: "/help" },
       { label: "Terms of Service", to: "/terms" },
       { label: "Privacy Policy", to: "/privacy" },
-      { label: "Admin Dashboard", to: "/adminDashboard" },
+      { label: "Admin Dashboard", to: "/admindashboard" },
     ],
   };
 
@@ -45,7 +45,7 @@ const Footer = () => {
                 </div>
               </div>
               <span className="font-display text-lg sm:text-xl font-bold">
-                Learn<span className="gradient-text">Sphere</span>
+                <span className="gradient-text">alife-stable-academy</span>
               </span>
             </NavLink>
             <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 max-w-sm">

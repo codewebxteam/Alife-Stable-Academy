@@ -26,8 +26,11 @@ import StudentsList from "./pages/StudentsList";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 import LandingPage from "./pages/LandingPage";
-
 import ReferralRedirect from "./pages/ReferralRedirect";
+
+// Admin
+import Partners from "./pages/admin/Partners";
+import Students from "./pages/admin/Students";
 
 const queryClient = new QueryClient();
 
@@ -43,23 +46,20 @@ const App = () => {
 
           <BrowserRouter>
             <Routes>
-
-              {/* ⭐ Referral Route */}
+              {/* Referral */}
               <Route path="/r/:refCode" element={<ReferralRedirect />} />
 
-              {/* ⭐ Signup outside layout */}
+              {/* Auth */}
               <Route path="/signup" element={<Signup />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
-              {/* ⭐ Main Layout */}
+              {/* Layout */}
               <Route element={<Layout />}>
-
-                {/* ⭐ Root route respects referral */}
                 <Route
                   path="/"
                   element={hasReferral ? <LandingPage /> : <Home />}
                 />
-
-                {/* ⭐ /home also respects referral */}
                 <Route
                   path="/home"
                   element={hasReferral ? <LandingPage /> : <Home />}
@@ -67,8 +67,6 @@ const App = () => {
 
                 <Route path="/courses" element={<Courses />} />
                 <Route path="/course/:id" element={<CourseDetail />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
 
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard/courses" element={<CoursesPage />} />
@@ -86,15 +84,14 @@ const App = () => {
                 <Route path="/students-list" element={<StudentsList />} />
 
                 <Route path="/admindashboard" element={<AdminDashboard />} />
-
+                <Route path="/admin/partners" element={<Partners />} />
+                <Route path="/admin/students" element={<Students />} />
               </Route>
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
-
             </Routes>
           </BrowserRouter>
-
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
