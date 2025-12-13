@@ -3,7 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Menu, X, GraduationCap, User, LogOut } from "lucide-react";
+import { Menu, X, GraduationCap, LogOut } from "lucide-react";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -13,30 +13,47 @@ const Navbar = () => {
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // ⭐ FIX: Referral branding stored in state so UI updates live
+  const [refName, setRefName] = useState<string | null>(null);
+
+  // Load referral branding on Navbar mount
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
+    const stored = localStorage.getItem("ref_by_name");
+    setRefName(stored || null);
+  }, []);
+
+  // Scroll effect
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     };
+
     if (showDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showDropdown]);
 
+  // ⭐ LOGOUT — Remove referral branding & refresh UI
   const handleLogout = async () => {
     await logout();
-    setShowDropdown(false);
+
+    localStorage.removeItem("ref_by_name");
+    localStorage.removeItem("pendingReferral");
+
+    setRefName(null); // UI resets immediately
+
     navigate("/");
+    window.location.reload(); // Hard refresh ensures clean branding
   };
 
   const navLinks = [
@@ -55,17 +72,19 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
+
+          {/* ⭐ LOGO — Brand Swaps Automatically */}
           <NavLink to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-orange flex items-center justify-center group-hover:scale-110 transition-transform">
               <GraduationCap className="h-6 w-6 text-white" />
             </div>
+
             <span className="font-display text-2xl font-black text-[#0B1A2A]">
-              alife-stable-academy
+              {refName ? `${refName} Academy` : "alife-stable-academy"}
             </span>
           </NavLink>
 
-          {/* Desktop Navigation */}
+          {/* DESKTOP NAV LINKS */}
           <div className="hidden xl:flex items-center gap-6">
             {navLinks.map((link) => (
               <NavLink
@@ -79,44 +98,34 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* CTA Buttons / User Profile */}
+          {/* RIGHT SIDE USER / LOGIN */}
           <div className="hidden xl:flex items-center gap-4">
             {isAuthenticated ? (
-              user?.role === 'partner' ? (
-                <NavLink to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                >
                   <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
-                    {user?.email?.[0].toUpperCase() || <User className="h-5 w-5" />}
+                    {user?.email?.[0].toUpperCase()}
                   </div>
                   <span className="font-semibold text-[#0B1A2A]">
-                    {user?.email?.split('@')[0] || 'User'}
+                    {user?.email?.split("@")[0]}
                   </span>
-                </NavLink>
-              ) : (
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => setShowDropdown(!showDropdown)}
-                    className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
-                      {user?.email?.[0].toUpperCase() || <User className="h-5 w-5" />}
-                    </div>
-                    <span className="font-semibold text-[#0B1A2A]">
-                      {user?.email?.split('@')[0] || 'User'}
-                    </span>
-                  </button>
-                  {showDropdown && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors text-red-600"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span className="text-sm">Logout</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
+                </button>
+
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors text-red-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="text-sm">Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <NavLink to="/login">
@@ -133,7 +142,7 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* MOBILE MENU BUTTON */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="xl:hidden p-2 text-foreground hover:text-primary transition-colors"
@@ -143,10 +152,11 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* ⭐ MOBILE MENU */}
       {isMobileMenuOpen && (
         <div className="xl:hidden glass border-t border-border">
           <div className="container mx-auto px-4 py-6 space-y-4">
+
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
@@ -158,6 +168,7 @@ const Navbar = () => {
                 {link.label}
               </NavLink>
             ))}
+
             <div className="pt-4 space-y-3">
               {isAuthenticated ? (
                 <NavLink to="/dashboard" className="block">
@@ -172,6 +183,7 @@ const Navbar = () => {
                       Log In
                     </Button>
                   </NavLink>
+
                   <NavLink to="/signup" className="block">
                     <Button className="w-full bg-gradient-orange text-white font-semibold rounded-full">
                       Get Started
@@ -180,6 +192,7 @@ const Navbar = () => {
                 </>
               )}
             </div>
+
           </div>
         </div>
       )}

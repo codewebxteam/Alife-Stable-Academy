@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Courses from "./pages/Courses";
@@ -24,47 +25,80 @@ import Resell from "./pages/Resell";
 import StudentsList from "./pages/StudentsList";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
+import LandingPage from "./pages/LandingPage";
+
+import ReferralRedirect from "./pages/ReferralRedirect";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Layout>
+const App = () => {
+  const hasReferral = Boolean(localStorage.getItem("ref_by_name"));
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+
+          <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/courses" element={<Courses />} />
-              <Route path="/course/:id" element={<CourseDetail />} />
-              <Route path="/login" element={<Login />} />
+
+              {/* ⭐ Referral Route */}
+              <Route path="/r/:refCode" element={<ReferralRedirect />} />
+
+              {/* ⭐ Signup outside layout */}
               <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/courses" element={<CoursesPage />} />
-              <Route path="/dashboard/purchases" element={<PurchasesPage />} />
-              <Route path="/social/new" element={<NewPage />} />
-              <Route path="/social/newsfeed" element={<NewsfeedPage />} />
-              <Route path="/social/chat" element={<ChatPage />} />
-              <Route path="/books" element={<Books />} />
-              <Route path="/study-material" element={<StudyMaterial />} />
-              <Route path="/blogs" element={<Blogs />} />
-              <Route path="/resell" element={<Resell />} />
- main
-              <Route path="/students-list" element={<StudentsList />} />
-=======
-              <Route path="/admindashboard" element={<AdminDashboard />} />
- main
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+              {/* ⭐ Main Layout */}
+              <Route element={<Layout />}>
+
+                {/* ⭐ Root route respects referral */}
+                <Route
+                  path="/"
+                  element={hasReferral ? <LandingPage /> : <Home />}
+                />
+
+                {/* ⭐ /home also respects referral */}
+                <Route
+                  path="/home"
+                  element={hasReferral ? <LandingPage /> : <Home />}
+                />
+
+                <Route path="/courses" element={<Courses />} />
+                <Route path="/course/:id" element={<CourseDetail />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard/courses" element={<CoursesPage />} />
+                <Route path="/dashboard/purchases" element={<PurchasesPage />} />
+
+                <Route path="/social/new" element={<NewPage />} />
+                <Route path="/social/newsfeed" element={<NewsfeedPage />} />
+                <Route path="/social/chat" element={<ChatPage />} />
+
+                <Route path="/books" element={<Books />} />
+                <Route path="/study-material" element={<StudyMaterial />} />
+                <Route path="/blogs" element={<Blogs />} />
+
+                <Route path="/resell" element={<Resell />} />
+                <Route path="/students-list" element={<StudentsList />} />
+
+                <Route path="/admindashboard" element={<AdminDashboard />} />
+
+              </Route>
+
+              {/* 404 */}
               <Route path="*" element={<NotFound />} />
+
             </Routes>
-          </Layout>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+          </BrowserRouter>
+
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
