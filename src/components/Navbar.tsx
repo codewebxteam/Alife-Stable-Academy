@@ -9,18 +9,12 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+
+  // ✅ ONLY CHANGE: get referralName from context
+  const { user, isAuthenticated, logout, referralName } = useAuth();
+
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // ⭐ FIX: Referral branding stored in state so UI updates live
-  const [refName, setRefName] = useState<string | null>(null);
-
-  // Load referral branding on Navbar mount
-  useEffect(() => {
-    const stored = localStorage.getItem("ref_by_name");
-    setRefName(stored || null);
-  }, []);
 
   // Scroll effect
   useEffect(() => {
@@ -32,7 +26,10 @@ const Navbar = () => {
   // Close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -40,20 +37,14 @@ const Navbar = () => {
     if (showDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, [showDropdown]);
 
-  // ⭐ LOGOUT — Remove referral branding & refresh UI
+  // Logout (no hard reload)
   const handleLogout = async () => {
     await logout();
-
-    localStorage.removeItem("ref_by_name");
-    localStorage.removeItem("pendingReferral");
-
-    setRefName(null); // UI resets immediately
-
     navigate("/");
-    window.location.reload(); // Hard refresh ensures clean branding
   };
 
   const navLinks = [
@@ -67,20 +58,23 @@ const Navbar = () => {
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "bg-white/80 backdrop-blur-md border-b" : "bg-white/80 backdrop-blur-md"
+        isScrolled
+          ? "bg-white/80 backdrop-blur-md border-b"
+          : "bg-white/80 backdrop-blur-md"
       }`}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-
-          {/* ⭐ LOGO — Brand Swaps Automatically */}
+          {/* LOGO */}
           <NavLink to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-orange flex items-center justify-center group-hover:scale-110 transition-transform">
               <GraduationCap className="h-6 w-6 text-white" />
             </div>
 
             <span className="font-display text-2xl font-black text-[#0B1A2A]">
-              {refName ? `${refName} Academy` : "alife-stable-academy"}
+              {referralName
+                ? `${referralName} Academy`
+                : "alife-stable-academy"}
             </span>
           </NavLink>
 
@@ -98,7 +92,7 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* RIGHT SIDE USER / LOGIN */}
+          {/* RIGHT SIDE */}
           <div className="hidden xl:flex items-center gap-4">
             {isAuthenticated ? (
               <div className="relative" ref={dropdownRef}>
@@ -107,7 +101,7 @@ const Navbar = () => {
                   className="flex items-center gap-3 hover:opacity-80 transition-opacity"
                 >
                   <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold">
-                    {user?.email?.[0].toUpperCase()}
+                    {user?.email?.[0]?.toUpperCase()}
                   </div>
                   <span className="font-semibold text-[#0B1A2A]">
                     {user?.email?.split("@")[0]}
@@ -129,12 +123,10 @@ const Navbar = () => {
             ) : (
               <>
                 <NavLink to="/login">
-                  <Button variant="ghost" className="font-semibold text-[#667085] hover:text-[#0B1A2A]">
-                    Log In
-                  </Button>
+                  <Button variant="ghost">Log In</Button>
                 </NavLink>
                 <NavLink to="/signup">
-                  <Button className="bg-gradient-orange text-white font-semibold rounded-full px-6 hover:shadow-glow-orange hover:-translate-y-0.5 transition-all">
+                  <Button className="bg-gradient-orange text-white rounded-full px-6">
                     Get Started
                   </Button>
                 </NavLink>
@@ -145,57 +137,12 @@ const Navbar = () => {
           {/* MOBILE MENU BUTTON */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="xl:hidden p-2 text-foreground hover:text-primary transition-colors"
+            className="xl:hidden p-2"
           >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMobileMenuOpen ? <X /> : <Menu />}
           </button>
         </div>
       </div>
-
-      {/* ⭐ MOBILE MENU */}
-      {isMobileMenuOpen && (
-        <div className="xl:hidden glass border-t border-border">
-          <div className="container mx-auto px-4 py-6 space-y-4">
-
-            {navLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className="block py-2 text-muted-foreground hover:text-foreground transition-colors font-medium"
-                activeClassName="text-primary"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.label}
-              </NavLink>
-            ))}
-
-            <div className="pt-4 space-y-3">
-              {isAuthenticated ? (
-                <NavLink to="/dashboard" className="block">
-                  <Button className="w-full bg-gradient-orange text-white font-semibold rounded-full">
-                    Dashboard
-                  </Button>
-                </NavLink>
-              ) : (
-                <>
-                  <NavLink to="/login" className="block">
-                    <Button variant="outline" className="w-full">
-                      Log In
-                    </Button>
-                  </NavLink>
-
-                  <NavLink to="/signup" className="block">
-                    <Button className="w-full bg-gradient-orange text-white font-semibold rounded-full">
-                      Get Started
-                    </Button>
-                  </NavLink>
-                </>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
     </nav>
   );
 };

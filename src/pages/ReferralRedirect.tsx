@@ -2,19 +2,22 @@ import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { ref, get, query, orderByChild, equalTo } from "firebase/database";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ReferralRedirect() {
   const { refCode } = useParams();
   const navigate = useNavigate();
+  const { setReferralName } = useAuth();
 
   useEffect(() => {
     if (!refCode) return;
 
     const handleReferral = async () => {
-      // Always save referral code
-      localStorage.setItem("pendingReferral", refCode);
-
       try {
+        // ✅ Always save referral code (for signup)
+        localStorage.setItem("pendingReferral", refCode);
+
+        // 🔎 Find partner by referralCode
         const usersRef = ref(db, "users");
         const q = query(
           usersRef,
@@ -30,29 +33,29 @@ export default function ReferralRedirect() {
           };
 
           if (partner?.fullName) {
-            localStorage.setItem("ref_by_name", partner.fullName);
+            // ⭐ IMPORTANT FIX
+            // Update BOTH context + localStorage (via context)
+            setReferralName(partner.fullName);
           }
         }
       } catch (err) {
-        console.error("Referral lookup failed", err);
+        console.error("Referral lookup failed:", err);
       }
 
-      // Small delay for smooth UX
+      // ⏭ Redirect to signup
       setTimeout(() => {
         navigate("/signup", { replace: true });
-      }, 500);
+      }, 400);
     };
 
     handleReferral();
-  }, [refCode, navigate]);
+  }, [refCode, navigate, setReferralName]);
 
-  // ✅ LOADING UI (NO MORE WHITE SCREEN)
+  // ✅ Proper loading screen (no white flash)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mb-4"></div>
-      <p className="text-sm text-gray-300">
-        Redirecting you to signup…
-      </p>
+      <p className="text-sm text-gray-300">Redirecting you to signup…</p>
     </div>
   );
 }
