@@ -1,9 +1,7 @@
-// 🔥 FUTURE-PROOF APP CONFIG FILE
+// src/config/appConfig.js
 
-// CURRENT (NO DOMAIN) → USE YOUR VERCEL URL
-export const ROOT_DOMAIN = "https://www.alifestableacademy.com/";
+// 🔹 Only change this when environment/domain changes
+export const APP_BASE_URL = "https://alife-stable-academy-beryl.vercel.app";
 
-// When you buy your domain, just replace this:
-// export const ROOT_DOMAIN = "alife-stable-academy.com";
-
-export const REFERRAL_BASE_URL = `https://${ROOT_DOMAIN}/r`;
+// 🔹 All app links derive from here
+export const REFERRAL_PATH = "/r";
