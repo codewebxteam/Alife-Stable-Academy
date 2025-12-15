@@ -20,6 +20,7 @@ const Footer = () => {
       { label: "Terms of Service", to: "/terms" },
       { label: "Privacy Policy", to: "/privacy" },
       { label: "Admin Dashboard", to: "/admindashboard" },
+      { label: "Partner Dashboard", to: "/partnerdashboard" },
     ],
   };
 
