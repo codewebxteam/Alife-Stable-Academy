@@ -20,6 +20,7 @@ import {
   Menu,
   GraduationCap,
   X,
+  DollarSign,
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -198,31 +199,21 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="py-2">
-                    {user?.role === 'partner' && (
-                      <button 
-                        onClick={() => { setShowDropdown(false); navigate('/resell'); }}
-                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
-                      >
-                        <ShoppingBag className="h-4 w-4" />
-                        <span className="text-sm">Resell</span>
-                      </button>
-                    )}
-                    {user?.role !== 'partner' && (
-                      <>
-                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                          <User className="h-4 w-4" />
-                          <span className="text-sm">My Profile</span>
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                          <ShoppingBag className="h-4 w-4" />
-                          <span className="text-sm">Purchase History</span>
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                          <Award className="h-4 w-4" />
-                          <span className="text-sm">My Certificates</span>
-                        </button>
-                      </>
-                    )}
+                    <button 
+                      onClick={() => navigate("/dashboard")}
+                      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span className="text-sm">My Dashboard</span>
+                    </button>
+                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                      <ShoppingBag className="h-4 w-4" />
+                      <span className="text-sm">Purchase History</span>
+                    </button>
+                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                      <Award className="h-4 w-4" />
+                      <span className="text-sm">My Certificates</span>
+                    </button>
                     <div className="border-t border-gray-100 my-2"></div>
                     <button
                       onClick={handleLogout}
@@ -260,11 +251,19 @@ const Dashboard = () => {
                 </div>
                 <div className="py-2">
                   <button 
-                    onClick={() => { setShowMobileUserMenu(false); navigate('/resell'); }}
+                    onClick={() => navigate("/dashboard")}
                     className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                   >
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span className="text-sm">My Dashboard</span>
+                  </button>
+                  <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
                     <ShoppingBag className="h-4 w-4" />
-                    <span className="text-sm">Resell</span>
+                    <span className="text-sm">Purchase History</span>
+                  </button>
+                  <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
+                    <Award className="h-4 w-4" />
+                    <span className="text-sm">My Certificates</span>
                   </button>
                   <div className="border-t border-gray-100 my-2"></div>
                   <button
@@ -344,11 +343,20 @@ const Dashboard = () => {
         <main className="flex-1 overflow-y-auto">
           {/* Dashboard Content */}
           <div className="p-4 sm:p-6 lg:p-8">
-          <div className="mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-              Welcome back, {user?.email?.split("@")[0] || "User"}!
-            </h1>
-            <p className="text-sm sm:text-base text-gray-600">Here's what's happening with your learning today</p>
+          <div className="mb-6 sm:mb-8 flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+                Welcome back, {user?.email?.split("@")[0] || "User"}!
+              </h1>
+              <p className="text-sm sm:text-base text-gray-600">Here's what's happening with your learning today</p>
+            </div>
+            <button 
+              onClick={() => navigate('/resell')}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <DollarSign className="h-4 w-4" />
+              <span className="font-medium text-sm">Resell</span>
+            </button>
           </div>
 
           {/* Overview Cards */}
@@ -363,6 +371,8 @@ const Dashboard = () => {
               </Card>
             ))}
           </div>
+
+
 
           {/* Grid Sections */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

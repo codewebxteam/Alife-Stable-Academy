@@ -130,9 +130,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                     </p>
                   </div>
                   <div className="py-2">
-                    <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
-                      <User className="h-4 w-4" />
-                      <span className="text-sm">My Profile</span>
+                    <button 
+                      onClick={() => navigate("/dashboard")}
+                      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span className="text-sm">My Dashboard</span>
                     </button>
                     <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700">
                       <ShoppingBag className="h-4 w-4" />
