@@ -31,6 +31,7 @@ import ReferralRedirect from "./pages/ReferralRedirect";
 // Admin
 import Partners from "./pages/admin/Partners";
 import Students from "./pages/admin/Students";
+import PartnerDashboard from "./pages/PartnerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const AppRoutes = () => {
           <Route path="/students-list" element={<StudentsList />} />
 
           <Route path="/admindashboard" element={<AdminDashboard />} />
+          <Route path="/partnerdashboard" element={<PartnerDashboard />} />
           <Route path="/admin/partners" element={<Partners />} />
           <Route path="/admin/students" element={<Students />} />
         </Route>
