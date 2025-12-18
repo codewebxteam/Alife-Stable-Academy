@@ -11,42 +11,27 @@ const Signup = () => {
     password: "",
     mobile: "",
     role: "student",
-    instituteName: "",
     referralCode: "",
   });
 
-  // 🔥 Load referral reliably (multi-check fix)
+
   useEffect(() => {
-    function loadReferral() {
-      const ref = localStorage.getItem("pendingReferral");
-
-      console.log("➡️ Checking referral:", ref);
-
-      if (ref && ref !== form.referralCode) {
-        setForm((prev) => ({
-          ...prev,
-          referralCode: ref,
-        }));
-      }
+    const ref = localStorage.getItem("pendingReferral");
+    if (ref) {
+      setForm((prev) => ({
+        ...prev,
+        referralCode: ref,
+      }));
     }
-
-    // Run immediately
-    loadReferral();
-
-    // Run again after redirect settles
-    setTimeout(loadReferral, 200);
-    setTimeout(loadReferral, 500);
   }, []);
 
-  // Submit handler
-  const handleSubmit = async (e: any) => {
+  // ✅ Proper typing
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    console.log("➡️ SUBMITTING with REFERRAL:", form.referralCode);
 
     await signup(form);
 
-    // Clear referral once used
+    // clear referral after use
     localStorage.removeItem("pendingReferral");
   };
 
@@ -56,46 +41,58 @@ const Signup = () => {
         type="text"
         placeholder="Full Name"
         value={form.fullName}
-        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, fullName: e.target.value }))
+        }
         className="w-full border p-2 rounded"
+        required
       />
 
       <input
         type="email"
         placeholder="Email"
         value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, email: e.target.value }))
+        }
         className="w-full border p-2 rounded"
+        required
       />
 
       <input
         type="text"
         placeholder="Mobile"
         value={form.mobile}
-        onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, mobile: e.target.value }))
+        }
         className="w-full border p-2 rounded"
+        required
       />
 
-      {/* ⭐ Auto-filled Referral Code */}
+      {/* ✅ Referral (readonly) */}
       <input
         type="text"
         placeholder="Referral Code"
-        value={form.referralCode}
+        value={form.referralCode || ""}
         readOnly
-        className="w-full border p-2 rounded bg-gray-100 cursor-not-allowed"
+        className="w-full border p-2 rounded bg-gray-100"
       />
 
       <input
         type="password"
         placeholder="Password"
         value={form.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, password: e.target.value }))
+        }
         className="w-full border p-2 rounded"
+        required
       />
 
       <button
         type="submit"
-        className="w-full bg-orange-600 text-white py-2 rounded mt-2"
+        className="w-full bg-orange-600 text-white py-2 rounded"
       >
         Signup
       </button>
