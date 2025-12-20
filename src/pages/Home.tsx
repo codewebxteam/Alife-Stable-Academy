@@ -187,7 +187,7 @@ const Home = () => {
                         ? 'bg-gradient-orange text-white hover:shadow-glow-orange hover:-translate-y-1' 
                         : 'bg-white/10 text-white hover:bg-white/20'
                     }`}
-                    onClick={() => handleAuthAction()}
+                    onClick={() => window.location.href = '/pricing'}
                   >
                     Get Started
                     <ArrowRight className="ml-2 h-4 w-4" />

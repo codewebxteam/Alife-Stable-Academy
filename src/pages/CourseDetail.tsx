@@ -7,6 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { NavLink } from "@/components/NavLink";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
+import { useAuth } from "@/contexts/AuthContext";
+import { ref, push } from "firebase/database";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 import {
   Star,
   Users,
@@ -26,6 +30,8 @@ const CourseDetail = () => {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState("overview");
   const { handleAuthAction } = useAuthRedirect();
+  const { user, isAuthenticated } = useAuth();
+  const [purchasing, setPurchasing] = useState(false);
 
   // Mock course data
   const course = {
@@ -152,6 +158,48 @@ const CourseDetail = () => {
     ],
   };
 
+  const handlePurchase = async () => {
+    if (!isAuthenticated) {
+      handleAuthAction();
+      return;
+    }
+
+    setPurchasing(true);
+    try {
+      const purchaseDate = Date.now();
+      const planDays = 365;
+      const expiryDate = purchaseDate + (planDays * 24 * 60 * 60 * 1000);
+      const amount = 2999;
+      const commission = amount * 0.2;
+
+      let partnerId = null;
+      if (user.referralCode) {
+        partnerId = user.referralCode.replace('.alife-stable-academy.com', '');
+      }
+
+      const saleData = {
+        studentName: user.fullName,
+        studentEmail: user.email,
+        courseName: course.title,
+        amount,
+        purchaseDate,
+        expiryDate,
+        planDays,
+        commission,
+        status: 'pending',
+        partnerId
+      };
+
+      await push(ref(db, 'sales'), saleData);
+      toast.success('Course purchased successfully!');
+    } catch (error) {
+      console.error('Purchase error:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen pt-20">
       {/* Hero Section */}
@@ -247,9 +295,10 @@ const CourseDetail = () => {
                   <div className="space-y-3">
                     <Button 
                       className="w-full h-12 bg-gradient-orange border-0 text-white font-semibold text-lg shadow-glow-orange hover:shadow-glow-orange hover:scale-105 transition-all"
-                      onClick={() => handleAuthAction()}
+                      onClick={handlePurchase}
+                      disabled={purchasing}
                     >
-                      Enroll Now
+                      {purchasing ? 'Processing...' : 'Enroll Now'}
                     </Button>
                     <Button variant="outline" className="w-full h-12 glass">
                       Add to Wishlist

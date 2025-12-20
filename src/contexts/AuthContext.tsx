@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { ref, set, get } from "firebase/database";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, firestore } from "@/lib/firebase";
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 
 /* ================= TYPES ================= */
 
@@ -20,6 +21,7 @@ export interface User {
   mobile: string;
   instituteName?: string;
   referralCode?: string;
+  plan?: string;
 }
 
 /* ✅ IMPORTANT: DIRECT EXPORT (THIS FIXES SignupData ERROR) */
@@ -31,6 +33,7 @@ export interface SignupData {
   mobile: string;
   instituteName?: string;
   referralCode?: string;
+  plan?: string;
 }
 
 interface AuthContextType {
@@ -60,6 +63,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isSigningUp, setIsSigningUp] = useState(false);
 
   // ✅ GLOBAL + REACTIVE referral branding
   const [referralName, setReferralNameState] = useState<string | null>(
@@ -78,49 +82,116 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   /* 🔁 AUTH STATE LISTENER */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (isSigningUp) return;
+      
       if (!firebaseUser) {
         setUser(null);
         return;
       }
 
-      const snap = await get(ref(db, `users/${firebaseUser.uid}`));
-      setUser(snap.exists() ? (snap.val() as User) : null);
+      try {
+        const snap = await get(ref(db, `users/${firebaseUser.uid}`));
+        if (snap.exists()) {
+          setUser(snap.val() as User);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
     });
 
     return unsubscribe;
-  }, []);
+  }, [isSigningUp]);
 
   /* 🟢 SIGNUP */
   const signup = async (data: SignupData) => {
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      data.email,
-      data.password
-    );
+    setIsSigningUp(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
 
-    const uid = cred.user.uid;
-    const autoReferral = Math.random().toString(36).substring(2, 8);
+      const uid = cred.user.uid;
+      const autoReferral = Math.random().toString(36).substring(2, 8);
 
-    const userData: User = {
-      id: uid,
-      email: data.email,
-      role: data.role,
-      fullName: data.fullName,
-      mobile: data.mobile,
+      const userData: User = {
+        id: uid,
+        email: data.email,
+        role: data.role,
+        fullName: data.fullName,
+        mobile: data.mobile,
 
-      ...(data.role === "student" &&
-        data.referralCode && {
-          referralCode: data.referralCode,
+        ...(data.role === "student" &&
+          data.referralCode && {
+            referralCode: data.referralCode,
+          }),
+
+        ...(data.role === "student" &&
+          data.plan && {
+            plan: data.plan,
+          }),
+
+        ...(data.role === "partner" && {
+          instituteName: data.instituteName,
+          referralCode: autoReferral,
         }),
+      };
 
-      ...(data.role === "partner" && {
-        instituteName: data.instituteName,
-        referralCode: autoReferral,
-      }),
-    };
+      await set(ref(db, `users/${uid}`), userData);
+      setUser(userData);
+      setIsSigningUp(false);
 
-    await set(ref(db, `users/${uid}`), userData);
-    setUser(userData);
+      // Run async operations in background
+      Promise.all([
+        // Track partner referral for students
+        (async () => {
+          if (data.role === "student" && data.referralCode) {
+            const referralCode = data.referralCode.replace('.alife-stable-academy.com', '');
+            const usersRef = ref(db, 'users');
+            const usersSnapshot = await get(usersRef);
+            
+            if (usersSnapshot.exists()) {
+              const users = usersSnapshot.val();
+              const partnerId = Object.keys(users).find(
+                key => users[key].referralCode === referralCode && users[key].role === 'partner'
+              );
+              
+              if (partnerId) {
+                await addDoc(collection(firestore, "sales"), {
+                  partnerId,
+                  customerName: data.fullName,
+                  customerEmail: data.email,
+                  courseName: "Platform Registration",
+                  amount: 0,
+                  purchaseDate: serverTimestamp(),
+                  expiryDate: null,
+                  planDays: 0,
+                  createdAt: serverTimestamp()
+                });
+              }
+            }
+          }
+        })(),
+        // Initialize partner data in Firestore
+        (async () => {
+          if (data.role === "partner") {
+            await addDoc(collection(firestore, "partners"), {
+              userId: uid,
+              instituteName: data.instituteName,
+              referralCode: autoReferral,
+              commissionRate: 10,
+              pendingCommission: 0,
+              clearedCommission: 0,
+              createdAt: serverTimestamp()
+            });
+          }
+        })()
+      ]).catch(err => console.error("Background operations error:", err));
+    } catch (error) {
+      setIsSigningUp(false);
+      throw error;
+    }
   };
 
   /* 🟢 LOGIN */

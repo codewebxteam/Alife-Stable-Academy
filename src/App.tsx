@@ -32,6 +32,7 @@ import ReferralRedirect from "./pages/ReferralRedirect";
 import Partners from "./pages/admin/Partners";
 import Students from "./pages/admin/Students";
 import PartnerDashboard from "./pages/PartnerDashboard";
+import PricingPage from "./pages/PricingPage";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const AppRoutes = () => {
 
           <Route path="/courses" element={<Courses />} />
           <Route path="/course/:id" element={<CourseDetail />} />
+          <Route path="/pricing" element={<PricingPage />} />
 
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/courses" element={<CoursesPage />} />

@@ -13,7 +13,15 @@ import {
   User,
   ArrowRight,
   X,
+  Crown,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 const Signup = () => {
@@ -26,6 +34,7 @@ const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [plan, setPlan] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { signup } = useAuth();
@@ -33,6 +42,12 @@ const Signup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (role === "partner" && !plan) {
+      toast.error("Please select a plan");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -43,6 +58,7 @@ const Signup = () => {
         fullName,
         mobile,
         ...(role === "partner" && { instituteName }),
+        ...(role === "partner" && plan && { plan }),
         ...(role === "student" &&
           referralCode && {
             referralCode: referralCode.toLowerCase().includes(
@@ -172,6 +188,23 @@ const Signup = () => {
                 )}
               </button>
             </div>
+
+            {/* Plan Selection - Partner Only */}
+            {role === "partner" && (
+              <div className="relative">
+                <Crown className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
+                <Select value={plan} onValueChange={setPlan} required>
+                  <SelectTrigger className="pl-12 h-14 bg-white/5 border border-white/20 text-white rounded-xl">
+                    <SelectValue placeholder="Select your plan *" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1B263B] border border-white/20 text-white">
+                    <SelectItem value="starter" className="hover:bg-white/10">Starter</SelectItem>
+                    <SelectItem value="supreme-master" className="hover:bg-white/10">Supreme Master</SelectItem>
+                    <SelectItem value="premium-elite" className="hover:bg-white/10">Premium Elite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Referral */}
             {role === "student" && (
