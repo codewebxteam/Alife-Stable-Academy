@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { ArrowRight, BookOpen, Users, Award, Check } from "lucide-react";
 import SyllabusSection from "@/components/SyllabusSection";
-import HeroSection from "@/components/herosection";
+import HeroSection from "@/components/Herosection";
 
 const Home = () => {
   const { handleAuthAction } = useAuthRedirect();
