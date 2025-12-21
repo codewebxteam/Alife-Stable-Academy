@@ -9,33 +9,16 @@ import courseWeb from "@/assets/course-web.jpg";
 import courseAI from "@/assets/course-ai.jpg";
 import courseBusiness from "@/assets/course-business.jpg";
 import courseDesign from "@/assets/course-design.jpg";
+import { db } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Courses = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [apiCourses, setApiCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await fetch('https://collection-for-coursera-courses.p.rapidapi.com/rapidapi/course/get_institution.php', {
-          method: 'GET',
-          headers: {
-            'x-rapidapi-key': 'f735c7dec3msh59187241bf1980ep1d9b2cjsn68b8408b287c',
-            'x-rapidapi-host': 'collection-for-coursera-courses.p.rapidapi.com'
-          }
-        });
-        const data = await response.json();
-        setApiCourses(data || []);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCourses();
-  }, []);
+  const [partnerPricing, setPartnerPricing] = useState<Record<number, number>>({});
+  const [isLoadingPricing, setIsLoadingPricing] = useState(true);
 
   const categories = [
     { id: "all", label: "All Courses" },
@@ -55,7 +38,7 @@ const Courses = () => {
       students: 12500,
       lessons: 156,
       duration: "48 hours",
-      price: "₹2,999",
+      price: 2999,
       level: "Beginner",
       image: courseWeb,
       description: "Master HTML, CSS, JavaScript, React, Node.js and become a full-stack developer",
@@ -69,7 +52,7 @@ const Courses = () => {
       students: 8400,
       lessons: 124,
       duration: "60 hours",
-      price: "₹4,999",
+      price: 4999,
       level: "Advanced",
       image: courseAI,
       description: "Deep dive into neural networks, TensorFlow, and cutting-edge AI applications",
@@ -83,7 +66,7 @@ const Courses = () => {
       students: 15200,
       lessons: 98,
       duration: "36 hours",
-      price: "₹2,499",
+      price: 2499,
       level: "Intermediate",
       image: courseBusiness,
       description: "Learn SEO, social media marketing, content strategy, and analytics",
@@ -97,7 +80,7 @@ const Courses = () => {
       students: 9800,
       lessons: 142,
       duration: "52 hours",
-      price: "₹3,499",
+      price: 3499,
       level: "Intermediate",
       image: courseDesign,
       description: "Master Figma, prototyping, user research, and design systems",
@@ -111,7 +94,7 @@ const Courses = () => {
       students: 11200,
       lessons: 108,
       duration: "42 hours",
-      price: "₹3,299",
+      price: 3299,
       level: "Beginner",
       image: courseAI,
       description: "Learn Pandas, NumPy, Matplotlib and data visualization techniques",
@@ -125,29 +108,46 @@ const Courses = () => {
       students: 7600,
       lessons: 134,
       duration: "56 hours",
-      price: "₹4,499",
+      price: 4499,
       level: "Advanced",
       image: courseWeb,
       description: "Build production-ready apps with React 18, Next.js 14, and TypeScript",
     },
   ];
 
-  const allCourses = [...courses, ...apiCourses.map((course: any, index: number) => ({
-    id: `api-${index}`,
-    title: course.name || course.title || 'Course',
-    instructor: course.instructor || course.partner || 'Coursera',
-    category: 'development',
-    rating: course.rating || 4.5,
-    students: course.enrolled || 1000,
-    lessons: course.modules || 50,
-    duration: course.duration || '30 hours',
-    price: '₹2,999',
-    level: course.level || 'Intermediate',
-    image: course.image || courseWeb,
-    description: course.description || 'Learn from industry experts',
-  }))];
+  useEffect(() => {
+    let referralCode = localStorage.getItem('pendingReferral') || localStorage.getItem('referralCode');
+    
+    if (user?.role === 'student' && user?.referralCode) {
+      referralCode = user.referralCode;
+    }
+    
+    if (!referralCode) {
+      setIsLoadingPricing(false);
+      return;
+    }
 
-  const filteredCourses = allCourses.filter((course) => {
+    const cleanCode = referralCode.replace('.alife-stable-academy.com', '');
+
+    const resellRef = ref(db, 'resellCourses');
+    const unsubscribe = onValue(resellRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const pricing: Record<number, number> = {};
+        Object.values(data).forEach((course: any) => {
+          if (course.referralCode === cleanCode) {
+            pricing[parseInt(course.courseId)] = course.sellingPrice;
+          }
+        });
+        setPartnerPricing(pricing);
+      }
+      setIsLoadingPricing(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const filteredCourses = courses.filter((course) => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.instructor.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || course.category === selectedCategory;
@@ -220,16 +220,8 @@ const Courses = () => {
           Showing {filteredCourses.length} {filteredCourses.length === 1 ? "course" : "courses"}
         </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading courses...</p>
-          </div>
-        )}
-
         {/* Course Grid */}
-        {!loading && (
+        {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {filteredCourses.map((course, index) => (
             <Card
@@ -293,7 +285,11 @@ const Courses = () => {
                 {/* Footer */}
                 <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-border">
                   <div className="font-display text-xl sm:text-2xl font-bold text-primary">
-                    {course.price}
+                    {isLoadingPricing ? (
+                      <span className="text-gray-400">...</span>
+                    ) : (
+                      `₹${(partnerPricing[course.id] || course.price).toLocaleString()}`
+                    )}
                   </div>
                   <NavLink to={`/course/${course.id}`}>
                     <Button size="sm" className="bg-gradient-orange border-0 text-white font-semibold hover:shadow-glow-orange hover:scale-105 transition-all text-xs sm:text-sm">
@@ -305,10 +301,10 @@ const Courses = () => {
             </Card>
           ))}
         </div>
-        )}
+        }
 
         {/* No Results */}
-        {!loading && filteredCourses.length === 0 && (
+        {filteredCourses.length === 0 && (
           <div className="text-center py-16 animate-fade-in">
             <div className="w-24 h-24 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
               <Search className="h-12 w-12 text-muted-foreground" />

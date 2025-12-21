@@ -4,7 +4,7 @@ import { NavLink } from "@/components/NavLink";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { ref, onValue, query, orderByChild, equalTo } from "firebase/database";
+import { ref, onValue, query, orderByChild, equalTo, remove, update } from "firebase/database";
 import { useGreeting } from "../hooks/useGreeting";
 import {
   LayoutDashboard,
@@ -29,6 +29,8 @@ import {
   TrendingDown,
   CheckCircle,
   AlertCircle,
+  Trash2,
+  Edit,
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -61,6 +63,10 @@ const Dashboard = () => {
   const [salesData, setSalesData] = useState<any[]>([]);
   const [studentsData, setStudentsData] = useState<any[]>([]);
   const [partnerData, setPartnerData] = useState<any>(null);
+  const [resellCoursesData, setResellCoursesData] = useState<any[]>([]);
+  const [editingCourse, setEditingCourse] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [studentUids, setStudentUids] = useState<{[email: string]: string}>({});
 
   const totalStudents = studentsData.length;
   const totalRevenue = salesData.reduce((sum, s) => sum + s.amount, 0);
@@ -124,6 +130,7 @@ const Dashboard = () => {
     const unsubscribeUsers = onValue(usersRef, (snapshot) => {
       if (snapshot.exists()) {
         const usersData = snapshot.val();
+        const uidMap: {[email: string]: string} = {};
         const students = Object.entries(usersData)
           .filter(([uid, u]: [string, any]) => 
             u.role === 'student' && 
@@ -132,6 +139,7 @@ const Dashboard = () => {
           .map(([uid, student]: [string, any]) => {
             const purchases = student.purchases || {};
             const activePurchase = Object.values(purchases).find((p: any) => p.status === 'active');
+            uidMap[student.email] = uid;
             
             return {
               name: student.fullName,
@@ -144,8 +152,10 @@ const Dashboard = () => {
             };
           });
         setStudentsData(students);
+        setStudentUids(uidMap);
       } else {
         setStudentsData([]);
+        setStudentUids({});
       }
     });
 
@@ -154,8 +164,15 @@ const Dashboard = () => {
     const unsubscribeSales = onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+        const validEmails = new Set(Object.entries(usersData || {})
+          .filter(([uid, u]: [string, any]) => 
+            u.role === 'student' && 
+            (u.referralCode === cleanCode || u.referralCode === referralUrl)
+          )
+          .map(([uid, u]: [string, any]) => u.email));
+        
         const sales = Object.values(data)
-          .filter((sale: any) => sale.partnerId === cleanCode)
+          .filter((sale: any) => sale.partnerId === cleanCode && validEmails.has(sale.studentEmail))
           .map((sale: any) => ({
             customerName: sale.studentName,
             courseName: sale.courseName,
@@ -172,15 +189,75 @@ const Dashboard = () => {
       }
     });
 
+    // Fetch resell courses
+    const resellRef = ref(db, 'resellCourses');
+    const unsubscribeResell = onValue(resellRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const filtered = Object.entries(data)
+          .filter(([id, course]: [string, any]) => 
+            course.referralCode === cleanCode || course.partnerId === user.uid
+          )
+          .map(([id, course]: [string, any]) => ({ ...course, id }));
+        setResellCoursesData(filtered);
+      } else {
+        setResellCoursesData([]);
+      }
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribeSales();
+      unsubscribeResell();
     };
   }, [user?.referralCode]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/");
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm('Remove this course?')) return;
+    try {
+      await remove(ref(db, `resellCourses/${courseId}`));
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const handleEditPrice = (courseId: string, currentPrice: number) => {
+    setEditingCourse(courseId);
+    setEditPrice(currentPrice.toString());
+  };
+
+  const handleSavePrice = async (courseId: string, actualPrice: number) => {
+    const newPrice = parseInt(editPrice);
+    if (newPrice <= actualPrice) {
+      alert('Selling price must be greater than actual price');
+      return;
+    }
+    try {
+      await update(ref(db, `resellCourses/${courseId}`), {
+        sellingPrice: newPrice,
+        commission: newPrice - actualPrice
+      });
+      setEditingCourse(null);
+      setEditPrice("");
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const handleDeleteStudent = async (email: string) => {
+    if (!confirm(`Remove ${email}?`)) return;
+    const uid = studentUids[email];
+    if (!uid) return;
+    try {
+      await update(ref(db, `users/${uid}`), { referralCode: null });
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   const sidebarItems = [
@@ -490,18 +567,28 @@ const Dashboard = () => {
                         <th className="px-3 py-2">Student Name</th>
                         <th className="px-3 py-2">Email</th>
                         <th className="px-3 py-2">Mobile</th>
+                        <th className="px-3 py-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {studentsData.length > 0 ? studentsData.map((student, i) => (
-                        <tr key={i} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedStudent(student)}>
-                          <td className="px-3 py-3 font-medium text-gray-800">{student.name}</td>
-                          <td className="px-3 py-3 text-gray-600">{student.email}</td>
-                          <td className="px-3 py-3 text-gray-600">{student.mobile}</td>
+                        <tr key={i} className="border-b hover:bg-gray-50">
+                          <td className="px-3 py-3 font-medium text-gray-800 cursor-pointer" onClick={() => setSelectedStudent(student)}>{student.name}</td>
+                          <td className="px-3 py-3 text-gray-600 cursor-pointer" onClick={() => setSelectedStudent(student)}>{student.email}</td>
+                          <td className="px-3 py-3 text-gray-600 cursor-pointer" onClick={() => setSelectedStudent(student)}>{student.mobile}</td>
+                          <td className="px-3 py-3">
+                            <button
+                              onClick={() => handleDeleteStudent(student.email)}
+                              className="p-1 hover:bg-red-50 rounded transition-colors"
+                              title="Remove student"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                            </button>
+                          </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={3} className="px-3 py-8 text-center text-gray-500">
+                          <td colSpan={4} className="px-3 py-8 text-center text-gray-500">
                             No students have joined with your referral code yet
                           </td>
                         </tr>
@@ -649,30 +736,94 @@ const Dashboard = () => {
               </div>
 
               <Card className="p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Commission Breakdown</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Course Breakdown</h3>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-green-600 font-medium">Live</span>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full table-auto text-sm">
                     <thead>
                       <tr className="text-xs text-gray-500 text-left border-b">
                         <th className="px-3 py-2">Course</th>
-                        <th className="px-3 py-2">Sales</th>
+                        <th className="px-3 py-2">Actual Price</th>
+                        <th className="px-3 py-2">Selling Price</th>
                         <th className="px-3 py-2">Commission</th>
                         <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {earnings.courses.map((course, i) => (
-                        <tr key={i} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 font-medium text-gray-800">{course.name}</td>
-                          <td className="px-3 py-2 text-gray-600">{course.sales}</td>
-                          <td className="px-3 py-2 font-semibold">{formatCurrency(course.commission)}</td>
+                      {resellCoursesData.length > 0 ? resellCoursesData.map((course, i) => (
+                        <tr key={i} className="border-b last:border-b-0 hover:bg-gray-50">
+                          <td className="px-3 py-2 font-medium text-gray-800">{course.courseName}</td>
+                          <td className="px-3 py-2 text-gray-600">{formatCurrency(course.actualPrice)}</td>
                           <td className="px-3 py-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.status === 'cleared' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                              {course.status === 'cleared' ? 'Cleared' : 'Pending'}
+                            {editingCourse === course.id ? (
+                              <input
+                                type="number"
+                                value={editPrice}
+                                onChange={(e) => setEditPrice(e.target.value)}
+                                className="w-24 border border-blue-300 rounded px-2 py-1 text-sm"
+                                min={course.actualPrice}
+                              />
+                            ) : (
+                              <span className="font-semibold text-blue-600">{formatCurrency(course.sellingPrice)}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-green-600">{formatCurrency(course.commission)}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                              {course.status === 'paid' ? 'Paid' : 'Unpaid'}
                             </span>
                           </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              {editingCourse === course.id ? (
+                                <>
+                                  <button
+                                    onClick={() => handleSavePrice(course.id, course.actualPrice)}
+                                    className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingCourse(null); setEditPrice(""); }}
+                                    className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleEditPrice(course.id, course.sellingPrice)}
+                                    className="p-1 hover:bg-blue-50 rounded transition-colors"
+                                    title="Edit price"
+                                  >
+                                    <Edit className="h-4 w-4 text-blue-500 hover:text-blue-700" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteCourse(course.id)}
+                                    className="p-1 hover:bg-red-50 rounded transition-colors"
+                                    title="Remove course"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
                         </tr>
-                      ))}
+                      )) : (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
+                            No resell courses added yet. Click "Resell" button to add courses.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

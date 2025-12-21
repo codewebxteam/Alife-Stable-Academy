@@ -16,6 +16,7 @@ export default function ReferralRedirect() {
       try {
         // ✅ Always save referral code (for signup)
         localStorage.setItem("pendingReferral", refCode);
+        localStorage.setItem("referralCode", refCode);
 
         // 🔎 Find partner by referralCode
         const usersRef = ref(db, "users");

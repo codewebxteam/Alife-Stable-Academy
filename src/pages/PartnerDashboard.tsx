@@ -46,6 +46,7 @@ export default function PartnerDashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [salesData, setSalesData] = useState([]);
   const [studentsData, setStudentsData] = useState([]);
+  const [resellCoursesData, setResellCoursesData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -104,9 +105,24 @@ export default function PartnerDashboard() {
       setLoading(false);
     });
 
+    // Fetch resell courses data
+    const resellRef = ref(db, 'resellCourses');
+    const unsubscribeResell = onValue(resellRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const filtered = Object.values(data).filter((course: any) => 
+          course.referralCode === cleanCode || course.partnerId === user.uid
+        );
+        setResellCoursesData(filtered);
+      } else {
+        setResellCoursesData([]);
+      }
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribeSales();
+      unsubscribeResell();
     };
   }, [user]);
 
@@ -375,33 +391,41 @@ export default function PartnerDashboard() {
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Commission Breakdown</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Commission Breakdown</h3>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-600 font-medium">Live</span>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full table-auto text-sm">
                   <thead>
                     <tr className="text-xs text-gray-500 text-left border-b">
                       <th className="px-3 py-2">Course</th>
-                      <th className="px-3 py-2">Sales</th>
+                      <th className="px-3 py-2">Actual Price</th>
+                      <th className="px-3 py-2">Selling Price</th>
                       <th className="px-3 py-2">Commission</th>
                       <th className="px-3 py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {earnings.courses.length > 0 ? earnings.courses.map((course, i) => (
+                    {resellCoursesData.length > 0 ? resellCoursesData.map((course, i) => (
                       <tr key={i} className="border-b last:border-b-0">
-                        <td className="px-3 py-2 font-medium text-gray-800">{course.name}</td>
-                        <td className="px-3 py-2 text-gray-600">{course.sales}</td>
-                        <td className="px-3 py-2 font-semibold">{formatCurrency(course.commission)}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">{course.courseName}</td>
+                        <td className="px-3 py-2 text-gray-600">{formatCurrency(course.actualPrice)}</td>
+                        <td className="px-3 py-2 font-semibold text-blue-600">{formatCurrency(course.sellingPrice)}</td>
+                        <td className="px-3 py-2 font-semibold text-green-600">{formatCurrency(course.commission)}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.status === 'cleared' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                            {course.status === 'cleared' ? 'Cleared' : 'Pending'}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {course.status === 'paid' ? 'Paid' : 'Unpaid'}
                           </span>
                         </td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={4} className="px-3 py-8 text-center text-gray-500">
-                          No commission data available yet
+                        <td colSpan={5} className="px-3 py-8 text-center text-gray-500">
+                          No resell courses added yet. Go to Resell page to add courses.
                         </td>
                       </tr>
                     )}

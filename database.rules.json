@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "resellCourses": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null"
+      }
+    },
+    "sales": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
