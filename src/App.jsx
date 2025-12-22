@@ -1,0 +1,241 @@
+import React, { useEffect, useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import { useAgency } from "./context/AgencyContext";
+import { db } from "./firebase/config";
+
+// --- Components ---
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+
+// --- Public Pages ---
+import Home from "./pages/Home";
+import Courses from "./pages/Courses";
+import CourseDetails from "./pages/CourseDetails";
+import EBooks from "./pages/EBooks";
+import EBookDetails from "./pages/EBookDetails";
+import AboutUs from "./pages/AboutUs";
+import ContactUs from "./pages/ContactUs";
+
+// --- Dashboard (Student) ---
+import DashboardLayout from "./components/dashboard/DashboardLayout";
+import StudentDashboard from "./pages/dashboard/StudentDashboard";
+import MyCourses from "./pages/dashboard/MyCourses";
+import EBookLibrary from "./pages/dashboard/EBookLibrary";
+import ProgressReport from "./pages/dashboard/ProgressReport";
+import ExploreCourses from "./pages/dashboard/ExploreCourses";
+import Certificates from "./pages/dashboard/Certificates";
+import Profile from "./pages/dashboard/Profile";
+
+// --- [NEW] Partner Pages ---
+import PartnerLayout from "./pages/partner/PartnerLayout";
+import PartnerDashboard from "./pages/partner/PartnerDashboard";
+import AgencySetup from "./pages/partner/AgencySetup";
+
+// --- Scroll To Top Helper ---
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
+// --- [UPDATED] Protected Route Wrapper (For Students) ---
+const ProtectedRoute = ({ children }) => {
+  const { currentUser, userData, loading } = useAuth();
+
+  if (loading) return null;
+  if (!currentUser) return <Navigate to="/" replace />;
+
+  // Security: Agar Partner login hai toh use Student dashboard se bahar nikalo
+  if (userData && userData.role === "partner") {
+    return <Navigate to="/partner-dashboard" replace />;
+  }
+
+  return children;
+};
+
+// --- [UPDATED] Partner Route Wrapper (Strictly for Agency Owners) ---
+const PartnerRoute = ({ children }) => {
+  const { currentUser, userData, loading } = useAuth();
+
+  if (loading) return null;
+  if (!currentUser) return <Navigate to="/" replace />;
+
+  // Security: Sirf 'partner' role waale hi ye routes dekh sakte hain
+  if (userData && userData.role !== "partner") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+const App = () => {
+  const { loading: agencyLoading } = useAgency();
+  const { currentUser, userData } = useAuth();
+
+  if (agencyLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-900"></div>
+          <p className="text-slate-500 font-bold animate-pulse">
+            Initializing Academy...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Router>
+      <ScrollToTop />
+
+      <Routes>
+        {/* PUBLIC ROUTES */}
+        <Route
+          path="/"
+          element={
+            <>
+              <Navbar />
+              <Home />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/courses"
+          element={
+            <>
+              <Navbar />
+              <Courses />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/courses/:id"
+          element={
+            <>
+              <Navbar />
+              <CourseDetails />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/ebooks"
+          element={
+            <>
+              <Navbar />
+              <EBooks />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/ebooks/:id"
+          element={
+            <>
+              <Navbar />
+              <EBookDetails />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <>
+              <Navbar />
+              <AboutUs />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <>
+              <Navbar />
+              <ContactUs />
+              <Footer />
+            </>
+          }
+        />
+
+        {/* AGENCY SETUP ROUTE */}
+        <Route
+          path="/agency-setup"
+          element={
+            <PartnerRoute>
+              <Navbar />
+              <AgencySetup />
+              <Footer />
+            </PartnerRoute>
+          }
+        />
+
+        {/* PARTNER DASHBOARD ROUTES - Restricted to 'partner' role */}
+        <Route
+          path="/partner-dashboard"
+          element={
+            <PartnerRoute>
+              <PartnerLayout />
+            </PartnerRoute>
+          }
+        >
+          <Route index element={<PartnerDashboard />} />
+          <Route
+            path="students"
+            element={
+              <div className="p-10 text-center font-bold text-slate-400">
+                Student Management
+              </div>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <div className="p-10 text-center font-bold text-slate-400">
+                Reports
+              </div>
+            }
+          />
+          {/* [NEW] Partner specific profile route */}
+          <Route path="profile" element={<Profile />} />
+        </Route>
+
+        {/* STUDENT DASHBOARD ROUTES - Restricted to 'student' role */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<StudentDashboard />} />
+          <Route path="my-courses" element={<MyCourses />} />
+          <Route path="ebooks" element={<EBookLibrary />} />
+          <Route path="progress" element={<ProgressReport />} />
+          <Route path="explore" element={<ExploreCourses />} />
+          <Route path="certificates" element={<Certificates />} />
+          <Route path="profile" element={<Profile />} />
+        </Route>
+
+        {/* 404 Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
