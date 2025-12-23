@@ -43,6 +43,16 @@ import CouponIntelligence from "./pages/partner/CouponIntelligence";
 import SalesIntelligence from "./pages/partner/SalesIntelligence";
 import StudentIntelligence from "./pages/partner/StudentIntelligence";
 
+// --- [NEW] Admin Pages ---
+import AdminLayout from "./pages/Admin/AdminLayout";
+import IntelligenceHub from "./components/Admin/IntelligenceHub";
+import SalesManager from "./components/Admin/SalesManager";
+import PaymentManager from "./components/Admin/PaymentManager";
+import CourseManager from "./components/Admin/CourseManager";
+import EBookManager from "./components/Admin/EBookManager";
+import AdminSettings from "./components/Admin/AdminSettings";
+
+
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -201,6 +211,16 @@ const AppContent = () => {
           <Route path="sales" element={<SalesIntelligence />} />
           <Route path="settings" element={<AgencySetup />} />
           <Route path="profile" element={<Profile />} />
+        </Route>
+
+        {/* --- [NEW] ADMIN DASHBOARD ROUTES (SIDEBAR SUPPORT) --- */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<IntelligenceHub />} />
+          <Route path="sales" element={<SalesManager />} />
+          <Route path="payments" element={<PaymentManager />} />
+          <Route path="courses" element={<CourseManager />} />
+          <Route path="ebooks" element={<EBookManager />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* STUDENT DASHBOARD ROUTES */}

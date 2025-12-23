@@ -1,4 +1,4 @@
-import React from "react";
+ import React from "react";
 import { motion } from "framer-motion";
 import {
   Twitter,
@@ -10,6 +10,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  ShieldCheck, // Admin icon ke liye
 } from "lucide-react";
 
 const footerLinks = {
@@ -36,6 +37,8 @@ const footerLinks = {
     { name: "Terms of Use", href: "/terms" },
     { name: "Privacy Policy", href: "/privacy" },
     { name: "Refund Policy", href: "/refund" },
+    // ✨ NEW LINK: Admin Dashboard Navigation
+    { name: "Admin Console", href: "/admin", isAdmin: true },
   ],
 };
 
@@ -149,12 +152,13 @@ const Footer = () => {
                         }
                       }}
                       className={`group flex items-center gap-2 transition-colors text-sm font-medium ${
-                        link.isPartner
+                        link.isPartner || link.isAdmin
                           ? "text-[#5edff4] hover:text-white font-bold"
                           : "text-slate-400 hover:text-[#5edff4]"
                       }`}
                     >
-                      <span className="relative">
+                      <span className="relative flex items-center gap-1.5">
+                        {link.isAdmin && <ShieldCheck className="size-3.5" />}
                         {link.name}
                         <span className="absolute -bottom-1 left-0 w-0 h-px bg-[#5edff4] transition-all group-hover:w-full"></span>
                       </span>
