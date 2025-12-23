@@ -7,7 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { useAgency } from "./context/AgencyContext";
+import { useAgency, AgencyProvider } from "./context/AgencyContext"; // ✨ Added AgencyProvider
 import { db } from "./firebase/config";
 
 // --- Components ---
@@ -54,7 +54,6 @@ const ProtectedRoute = ({ children }) => {
   if (loading) return null;
   if (!currentUser) return <Navigate to="/" replace />;
 
-  // Security: Agar Partner login hai toh use Student dashboard se bahar nikalo
   if (userData && userData.role === "partner") {
     return <Navigate to="/partner-dashboard" replace />;
   }
@@ -69,7 +68,6 @@ const PartnerRoute = ({ children }) => {
   if (loading) return null;
   if (!currentUser) return <Navigate to="/" replace />;
 
-  // Security: Sirf 'partner' role waale hi ye routes dekh sakte hain
   if (userData && userData.role !== "partner") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -77,17 +75,20 @@ const PartnerRoute = ({ children }) => {
   return children;
 };
 
-const App = () => {
-  const { loading: agencyLoading } = useAgency();
+// --- Sub-Component to handle Agency Loading UI ---
+const AppContent = () => {
+  const { loading: agencyLoading, isAgencyMode, agencyData } = useAgency();
   const { currentUser, userData } = useAuth();
 
   if (agencyLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-white">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-900"></div>
-          <p className="text-slate-500 font-bold animate-pulse">
-            Initializing Academy...
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5edff4]"></div>
+          <p className="text-slate-400 font-bold animate-pulse">
+            {isAgencyMode
+              ? `Loading ${agencyData?.agencyName}...`
+              : "Initializing Academy..."}
           </p>
         </div>
       </div>
@@ -95,9 +96,8 @@ const App = () => {
   }
 
   return (
-    <Router>
+    <>
       <ScrollToTop />
-
       <Routes>
         {/* PUBLIC ROUTES */}
         <Route
@@ -183,7 +183,7 @@ const App = () => {
           }
         />
 
-        {/* PARTNER DASHBOARD ROUTES - Restricted to 'partner' role */}
+        {/* PARTNER DASHBOARD ROUTES */}
         <Route
           path="/partner-dashboard"
           element={
@@ -209,11 +209,10 @@ const App = () => {
               </div>
             }
           />
-          {/* [NEW] Partner specific profile route */}
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* STUDENT DASHBOARD ROUTES - Restricted to 'student' role */}
+        {/* STUDENT DASHBOARD ROUTES */}
         <Route
           path="/dashboard"
           element={
@@ -231,9 +230,19 @@ const App = () => {
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* 404 Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </>
+  );
+};
+
+// --- MAIN APP WRAPPER ---
+const App = () => {
+  return (
+    <Router>
+      <AgencyProvider>
+        <AppContent />
+      </AgencyProvider>
     </Router>
   );
 };

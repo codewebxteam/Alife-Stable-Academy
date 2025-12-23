@@ -23,7 +23,8 @@ const footerLinks = {
     { name: "About Us", href: "/about" },
     { name: "Careers", href: "/careers" },
     { name: "Become a Mentor", href: "/teach" },
-    { name: "Partners", href: "/partners" },
+    // ✨ NEW LINK: isPartner flag ke sath
+    { name: "Register as a Partner", href: "#", isPartner: true },
   ],
   Resources: [
     { name: "Blog", href: "/blog" },
@@ -59,15 +60,12 @@ const Footer = () => {
   return (
     <footer className="relative bg-slate-950 pt-24 pb-12 overflow-hidden font-sans border-t border-slate-900">
       {/* --- Background Effects --- */}
-      {/* Glowing Blob (Top Left) */}
       <div className="absolute top-0 left-0 size-200 bg-[#5edff4]/5 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      {/* Glowing Blob (Bottom Right) */}
       <div className="absolute bottom-0 right-0 size-150 bg-[#0891b2]/5 rounded-full blur-[100px] pointer-events-none translate-x-1/3 translate-y-1/3" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         {/* --- Top Section: CTA & Newsletter --- */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 mb-20 pb-12 border-b border-slate-800/50">
-          {/* Brand & Tagline */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -75,7 +73,6 @@ const Footer = () => {
             transition={{ duration: 0.6 }}
           >
             <div className="flex items-center gap-2 mb-6">
-              {/* Logo Placeholder */}
               <div className="size-10 bg-linear-to-br from-[#5edff4] to-[#0891b2] rounded-xl flex items-center justify-center shadow-lg shadow-[#5edff4]/20">
                 <span className="text-slate-900 font-bold text-xl">A</span>
               </div>
@@ -103,14 +100,12 @@ const Footer = () => {
           >
             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-sm relative overflow-hidden group">
               <div className="absolute inset-0 bg-linear-to-r from-[#5edff4]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
               <h4 className="text-white font-bold text-xl mb-2 relative z-10">
                 Subscribe to our newsletter
               </h4>
               <p className="text-slate-400 mb-6 text-sm relative z-10">
                 Get the latest trends, tips, and free resources weekly.
               </p>
-
               <form className="relative flex items-center z-10">
                 <input
                   type="email"
@@ -144,7 +139,20 @@ const Footer = () => {
                   <li key={i}>
                     <a
                       href={link.href}
-                      className="group flex items-center gap-2 text-slate-400 hover:text-[#5edff4] transition-colors text-sm font-medium"
+                      onClick={(e) => {
+                        if (link.isPartner) {
+                          e.preventDefault();
+                          // Signal to Navbar to open Partner Modal
+                          window.dispatchEvent(
+                            new CustomEvent("openPartnerModal")
+                          );
+                        }
+                      }}
+                      className={`group flex items-center gap-2 transition-colors text-sm font-medium ${
+                        link.isPartner
+                          ? "text-[#5edff4] hover:text-white font-bold"
+                          : "text-slate-400 hover:text-[#5edff4]"
+                      }`}
                     >
                       <span className="relative">
                         {link.name}
@@ -169,7 +177,7 @@ const Footer = () => {
             <Heart className="size-4 text-red-500 fill-red-500 animate-pulse" />
             <span>by</span>
             <a
-              href="#"
+              href="https://www.codewebx.in/"
               className="text-[#5edff4] hover:text-[#cff9fe] transition-colors font-bold"
             >
               CodeWebX
@@ -185,7 +193,7 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* --- Giant Background Watermark (Animation) --- */}
+      {/* --- Giant Background Watermark --- */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/4 w-full text-center pointer-events-none select-none overflow-hidden">
         <motion.h1
           initial={{ opacity: 0 }}

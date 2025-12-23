@@ -7,7 +7,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, db } from "../firebase/config"; // [UPDATED] Import db for Firestore
-import { doc, setDoc, getDoc } from "firebase/firestore"; // [NEW] Firestore methods
+import { doc, setDoc, getDoc, serverTimestamp} from "firebase/firestore"; // [NEW] Firestore methods
 
 const AuthContext = createContext();
 
@@ -28,24 +28,105 @@ export const AuthProvider = ({ children }) => {
       password
     );
 
+    const uid = userCredential.user.uid;
+    
+
     // Update Firebase Auth Profile
     await updateProfile(userCredential.user, { displayName: name });
 
     // [NEW] Save User Profile with Role in Firestore
-    await setDoc(doc(db, "users", userCredential.user.uid), {
-      uid: userCredential.user.uid,
+    await setDoc(doc(db, "users", uid), {
+      uid,
       name: name,
       email: email,
       role: role, // 'student' or 'partner'
       createdAt: new Date().toISOString(),
     });
 
+     await setDoc(doc(db, "dashboard", uid), {
+      user: {
+        name,
+        email,
+        avatar: "",
+      },
+
+      stats: {
+        enrolledCourses: 0,
+        activeHours: 0,
+        certificates: 0,
+        ebooks: 0,
+      },
+
+      activity: [
+        { day: "M", hours: 0 },
+        { day: "T", hours: 0 },
+        { day: "W", hours: 0 },
+        { day: "T", hours: 0 },
+        { day: "F", hours: 0 },
+        { day: "S", hours: 0 },
+        { day: "S", hours: 0 },
+      ],
+
+      currentCourse: null,
+
+      gamification: {
+        level: 1,
+        xp: 0,
+        streak: 0,
+      },
+
+      meta: {
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastActive: serverTimestamp(),
+      },
+    });
+
+
     return userCredential;
   };
 
   // 2. Login Function
-  const login = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, password) => {
+    const res = await signInWithEmailAndPassword(auth, email, password);
+    const uid = res.user.uid;
+
+    // Safety: ensure dashboard exists
+    const dashboardRef = doc(db, "dashboard", uid);
+    const snap = await getDoc(dashboardRef);
+
+    if (!snap.exists()) {
+      await setDoc(dashboardRef, {
+        user: {
+          name: res.user.displayName || "Student",
+          email: res.user.email,
+          avatar: "",
+        },
+        stats: {
+          enrolledCourses: 0,
+          activeHours: 0,
+          certificates: 0,
+          ebooks: 0,
+        },
+        activity: [
+          { day: "M", hours: 0 },
+          { day: "T", hours: 0 },
+          { day: "W", hours: 0 },
+          { day: "T", hours: 0 },
+          { day: "F", hours: 0 },
+          { day: "S", hours: 0 },
+          { day: "S", hours: 0 },
+        ],
+        currentCourse: null,
+        gamification: { level: 1, xp: 0, streak: 0 },
+        meta: {
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+      });
+    }
+
+    return res;
   };
 
   // 3. Logout Function
