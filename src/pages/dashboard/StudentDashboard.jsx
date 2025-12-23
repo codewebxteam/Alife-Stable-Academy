@@ -35,6 +35,7 @@ const StudentDashboard = () => {
   const [activityData, setActivityData] = useState([]);
   const [stats, setStats] = useState([]);
   const [continueLearning, setContinueLearning] = useState(null);
+  const [activeHours, setActiveHours] = useState(0);
   const [gamification, setGamification] = useState({
     level: 1,
     xp: 0,
@@ -106,6 +107,7 @@ const StudentDashboard = () => {
       setActivityData(data.activity || []);
       setContinueLearning(data.currentCourse);
       setGamification(data.gamification);
+      setActiveHours(data.stats.activeHours || 0);
 
       setLoading(false);
     });
@@ -122,6 +124,23 @@ const StudentDashboard = () => {
       </div>
     );
   }
+
+ const HOURS_PER_LEVEL = 10;
+
+// Level calculation
+const calculatedLevel = 1 + Math.floor(activeHours / HOURS_PER_LEVEL);
+
+// Next level target in hours
+const nextLevelTargetHours = calculatedLevel * HOURS_PER_LEVEL;
+
+// Progress percentage (cumulative, never resets)
+const progressPercent = Math.min(
+  (activeHours / nextLevelTargetHours) * 100,
+  100
+);
+
+
+
 
   return (
     <div className="space-y-8 pb-10">
@@ -154,15 +173,6 @@ const StudentDashboard = () => {
               off.
             </p>
           </div>
-
-          {/* <div className="relative z-10 pt-8 flex gap-4">
-            <button
-              onClick={() => navigate("/dashboard/my-courses")}
-              className="px-6 py-3 bg-[#5edff4] text-slate-900 font-bold rounded-xl hover:bg-[#4bcce0] transition-all shadow-lg shadow-[#5edff4]/20 flex items-center gap-2 active:scale-95"
-            >
-              <PlayCircle className="size-5" /> Resume Learning
-            </button>
-          </div> */}
           <div className="relative z-10 pt-8 flex gap-4">
             {enrolledCourses > 0 ? (
               <button
@@ -206,30 +216,39 @@ const StudentDashboard = () => {
 
         {/* Right: Gamification/Level Widget */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden"
-        >
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#5edff4] to-purple-500" />
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.1 }}
+  className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden"
+>
+  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#5edff4] to-purple-500" />
 
-          <div className="size-24 rounded-full border-4 border-[#5edff4]/20 flex items-center justify-center mb-4 relative">
-            <Zap className="size-10 text-[#5edff4] fill-[#5edff4]" />
-            <div className="absolute inset-0 border-4 border-[#5edff4] rounded-full border-t-transparent animate-spin-slow" />
-          </div>
+  <div className="size-24 rounded-full border-4 border-[#5edff4]/20 flex items-center justify-center mb-4 relative">
+    <Zap className="size-10 text-[#5edff4] fill-[#5edff4]" />
+    <div className="absolute inset-0 border-4 border-[#5edff4] rounded-full border-t-transparent animate-spin-slow" />
+  </div>
 
-          <h3 className="text-2xl font-bold text-slate-900">
-            Level {gamification.level}
-          </h3>
-          <p className="text-slate-500 text-sm mb-4">Intermediate Scholar</p>
+  <h3 className="text-2xl font-bold text-slate-900">
+    Level {calculatedLevel}
+  </h3>
 
-          <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#5edff4] to-purple-500 w-[70%]" />
-          </div>
-          <p className="text-xs font-bold text-slate-400">
-            2,400 / 3,000 XP to Level 5
-          </p>
-        </motion.div>
+  <p className="text-slate-500 text-sm mb-4">
+    {activeHours >= 30 ? "Advanced Learner" : "Intermediate Scholar"}
+  </p>
+
+  {/* Progress Bar */}
+  <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
+    <div
+      className="h-full bg-gradient-to-r from-[#5edff4] to-purple-500 transition-all"
+      style={{ width: `${progressPercent}%` }}
+    />
+  </div>
+
+  <p className="text-xs font-bold text-slate-400">
+   {activeHours} hrs / {nextLevelTargetHours} hrs to Level {calculatedLevel + 1}
+  </p>
+</motion.div>
+
       </div>
 
       {/* 2. STATS OVERVIEW */}
