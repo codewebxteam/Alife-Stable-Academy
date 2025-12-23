@@ -55,12 +55,20 @@ const Navbar = () => {
       }
     };
 
+    // ✨ NEW: Listener for Footer Partner Link
+    const handlePartnerModalTrigger = () => {
+      setAuthMode("partner");
+      setIsAuthOpen(true);
+    };
+
     window.addEventListener("scroll", handleScroll);
     document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("openPartnerModal", handlePartnerModalTrigger);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("openPartnerModal", handlePartnerModalTrigger);
     };
   }, []);
 
