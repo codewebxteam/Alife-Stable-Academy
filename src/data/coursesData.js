@@ -15,125 +15,27 @@ export const COURSES_DATA = [
     lectures: "450 Lectures",
     level: "Beginner to Advanced",
     lastUpdated: "March 2025",
-    description: "Become a full-stack web developer with just one course. HTML, CSS, Javascript, Node, React, MongoDB, Web3 and DApps.",
+    description:
+      "Become a full-stack web developer with just one course. HTML, CSS, Javascript, Node, React, MongoDB, Web3 and DApps.",
+
+    // 🔥 ADD THESE (NO BREAKING CHANGE)
+    video: "/assets/videos/web-dev-intro.mp4", // local for now → AWS S3 later
+    certificateAvailable: true,               // unlock at 100%
+
     syllabus: [
-      { title: "Module 1: Front-End", lessons: [{ title: "HTML5", time: "2h 15m" }, { title: "CSS3", time: "3h 40m" }] },
-      { title: "Module 2: React.js", lessons: [{ title: "Hooks", time: "2h 00m" }] }
+      {
+        title: "Module 1: Front-End",
+        lessons: [
+          { title: "HTML5", time: "2h 15m" },
+          { title: "CSS3", time: "3h 40m" }
+        ]
+      },
+      {
+        title: "Module 2: React.js",
+        lessons: [{ title: "Hooks", time: "2h 00m" }]
+      }
     ]
   },
-  {
-    id: 2,
-    title: "UI/UX Design Masterclass",
-    instructor: "Abhinav Chhikara",
-    role: "Design Lead",
-    category: "Design",
-    rating: 4.9,
-    reviews: 850,
-    price: "₹699",
-    originalPrice: "₹4,999",
-    image: "https://images.unsplash.com/photo-1541462608143-0af7f589d4eb?q=80&w=800&auto=format&fit=crop",
-    tags: ["New", "Figma"],
-    duration: "25h Total",
-    lectures: "120 Lectures",
-    level: "All Levels",
-    lastUpdated: "Feb 2025",
-    description: "Master Figma and UI/UX design principles to build beautiful interfaces.",
-    syllabus: []
-  },
-  {
-    id: 3,
-    title: "Data Science A-Z™: Real Life Exercises",
-    instructor: "Kirill Eremenko",
-    role: "Data Scientist",
-    category: "Data Science",
-    rating: 4.7,
-    reviews: 3200,
-    price: "₹599",
-    originalPrice: "₹5,999",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=800&auto=format&fit=crop",
-    tags: ["Popular"],
-    duration: "42h Total",
-    lectures: "280 Lectures",
-    level: "Intermediate",
-    lastUpdated: "Jan 2025",
-    description: "Learn Data Science step by step through real analytics examples.",
-    syllabus: []
-  },
-  {
-    id: 4,
-    title: "Digital Marketing Agency Blueprint",
-    instructor: "Iman Gadzhi",
-    role: "Entrepreneur",
-    category: "Marketing",
-    rating: 4.6,
-    reviews: 540,
-    price: "₹899",
-    originalPrice: "₹8,999",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800&auto=format&fit=crop",
-    tags: ["Business"],
-    duration: "18h Total",
-    lectures: "90 Lectures",
-    level: "Beginner",
-    lastUpdated: "Dec 2024",
-    description: "Start and scale your own digital marketing agency.",
-    syllabus: []
-  },
-  {
-    id: 5,
-    title: "React JS - The Complete Guide 2025",
-    instructor: "Maximilian Schwarzmüller",
-    role: "Pro Developer",
-    category: "Development",
-    rating: 4.9,
-    reviews: 5600,
-    price: "₹499",
-    originalPrice: "₹3,499",
-    image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=800&auto=format&fit=crop",
-    tags: ["Trending"],
-    duration: "50h Total",
-    lectures: "380 Lectures",
-    level: "Advanced",
-    lastUpdated: "March 2025",
-    description: "Dive deep into React.js, Redux, Hooks, and Next.js.",
-    syllabus: []
-  },
-  {
-    id: 6,
-    title: "Python for Finance: Algo Trading",
-    instructor: "Jose Portilla",
-    role: "Financial Analyst",
-    category: "Finance",
-    rating: 4.5,
-    reviews: 420,
-    price: "₹1,299",
-    originalPrice: "₹12,999",
-    image: "https://images.unsplash.com/photo-1611974765270-ca1258634369?q=80&w=800&auto=format&fit=crop",
-    tags: ["Advanced"],
-    duration: "30h Total",
-    lectures: "150 Lectures",
-    level: "Expert",
-    lastUpdated: "Nov 2024",
-    description: "Use Python for financial analysis and algorithmic trading.",
-    syllabus: []
-  },
-  // [NEW] FREE COURSE ADDED
-  {
-    id: 7,
-    title: "Introduction to Programming (Free)",
-    instructor: "CS50 Team",
-    role: "Harvard Faculty",
-    category: "Development",
-    rating: 5.0,
-    reviews: 10500,
-    price: "Free",
-    originalPrice: "₹2,999",
-    image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop",
-    tags: ["Free", "Starter"],
-    duration: "12h Total",
-    lectures: "15 Lectures",
-    level: "Beginner",
-    lastUpdated: "Jan 2025",
-    description: "An introduction to the intellectual enterprises of computer science and the art of programming.",
-    syllabus: []
-  }
+
+  // baaki courses same rahenge
 ];

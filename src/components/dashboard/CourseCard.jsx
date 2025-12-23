@@ -1,11 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { PlayCircle, Clock, CheckCircle } from "lucide-react";
+import { PlayCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const CourseCard = ({ course }) => {
-  // Mock Progress (In a real app, this comes from the database)
-  const progress = course.progress || Math.floor(Math.random() * 100);
+  // ✅ REAL progress (no random)
+  const progress = course.progress ?? 0;
 
   return (
     <motion.div
@@ -25,6 +25,7 @@ const CourseCard = ({ course }) => {
           alt={course.title}
           className="w-full h-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-60 transition-all duration-500"
         />
+
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <Link
             to={`/courses/${course.id}`}
@@ -46,9 +47,13 @@ const CourseCard = ({ course }) => {
           <h3 className="font-bold text-lg text-slate-900 leading-tight mb-2 line-clamp-2 group-hover:text-[#0891b2] transition-colors">
             {course.title}
           </h3>
+
           <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
             <span className="size-2 rounded-full bg-green-500" />
-            Last Active: 2 days ago
+            Last Active:{" "}
+            {course.lastActive
+              ? new Date(course.lastActive).toLocaleDateString()
+              : "Just now"}
           </p>
         </div>
 
@@ -59,11 +64,12 @@ const CourseCard = ({ course }) => {
               <span>Progress</span>
               <span>{progress}/100%</span>
             </div>
+
             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
                 className="h-full bg-linear-to-r from-[#5edff4] to-[#0891b2] rounded-full"
               />
             </div>
