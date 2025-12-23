@@ -7,7 +7,8 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { useAgency, AgencyProvider } from "./context/AgencyContext"; // ✨ Added AgencyProvider
+import { useAgency, AgencyProvider } from "./context/AgencyContext";
+import { EBookProvider } from "./context/EBookContext";
 import { db } from "./firebase/config";
 
 // --- Components ---
@@ -241,7 +242,9 @@ const App = () => {
   return (
     <Router>
       <AgencyProvider>
-        <AppContent />
+        <EBookProvider>
+          <AppContent />
+        </EBookProvider>
       </AgencyProvider>
     </Router>
   );
