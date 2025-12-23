@@ -1,5 +1,5 @@
 import React from "react";
-import { Book, ShieldCheck, CheckCircle, ShoppingBag } from "lucide-react";
+import { Book, ShieldCheck, CheckCircle, ShoppingBag, BookOpen } from "lucide-react";
 
 const BookPricingCard = ({ book, onAction }) => {
   const isFree = book.price === "Free";
@@ -26,7 +26,7 @@ const BookPricingCard = ({ book, onAction }) => {
                 onClick={onAction}
                 className="w-full py-4 bg-[#5edff4] text-slate-900 font-bold text-lg rounded-xl hover:bg-[#22ccEB] transition-all shadow-lg shadow-[#5edff4]/20 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Book className="size-5" /> Read Now
+                <BookOpen className="size-5" /> Open E-Book
               </button>
             </div>
           ) : (

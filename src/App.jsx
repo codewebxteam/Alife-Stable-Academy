@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useAgency, AgencyProvider } from "./context/AgencyContext";
+import { EBookProvider } from "./context/EBookContext";
 import { db } from "./firebase/config";
 
 // --- Components ---
@@ -36,7 +37,7 @@ import Profile from "./pages/dashboard/Profile";
 // --- [FINAL] Partner Pages ---
 import PartnerLayout from "./pages/partner/PartnerLayout";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
-import Financials from "./pages/partner/Financials"; // ✨ Financials import
+import Financials from "./pages/partner/Financials";
 import AgencySetup from "./pages/partner/AgencySetup";
 import CouponIntelligence from "./pages/partner/CouponIntelligence";
 import SalesIntelligence from "./pages/partner/SalesIntelligence";
@@ -59,7 +60,7 @@ const ProtectedRoute = ({ children }) => {
   if (!currentUser) return <Navigate to="/" replace />;
 
   if (userData && userData.role === "partner") {
-    return <Navigate to="/partner" replace />; // ✨ Updated path
+    return <Navigate to="/partner" replace />;
   }
 
   return children;
@@ -186,7 +187,7 @@ const AppContent = () => {
 
         {/* --- [UPDATED] PARTNER CONSOLE ROUTES --- */}
         <Route
-          path="/partner" // ✨ Base path updated to /partner
+          path="/partner"
           element={
             <PartnerRoute>
               <PartnerLayout />
@@ -194,8 +195,7 @@ const AppContent = () => {
           }
         >
           <Route index element={<PartnerDashboard />} />
-          <Route path="financials" element={<Financials />} />{" "}
-          {/* ✨ Path changed to financials */}
+          <Route path="financials" element={<Financials />} />
           <Route path="students" element={<StudentIntelligence />} />
           <Route path="coupons" element={<CouponIntelligence />} />
           <Route path="sales" element={<SalesIntelligence />} />
@@ -231,7 +231,9 @@ const App = () => {
   return (
     <Router>
       <AgencyProvider>
-        <AppContent />
+        <EBookProvider>
+          <AppContent />
+        </EBookProvider>
       </AgencyProvider>
     </Router>
   );

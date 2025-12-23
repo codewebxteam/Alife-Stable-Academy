@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -27,18 +27,31 @@ import {
   Laptop,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from "firebase/auth";
+import { db } from "../../firebase/config";
 
 const Profile = () => {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState("personal");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const fileInputRef = useRef(null);
+  const bioRef = useRef(null);
 
-  // --- Delete Account State ---
+  // Password fields
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: ""
+  });
+
+  // Delete Account State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
 
-  // --- Notification State ---
+  // Notification State
   const [notifications, setNotifications] = useState({
     emailCourse: true,
     emailPromos: false,
@@ -46,38 +59,232 @@ const Profile = () => {
     smsAlerts: false,
   });
 
-  // Mock Data
+  // Form Data
   const [formData, setFormData] = useState({
-    name: currentUser?.displayName || "Student Name",
-    email: currentUser?.email || "student@example.com",
-    phone: "+91 98765 43210",
-    location: "Bangalore, India",
-    bio: "Fullstack Developer in the making. Passionate about React and AI. Learning everyday to build the future.",
-    website: "https://portfolio.dev",
-    github: "github.com/student",
-    twitter: "@student_dev",
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    bio: "",
+    website: "",
+    github: "",
+    twitter: "",
+    linkedin: "",
+    photoURL: ""
   });
 
-  const handleSave = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setIsEditing(false);
-      alert("Profile Updated Successfully!");
-    }, 1500);
-  };
+  // Load user data from Firestore
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setFormData({
+            name: data.name || currentUser.displayName || "",
+            email: currentUser.email || "",
+            phone: data.phone || "",
+            location: data.location || "",
+            bio: data.bio || "",
+            website: data.website || "",
+            github: data.github || "",
+            twitter: data.twitter || "",
+            linkedin: data.linkedin || "",
+            photoURL: data.photoURL || currentUser.photoURL || ""
+          });
+          setNotifications(data.notifications || notifications);
+        } else {
+          // Initialize with current user data
+          setFormData(prev => ({
+            ...prev,
+            name: currentUser.displayName || "",
+            email: currentUser.email || "",
+            photoURL: currentUser.photoURL || ""
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    };
+    
+    loadUserData();
+  }, [currentUser]);
 
-  const handleDeleteAccount = () => {
-    if (deleteInput === formData.email) {
-      alert("Account Deleted Successfully (Mock)");
-      // In real app: await deleteUser();
-    } else {
-      alert("Email does not match!");
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      // Get updated bio from textarea
+      const updatedBio = bioRef.current?.value || formData.bio;
+      
+      // Update Firebase Auth profile
+      await updateProfile(currentUser, {
+        displayName: formData.name
+      });
+
+      // Update Firestore
+      await setDoc(doc(db, "users", currentUser.uid), {
+        name: formData.name,
+        phone: formData.phone,
+        location: formData.location,
+        bio: updatedBio,
+        website: formData.website,
+        github: formData.github,
+        twitter: formData.twitter,
+        linkedin: formData.linkedin,
+        photoURL: formData.photoURL,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      setFormData(prev => ({ ...prev, bio: updatedBio }));
+      setIsEditing(false);
+      alert("✅ Profile updated successfully!");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("❌ Failed to update profile: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleNotification = (key) => {
-    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("❌ Image size should be less than 5MB!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Compress and resize image
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize to max 800x800 while maintaining aspect ratio
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 800;
+        
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression (0.7 quality)
+        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        
+        // Check if compressed size is still too large
+        if (base64String.length > 900000) {
+          alert("❌ Image is too large even after compression. Please use a smaller image!");
+          setLoading(false);
+          return;
+        }
+        
+        // Only update Firestore (not Firebase Auth)
+        await updateDoc(doc(db, "users", currentUser.uid), { 
+          photoURL: base64String 
+        });
+
+        console.log("✅ Image saved to Firestore!", base64String.substring(0, 50) + "...");
+        setFormData(prev => ({ ...prev, photoURL: base64String }));
+        alert("✅ Profile picture updated!");
+        setLoading(false);
+      };
+      
+      img.onerror = () => {
+        alert("❌ Failed to load image!");
+        setLoading(false);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("❌ Failed to update profile picture: " + error.message);
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwords.new !== passwords.confirm) {
+      alert("❌ New passwords don't match!");
+      return;
+    }
+
+    if (passwords.new.length < 6) {
+      alert("❌ Password must be at least 6 characters!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        passwords.current
+      );
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, passwords.new);
+      
+      setPasswords({ current: "", new: "", confirm: "" });
+      alert("✅ Password updated successfully!");
+    } catch (error) {
+      console.error("Error updating password:", error);
+      if (error.code === "auth/wrong-password") {
+        alert("❌ Current password is incorrect!");
+      } else {
+        alert("❌ Failed to update password: " + error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== formData.email) {
+      alert("❌ Email does not match!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteUser(currentUser);
+      alert("✅ Account deleted successfully!");
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      alert("❌ Failed to delete account: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleNotification = async (key) => {
+    const updated = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updated);
+    
+    try {
+      await updateDoc(doc(db, "users", currentUser.uid), {
+        notifications: updated
+      });
+    } catch (error) {
+      console.error("Error updating notifications:", error);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -99,12 +306,23 @@ const Profile = () => {
           <div className="relative group">
             <div className="size-32 md:size-40 rounded-[2rem] bg-white p-2 shadow-2xl rotate-3 group-hover:rotate-0 transition-transform duration-500">
               <img
-                src={`https://ui-avatars.com/api/?name=${formData.name}&background=0f172a&color=5edff4&bold=true`}
+                src={formData.photoURL || `https://ui-avatars.com/api/?name=${formData.name}&background=0f172a&color=5edff4&bold=true`}
                 alt="Profile"
                 className="size-full rounded-[1.5rem] object-cover bg-slate-100"
               />
             </div>
-            <button className="absolute bottom-2 right-2 p-3 bg-[#5edff4] text-slate-900 rounded-xl shadow-lg hover:scale-110 transition-transform border-2 border-white cursor-pointer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              className="absolute bottom-2 right-2 p-3 bg-[#5edff4] text-slate-900 rounded-xl shadow-lg hover:scale-110 transition-transform border-2 border-white cursor-pointer disabled:opacity-50"
+            >
               <Camera className="size-5" />
             </button>
           </div>
@@ -164,7 +382,7 @@ const Profile = () => {
       <div className="grid lg:grid-cols-4 gap-8">
         {/* LEFT SIDEBAR */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm sticky top-24">
+          <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
             <nav className="space-y-1">
               <TabButton
                 active={activeTab === "personal"}
@@ -240,6 +458,7 @@ const Profile = () => {
                       value={formData.name}
                       icon={User}
                       isEditing={isEditing}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                     />
                     <InputGroup
                       label="Email Address"
@@ -253,12 +472,14 @@ const Profile = () => {
                       value={formData.phone}
                       icon={Phone}
                       isEditing={isEditing}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
                     />
                     <InputGroup
                       label="Location"
                       value={formData.location}
                       icon={MapPin}
                       isEditing={isEditing}
+                      onChange={(e) => handleInputChange('location', e.target.value)}
                     />
                   </div>
 
@@ -268,14 +489,15 @@ const Profile = () => {
                     </label>
                     {isEditing ? (
                       <textarea
+                        ref={bioRef}
                         className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] outline-none min-h-[120px] font-medium text-slate-700 resize-none transition-all"
                         defaultValue={formData.bio}
                       />
                     ) : (
                       <p className="p-4 bg-slate-50 rounded-2xl text-slate-600 leading-relaxed border border-transparent">
-                        {formData.bio}
+                        {formData.bio || "No bio added yet."}
                       </p>
-                    )}
+                    )},
                   </div>
 
                   <div className="pt-8 border-t border-slate-100">
@@ -288,24 +510,28 @@ const Profile = () => {
                         value={formData.website}
                         icon={Globe}
                         isEditing={isEditing}
+                        onChange={(e) => handleInputChange('website', e.target.value)}
                       />
                       <InputGroup
                         label="GitHub"
                         value={formData.github}
                         icon={Github}
                         isEditing={isEditing}
+                        onChange={(e) => handleInputChange('github', e.target.value)}
                       />
                       <InputGroup
                         label="Twitter (X)"
                         value={formData.twitter}
                         icon={Twitter}
                         isEditing={isEditing}
+                        onChange={(e) => handleInputChange('twitter', e.target.value)}
                       />
                       <InputGroup
                         label="LinkedIn"
-                        value="linkedin.com/in/student"
+                        value={formData.linkedin}
                         icon={Linkedin}
                         isEditing={isEditing}
+                        onChange={(e) => handleInputChange('linkedin', e.target.value)}
                       />
                     </div>
                   </div>
@@ -337,31 +563,40 @@ const Profile = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                       <InputGroup
                         label="Current Password"
-                        value="••••••••"
+                        value={passwords.current}
                         icon={Lock}
                         isEditing={true}
                         type="password"
+                        placeholder="Enter current password"
+                        onChange={(e) => setPasswords(prev => ({ ...prev, current: e.target.value }))}
                       />
                       <div className="hidden md:block"></div>
                       <InputGroup
                         label="New Password"
-                        value=""
+                        value={passwords.new}
                         placeholder="Enter new password"
                         icon={Lock}
                         isEditing={true}
                         type="password"
+                        onChange={(e) => setPasswords(prev => ({ ...prev, new: e.target.value }))}
                       />
                       <InputGroup
                         label="Confirm Password"
-                        value=""
+                        value={passwords.confirm}
                         placeholder="Confirm new password"
                         icon={Lock}
                         isEditing={true}
                         type="password"
+                        onChange={(e) => setPasswords(prev => ({ ...prev, confirm: e.target.value }))}
                       />
                     </div>
                     <div className="flex justify-end">
-                      <button className="px-6 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg text-sm cursor-pointer">
+                      <button 
+                        onClick={handlePasswordChange}
+                        disabled={loading || !passwords.current || !passwords.new || !passwords.confirm}
+                        className="px-6 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {loading ? <Loader2 className="animate-spin size-4" /> : null}
                         Update Password
                       </button>
                     </div>
@@ -675,6 +910,7 @@ const InputGroup = ({
   disabled,
   type = "text",
   placeholder,
+  onChange
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
@@ -697,7 +933,8 @@ const InputGroup = ({
         </div>
         <input
           type={currentType}
-          defaultValue={value}
+          value={value}
+          onChange={onChange}
           placeholder={placeholder}
           disabled={!isEditing || disabled}
           className={`w-full pl-12 pr-12 py-3.5 rounded-xl outline-none font-bold text-slate-700 transition-all
@@ -709,6 +946,7 @@ const InputGroup = ({
         />
         {isPassword && isEditing && (
           <button
+            type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer text-slate-400 hover:text-slate-600 transition-colors"
           >
