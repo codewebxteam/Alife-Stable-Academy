@@ -7,7 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { useAgency, AgencyProvider } from "./context/AgencyContext"; // ✨ Added AgencyProvider
+import { useAgency, AgencyProvider } from "./context/AgencyContext";
 import { db } from "./firebase/config";
 
 // --- Components ---
@@ -33,10 +33,14 @@ import ExploreCourses from "./pages/dashboard/ExploreCourses";
 import Certificates from "./pages/dashboard/Certificates";
 import Profile from "./pages/dashboard/Profile";
 
-// --- [NEW] Partner Pages ---
+// --- [FINAL] Partner Pages ---
 import PartnerLayout from "./pages/partner/PartnerLayout";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
+import Financials from "./pages/partner/Financials"; // ✨ Financials import
 import AgencySetup from "./pages/partner/AgencySetup";
+import CouponIntelligence from "./pages/partner/CouponIntelligence";
+import SalesIntelligence from "./pages/partner/SalesIntelligence";
+import StudentIntelligence from "./pages/partner/StudentIntelligence";
 
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
@@ -47,7 +51,7 @@ const ScrollToTop = () => {
   return null;
 };
 
-// --- [UPDATED] Protected Route Wrapper (For Students) ---
+// --- [PRESERVED] Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
@@ -55,13 +59,13 @@ const ProtectedRoute = ({ children }) => {
   if (!currentUser) return <Navigate to="/" replace />;
 
   if (userData && userData.role === "partner") {
-    return <Navigate to="/partner-dashboard" replace />;
+    return <Navigate to="/partner" replace />; // ✨ Updated path
   }
 
   return children;
 };
 
-// --- [UPDATED] Partner Route Wrapper (Strictly for Agency Owners) ---
+// --- [PRESERVED] Partner Route Wrapper ---
 const PartnerRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
@@ -75,10 +79,8 @@ const PartnerRoute = ({ children }) => {
   return children;
 };
 
-// --- Sub-Component to handle Agency Loading UI ---
 const AppContent = () => {
   const { loading: agencyLoading, isAgencyMode, agencyData } = useAgency();
-  const { currentUser, userData } = useAuth();
 
   if (agencyLoading) {
     return (
@@ -171,7 +173,6 @@ const AppContent = () => {
           }
         />
 
-        {/* AGENCY SETUP ROUTE */}
         <Route
           path="/agency-setup"
           element={
@@ -183,9 +184,9 @@ const AppContent = () => {
           }
         />
 
-        {/* PARTNER DASHBOARD ROUTES */}
+        {/* --- [UPDATED] PARTNER CONSOLE ROUTES --- */}
         <Route
-          path="/partner-dashboard"
+          path="/partner" // ✨ Base path updated to /partner
           element={
             <PartnerRoute>
               <PartnerLayout />
@@ -193,22 +194,12 @@ const AppContent = () => {
           }
         >
           <Route index element={<PartnerDashboard />} />
-          <Route
-            path="students"
-            element={
-              <div className="p-10 text-center font-bold text-slate-400">
-                Student Management
-              </div>
-            }
-          />
-          <Route
-            path="reports"
-            element={
-              <div className="p-10 text-center font-bold text-slate-400">
-                Reports
-              </div>
-            }
-          />
+          <Route path="financials" element={<Financials />} />{" "}
+          {/* ✨ Path changed to financials */}
+          <Route path="students" element={<StudentIntelligence />} />
+          <Route path="coupons" element={<CouponIntelligence />} />
+          <Route path="sales" element={<SalesIntelligence />} />
+          <Route path="settings" element={<AgencySetup />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
@@ -236,7 +227,6 @@ const AppContent = () => {
   );
 };
 
-// --- MAIN APP WRAPPER ---
 const App = () => {
   return (
     <Router>

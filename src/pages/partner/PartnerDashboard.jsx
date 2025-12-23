@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
   Area,
@@ -10,310 +11,385 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  Users,
   Wallet,
   TrendingUp,
-  ArrowUpRight,
-  ExternalLink,
-  Copy,
-  Check,
-  LayoutDashboard,
+  BookOpen,
+  GraduationCap,
   Calendar,
-  Info,
+  ChevronDown,
+  ArrowUpRight,
+  Filter,
+  User,
+  Search,
+  Clock,
+  ArrowRight,
 } from "lucide-react";
-import { useAgency } from "../../context/AgencyContext";
-import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
-import CommissionStats from "../../components/partner/CommissionStats";
 
-// --- DATA SETS (WEEKLY VS MONTHLY) ---
-const WEEKLY_DATA = [
-  { name: "Mon", sales: 4200 },
-  { name: "Tue", sales: 3800 },
-  { name: "Wed", sales: 5100 },
-  { name: "Thu", sales: 4600 },
-  { name: "Fri", sales: 7200 },
-  { name: "Sat", sales: 8900 },
-  { name: "Sun", sales: 8100 },
-];
-
-const MONTHLY_DATA = [
-  { name: "Week 1", sales: 12000 },
-  { name: "Week 2", sales: 18500 },
-  { name: "Week 3", sales: 15200 },
-  { name: "Week 4", sales: 22400 },
-];
+// --- ADVANCED DATA ENGINE ---
+const DASHBOARD_DATA = {
+  Today: {
+    revenue: { total: "4,500", product: "3,200", comm: "1,300" },
+    courses: {
+      total: 12,
+      top: [
+        { name: "React Pro Mastery", units: 8 },
+        { name: "UI/UX Design Bootcamp", units: 4 },
+      ],
+    },
+    ebooks: {
+      total: 8,
+      top: [
+        { name: "JavaScript Survival Guide", units: 5 },
+        { name: "CSS Artistry", units: 3 },
+      ],
+    },
+    payout: "1,200",
+    graph: [
+      { name: "Mon", sales: 2, comm: 400 },
+      { name: "Tue", sales: 1, comm: 200 },
+      { name: "Wed", sales: 5, comm: 900 },
+      { name: "Thu", sales: 3, comm: 600 },
+      { name: "Fri", sales: 4, comm: 800 },
+      { name: "Sat", sales: 6, comm: 1100 },
+      { name: "Sun", sales: 2, comm: 400 },
+    ],
+    monthlyGraph: [
+      { name: "Jan", sales: 45, comm: 8000 },
+      { name: "Feb", sales: 52, comm: 9500 },
+      { name: "Mar", sales: 48, comm: 8800 },
+      { name: "Apr", sales: 61, comm: 11000 },
+      { name: "May", sales: 55, comm: 10200 },
+      { name: "Jun", sales: 67, comm: 12500 },
+      { name: "Jul", sales: 72, comm: 14000 },
+      { name: "Aug", sales: 68, comm: 13200 },
+      { name: "Sep", sales: 75, comm: 15000 },
+      { name: "Oct", sales: 82, comm: 16500 },
+      { name: "Nov", sales: 88, comm: 17800 },
+      { name: "Dec", sales: 95, comm: 19000 },
+    ],
+  },
+  // Add other ranges as needed...
+};
 
 const PartnerDashboard = () => {
-  const { agency } = useAgency();
-  const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [timeRange, setTimeRange] = useState("7D");
+  const [graphView, setGraphView] = useState("weekly"); // 'weekly' | 'monthly'
+  const [customDates, setCustomDates] = useState({ start: "", end: "" });
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const [copied, setCopied] = useState(false);
-  const [timeRange, setTimeRange] = useState("weekly"); // 'weekly' | 'monthly'
+  const activeData = useMemo(() => DASHBOARD_DATA["Today"], []); // Simplified for demo logic
 
-  const activeData = timeRange === "weekly" ? WEEKLY_DATA : MONTHLY_DATA;
-
-  const stats = {
-    totalProfit: "42,500",
-    salesCount: 128,
-    pendingPayout: "12,200",
-  };
-
-  const partnerLink = `${agency.subdomain}.alifestableacademy.com`;
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(partnerLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleRequestPayout = () => {
+    setIsRequesting(true);
+    setTimeout(() => {
+      setIsRequesting(false);
+    }, 2000);
   };
 
   return (
-    <div className="p-6 lg:p-10 bg-[#fcfdfe] min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        {/* 1. HEADER & DYNAMIC URL SECTION */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-12">
+    <div className="p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900 selection:bg-indigo-100">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* --- DYNAMIC HEADER & SMART FILTER --- */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 bg-slate-900 text-[#5edff4] text-[10px] font-black uppercase tracking-widest rounded-full">
-                Partner Mode
-              </span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-500 text-sm font-bold">
-                {agency.agencyName}
-              </span>
-            </div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-              Intelligence Dashboard
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">
+              Intelligence Console
             </h1>
+            <p className="text-sm text-slate-500 font-medium">
+              System operational • Data synced just now
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="bg-white border border-slate-200 p-1.5 rounded-2xl flex items-center gap-3 shadow-sm group">
-              <div className="pl-4 pr-6 py-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
-                  Gateway Link
-                </p>
-                <p className="text-sm font-bold text-slate-700">
-                  {partnerLink}
-                </p>
+          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+            {timeRange === "Custom" && (
+              <div className="flex items-center gap-2 px-3 animate-in slide-in-from-right-4 duration-300">
+                <input
+                  type="date"
+                  className="text-[10px] font-bold uppercase p-2 bg-slate-50 border-none rounded-lg outline-none"
+                  onChange={(e) =>
+                    setCustomDates({ ...customDates, start: e.target.value })
+                  }
+                />
+                <span className="text-slate-300">to</span>
+                <input
+                  type="date"
+                  className="text-[10px] font-bold uppercase p-2 bg-slate-50 border-none rounded-lg outline-none"
+                  onChange={(e) =>
+                    setCustomDates({ ...customDates, end: e.target.value })
+                  }
+                />
               </div>
-              <button
-                onClick={copyToClipboard}
-                className="p-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all active:scale-90 shadow-lg shadow-slate-200"
+            )}
+
+            <div className="relative">
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className="appearance-none bg-slate-950 text-white py-2.5 pl-10 pr-10 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-slate-800 transition-all outline-none"
               >
-                {copied ? (
-                  <Check size={18} className="text-green-400" />
-                ) : (
-                  <Copy size={18} />
+                {["Today", "7D", "30D", "Quarter", "Year", "Custom"].map(
+                  (opt) => (
+                    <option key={opt} value={opt}>
+                      {opt === "7D" ? "This Week" : opt}
+                    </option>
+                  )
                 )}
-              </button>
+              </select>
+              <Filter
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={14}
+              />
+              <ChevronDown
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                size={14}
+              />
             </div>
           </div>
         </div>
 
-        {/* 2. STATS KPI GRID */}
-        <CommissionStats stats={stats} />
+        {/* --- KPI CARDS GRID --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            label="Total Revenue"
+            value={`₹${activeData.revenue.total}`}
+            icon={<TrendingUp className="text-blue-500" />}
+            footer={
+              <div className="flex gap-6 mt-5 pt-5 border-t border-slate-50">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block tracking-tighter">
+                    Product
+                  </span>
+                  <span className="text-xs font-bold">
+                    ₹{activeData.revenue.product}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block tracking-tighter">
+                    Commission
+                  </span>
+                  <span className="text-xs font-bold">
+                    ₹{activeData.revenue.comm}
+                  </span>
+                </div>
+              </div>
+            }
+          />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
-          {/* 3. MAIN ANALYTICS CHART (Weekly/Monthly Switcher) */}
-          <div className="lg:col-span-2 bg-white rounded-[40px] border border-slate-100 p-8 shadow-xl shadow-slate-200/30 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10 relative z-10">
+          <StatCard
+            label="Courses Sold"
+            value={activeData.courses.total}
+            icon={<GraduationCap className="text-indigo-500" />}
+            footer={
+              <div className="space-y-2 mt-5 pt-5 border-t border-slate-50">
+                {activeData.courses.top.map((c, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between text-[10px] font-bold italic text-slate-500"
+                  >
+                    <span>{c.name}</span>
+                    <span className="text-slate-900 not-italic">
+                      {c.units} Units
+                    </span>
+                  </div>
+                ))}
+              </div>
+            }
+          />
+
+          <StatCard
+            label="E-Books Sold"
+            value={activeData.ebooks.total}
+            icon={<BookOpen className="text-emerald-500" />}
+            footer={
+              <div className="space-y-2 mt-5 pt-5 border-t border-slate-50">
+                {activeData.ebooks.top.map((e, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between text-[10px] font-bold italic text-slate-500"
+                  >
+                    <span>{e.name}</span>
+                    <span className="text-slate-900 not-italic">
+                      {e.units} Units
+                    </span>
+                  </div>
+                ))}
+              </div>
+            }
+          />
+
+          <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="p-3 bg-slate-50 rounded-2xl w-fit mb-4 text-slate-900">
+                <Wallet size={20} />
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                Available Payout
+              </p>
+              <h3 className="text-3xl font-black text-slate-900 tracking-tighter">
+                ₹{activeData.payout}
+              </h3>
+            </div>
+            <button
+              onClick={handleRequestPayout}
+              disabled={isRequesting}
+              className="mt-6 w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
+            >
+              {isRequesting ? "Requesting..." : "Request Payout"}
+            </button>
+          </div>
+        </div>
+
+        {/* --- ANALYTICS SECTION --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 bg-white rounded-[48px] p-10 border border-slate-100 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-12">
               <div>
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                  Revenue Stream <Info size={16} className="text-slate-300" />
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                  Revenue Stream
                 </h3>
                 <p className="text-sm text-slate-400 font-medium">
-                  Visualizing your profit generation
+                  Performance tracking:{" "}
+                  {graphView === "weekly" ? "Sun - Sat" : "Jan - Dec"}
                 </p>
               </div>
-
-              {/* TOGGLE SWITCHER (PRO STYLE) */}
-              <div className="flex p-1 bg-slate-100 rounded-xl w-fit">
-                <button
-                  onClick={() => setTimeRange("weekly")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    timeRange === "weekly"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  Weekly
-                </button>
-                <button
-                  onClick={() => setTimeRange("monthly")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    timeRange === "monthly"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  Monthly
-                </button>
+              <div className="flex p-1 bg-slate-100 rounded-xl">
+                {["weekly", "monthly"].map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setGraphView(view)}
+                    className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                      graphView === view
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {view}
+                  </button>
+                ))}
               </div>
             </div>
-
-            <div className="h-[350px] w-full relative z-10">
+            <div className="h-[380px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={activeData}>
+                <AreaChart
+                  data={
+                    graphView === "weekly"
+                      ? activeData.graph
+                      : activeData.monthlyGraph
+                  }
+                >
                   <defs>
-                    <linearGradient
-                      id="chartGradient"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor={agency.themeColor || "#0f172a"}
-                        stopOpacity={0.15}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={agency.themeColor || "#0f172a"}
-                        stopOpacity={0}
-                      />
+                    <linearGradient id="colorComm" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#f1f5f9"
+                    stroke="#F1F5F9"
                   />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{
-                      fontSize: 12,
-                      fontWeights: "bold",
-                      fill: "#94a3b8",
-                    }}
-                    dy={15}
+                    tick={{ fontSize: 11, fill: "#94A3B8", fontWeight: 700 }}
+                    dy={10}
                   />
-                  <YAxis hide domain={["auto", "auto"]} />
-                  <Tooltip
-                    cursor={{ stroke: "#e2e8f0", strokeWidth: 2 }}
-                    contentStyle={{
-                      borderRadius: "20px",
-                      border: "none",
-                      boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                      padding: "12px",
-                    }}
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="comm"
+                    stroke="#6366f1"
+                    strokeWidth={4}
+                    fill="url(#colorComm)"
+                    animationDuration={1500}
                   />
                   <Area
                     type="monotone"
                     dataKey="sales"
-                    stroke={agency.themeColor || "#0f172a"}
-                    strokeWidth={4}
-                    fillOpacity={1}
-                    fill="url(#chartGradient)"
-                    animationDuration={1500}
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="transparent"
+                    strokeDasharray="6 6"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* 4. PERFORMANCE & ASSET STATUS */}
-          <div className="space-y-8">
-            {/* Branding Mini-Console */}
-            <div className="bg-slate-900 rounded-[40px] p-8 text-white relative overflow-hidden group">
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="size-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <LayoutDashboard className="text-[#5edff4]" />
-                  </div>
-                  <button
-                    onClick={() => navigate("/agency-setup")}
-                    className="text-[10px] font-black uppercase tracking-tighter text-[#5edff4] hover:underline cursor-pointer"
-                  >
-                    Edit Setup
-                  </button>
-                </div>
-                <h4 className="text-lg font-bold mb-1">Branding Hub</h4>
-                <p className="text-slate-400 text-xs mb-6 font-medium">
-                  Active Configuration
-                </p>
+          <div className="lg:col-span-4 bg-white rounded-[48px] p-10 border border-slate-100 shadow-sm">
+            <h3 className="text-xl font-black text-slate-900 mb-10">
+              Asset Pulse
+            </h3>
+            <div className="space-y-8">
+              <PerformanceBar
+                label="React Pro Mastery"
+                val={82}
+                color="#6366f1"
+              />
+              <PerformanceBar
+                label="UI/UX Design Bootcamp"
+                val={68}
+                color="#10b981"
+              />
+              <PerformanceBar
+                label="JavaScript Survival Guide"
+                val={45}
+                color="#f59e0b"
+              />
+              <PerformanceBar
+                label="Next.js 14 Guide"
+                val={30}
+                color="#ec4899"
+              />
 
-                <div className="space-y-4">
-                  <div className="flex justify-between p-3 bg-white/5 rounded-xl border border-white/5">
-                    <span className="text-xs text-slate-400 font-bold">
-                      Theme
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="size-3 rounded-full"
-                        style={{ backgroundColor: agency.themeColor }}
-                      />
-                      <span className="text-[10px] font-mono">
-                        {agency.themeColor}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between p-3 bg-white/5 rounded-xl border border-white/5">
-                    <span className="text-xs text-slate-400 font-bold">
-                      Markup
-                    </span>
-                    <span className="text-xs font-black text-[#5edff4]">
-                      {agency.pricingMultiplier}x Profit
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute -bottom-10 -right-10 size-40 bg-[#5edff4]/10 blur-[80px] rounded-full group-hover:bg-[#5edff4]/20 transition-all duration-700" />
-            </div>
-
-            {/* AI Sales Insight */}
-            <div className="bg-white rounded-[40px] border border-slate-100 p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="size-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
-                  <TrendingUp size={20} />
-                </div>
-                <h4 className="font-bold text-slate-900">
-                  Intelligence Insight
-                </h4>
-              </div>
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 relative">
-                <p className="text-xs text-slate-600 font-bold leading-relaxed italic">
-                  "Peak sales detected between 7PM - 10PM. Try scheduling your
-                  promotional emails during this window to increase
-                  conversions."
+              <div className="mt-12 p-8 bg-indigo-900 rounded-[32px] text-white relative overflow-hidden">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">
+                  Growth Insight
                 </p>
-                <div className="absolute -top-2 -right-2 size-6 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg">
-                  <Info size={12} />
-                </div>
+                <p className="text-sm font-bold leading-relaxed mb-4">
+                  React Pro Mastery is trending. Launch a coupon to maximize
+                  profit.
+                </p>
+                <button className="text-[10px] font-black uppercase underline">
+                  Deploy Campaign
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 5. RECENT ENROLLMENTS TABLE (Enhanced Style) */}
-        <div className="mt-10 bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/20 overflow-hidden">
-          <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-900">
-              Live Acquisition Stream
-            </h3>
-            <button className="px-5 py-2 bg-slate-50 text-slate-600 rounded-full text-xs font-bold hover:bg-slate-100 transition-all">
-              Export Report (.CSV)
-            </button>
+        {/* --- ENHANCED LIVE ACQUISITION FEED --- */}
+        <div className="bg-white rounded-[48px] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-10 border-b border-slate-50 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-black text-slate-900">
+                Live Acquisition Stream
+              </h3>
+              <p className="text-sm text-slate-400 font-medium">
+                Real-time student enrollment feed
+              </p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-2xl text-slate-400">
+              <Clock size={20} />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <tr className="bg-slate-50/30">
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Student Identity
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Enrollment Asset
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Sale Value
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                    Net Profit
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                    Net Commission
                   </th>
                 </tr>
               </thead>
@@ -321,33 +397,44 @@ const PartnerDashboard = () => {
                 {[1, 2, 3, 4].map((item) => (
                   <tr
                     key={item}
-                    className="group hover:bg-slate-50/30 transition-all"
+                    onClick={() => navigate("/partner-dashboard/students")}
+                    className="group hover:bg-slate-50/50 transition-all cursor-pointer"
                   >
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs group-hover:scale-110 transition-transform">
-                          JD
+                    <td className="px-10 py-7">
+                      <div className="flex items-center gap-4">
+                        <div className="size-11 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                          <User size={20} />
                         </div>
-                        <span className="font-bold text-slate-700">
-                          John Doe{" "}
-                          <span className="text-[10px] block font-medium text-slate-400">
-                            j.doe@example.com
-                          </span>
-                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">
+                            Aryan Sharma
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-medium italic">
+                            aryan.dev@example.com
+                          </p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-8 py-5">
-                      <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold border border-slate-200">
+                    <td className="px-10 py-7 text-center">
+                      <span className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase border border-indigo-100">
                         React Pro Mastery
                       </span>
                     </td>
-                    <td className="px-8 py-5 text-sm font-black text-slate-900">
-                      ₹749
+                    <td className="px-10 py-7">
+                      <p className="text-sm font-black text-slate-900">₹749</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
+                        Verified Purchase
+                      </p>
                     </td>
-                    <td className="px-8 py-5 text-right">
-                      <span className="text-green-600 font-black flex items-center justify-end gap-1">
-                        <ArrowUpRight size={14} /> +₹250
-                      </span>
+                    <td className="px-10 py-7 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-emerald-500 font-black flex items-center gap-1">
+                          <ArrowUpRight size={14} /> +₹250
+                        </span>
+                        <span className="text-[9px] text-slate-300 font-medium">
+                          Just now
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -358,6 +445,75 @@ const PartnerDashboard = () => {
       </div>
     </div>
   );
+};
+
+// --- HIGHLY REUSABLE COMPONENTS ---
+
+const StatCard = ({ label, value, icon, footer }) => (
+  <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm group">
+    <div className="flex justify-between items-start mb-5">
+      <div className="p-4 bg-slate-50 rounded-[24px] text-slate-900 group-hover:rotate-12 transition-transform duration-500">
+        {icon}
+      </div>
+      <div className="p-2 bg-slate-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
+        <ArrowRight size={14} className="text-slate-400" />
+      </div>
+    </div>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+      {label}
+    </p>
+    <h3 className="text-3xl font-black text-slate-900 tracking-tighter">
+      {value}
+    </h3>
+    {footer}
+  </div>
+);
+
+const PerformanceBar = ({ label, val, color }) => (
+  <div className="space-y-2">
+    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+      <span className="italic">{label}</span>
+      <span>{val}%</span>
+    </div>
+    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${val}%` }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="h-full rounded-full shadow-sm"
+        style={{ backgroundColor: color }}
+      />
+    </div>
+  </div>
+);
+
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 text-white p-6 rounded-[24px] shadow-2xl border border-white/10 backdrop-blur-md">
+        <p className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">
+          {payload[0].payload.name}
+        </p>
+        <div className="space-y-2">
+          <div className="flex justify-between gap-10">
+            <span className="text-xs font-bold text-slate-400">
+              Net Commission
+            </span>
+            <span className="text-xs font-black text-emerald-400">
+              ₹{payload[0].value}
+            </span>
+          </div>
+          <div className="flex justify-between gap-10">
+            <span className="text-xs font-bold text-slate-400">Units Sold</span>
+            <span className="text-xs font-black text-indigo-400">
+              {payload[1].value} Units
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 export default PartnerDashboard;

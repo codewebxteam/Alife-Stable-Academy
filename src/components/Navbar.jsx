@@ -35,12 +35,11 @@ const Navbar = () => {
   const brandColor = agency.themeColor || "#0f172a";
   const accentColor = agency.accentColor || "#5edff4";
 
-  // --- [NEW] Dynamic Dashboard & Profile Links ---
+  // --- [NEW] Logical Dashboard & Profile Paths ---
+  // ✨ Navbar ab strictly naye "/partner" route ko follow karega
   const isPartner = userData?.role === "partner";
-  const dashboardPath = isPartner ? "/partner-dashboard" : "/dashboard";
-  const profilePath = isPartner
-    ? "/partner-dashboard/profile"
-    : "/dashboard/profile";
+  const dashboardPath = isPartner ? "/partner" : "/dashboard";
+  const profilePath = isPartner ? "/partner/profile" : "/dashboard/profile";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -93,6 +92,10 @@ const Navbar = () => {
     { name: "E-Books", path: "/ebooks", icon: BookOpen },
     { name: "About Us", path: "/about", icon: Users },
     { name: "Contact Us", path: "/contact", icon: Mail },
+    // ✨ Dashboard link logic added here to ensure it shows up in nav items when logged in
+    ...(currentUser
+      ? [{ name: "Dashboard", path: dashboardPath, icon: LayoutDashboard }]
+      : []),
   ];
 
   return (
@@ -230,7 +233,6 @@ const Navbar = () => {
                         </p>
                       </div>
                       <div className="p-2 space-y-1">
-                        {/* --- [DYNAMIC] Dashboard Link --- */}
                         <Link
                           to={dashboardPath}
                           onClick={() => setShowProfileMenu(false)}
@@ -238,7 +240,6 @@ const Navbar = () => {
                         >
                           <LayoutDashboard className="size-4" /> Dashboard
                         </Link>
-                        {/* --- [DYNAMIC] Profile Link --- */}
                         <Link
                           to={profilePath}
                           onClick={() => setShowProfileMenu(false)}
@@ -347,9 +348,6 @@ const Navbar = () => {
       </div>
       <div className="h-16 lg:hidden" />
 
-      {/* =======================================
-          AUTH MODAL INTEGRATION
-      ======================================= */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
