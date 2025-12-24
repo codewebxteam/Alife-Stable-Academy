@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart,
@@ -19,45 +19,76 @@ import {
   Award,
   BarChart3,
 } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
 
 const ProgressReport = () => {
   const [timeRange, setTimeRange] = useState("Weekly");
+  const { currentUser } = useAuth();
+
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [focusBar, setFocusBar] = useState(null);
-
   // Mock Data for Recharts
-  const data = [
-    { name: "Mon", hours: 2.5 },
-    { name: "Tue", hours: 4.0 },
-    { name: "Wed", hours: 1.5 },
-    { name: "Thu", hours: 5.2 },
-    { name: "Fri", hours: 3.0 },
-    { name: "Sat", hours: 6.5 },
-    { name: "Sun", hours: 4.8 },
-  ];
+  // const data = [
+  //   { name: "Mon", hours: 2.5 },
+  //   { name: "Tue", hours: 4.0 },
+  //   { name: "Wed", hours: 1.5 },
+  //   { name: "Thu", hours: 5.2 },
+  //   { name: "Fri", hours: 3.0 },
+  //   { name: "Sat", hours: 6.5 },
+  //   { name: "Sun", hours: 4.8 },
+  // ];
 
-  const courseProgress = [
-    {
-      title: "Complete Web Development Bootcamp",
-      watched: "12h 30m",
-      total: "60h",
-      progress: 20,
-      lastActive: "2 hours ago",
-    },
-    {
-      title: "UI/UX Design Masterclass",
-      watched: "8h 15m",
-      total: "25h",
-      progress: 33,
-      lastActive: "Yesterday",
-    },
-    {
-      title: "React JS - The Complete Guide",
-      watched: "45h 00m",
-      total: "50h",
-      progress: 90,
-      lastActive: "3 days ago",
-    },
-  ];
+  // const courseProgress = [
+  //   {
+  //     title: "Complete Web Development Bootcamp",
+  //     watched: "12h 30m",
+  //     total: "60h",
+  //     progress: 20,
+  //     lastActive: "2 hours ago",
+  //   },
+  //   {
+  //     title: "UI/UX Design Masterclass",
+  //     watched: "8h 15m",
+  //     total: "25h",
+  //     progress: 33,
+  //     lastActive: "Yesterday",
+  //   },
+  //   {
+  //     title: "React JS - The Complete Guide",
+  //     watched: "45h 00m",
+  //     total: "50h",
+  //     progress: 90,
+  //     lastActive: "3 days ago",
+  //   },
+  // ];
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const ref = doc(db, "dashboard", currentUser.uid);
+
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setDashboard(snap.data());
+      }
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, [currentUser]);
+
+  if (loading || !dashboard) {
+    return (
+      <div className="h-[60vh] flex items-center justify-center">
+        <span className="text-slate-500 font-semibold animate-pulse">
+          Loading progress report...
+        </span>
+      </div>
+    );
+  }
 
   // Custom Tooltip for Recharts
   const CustomTooltip = ({ active, payload, label }) => {
@@ -103,33 +134,36 @@ const ProgressReport = () => {
         <StatCard
           icon={Clock}
           label="Total Watch Time"
-          value="65.4 Hrs"
-          subtext="+12% vs last week"
+          value={`${dashboard.stats.activeHours} Hrs`}
+          subtext="Keep going!"
           color="text-[#5edff4]"
           bg="bg-slate-900"
           dark
         />
+
         <StatCard
           icon={Flame}
           label="Current Streak"
-          value="12 Days"
-          subtext="Don't break the chain!"
+          value={`${dashboard.gamification.streak} Days`}
+          subtext="Consistency matters"
           color="text-orange-500"
           bg="bg-white"
         />
+
         <StatCard
           icon={Zap}
-          label="Focus Score"
-          value="88/100"
-          subtext="High efficiency detected"
+          label="Level"
+          value={`Level ${dashboard.gamification.level}`}
+          subtext="Learning momentum"
           color="text-purple-500"
           bg="bg-white"
         />
+
         <StatCard
           icon={Award}
-          label="Lessons Completed"
-          value="142"
-          subtext="Top 5% of students"
+          label="Certificates"
+          value={dashboard.stats.certificates}
+          subtext="Achievements unlocked"
           color="text-yellow-500"
           bg="bg-white"
         />
@@ -160,7 +194,7 @@ const ProgressReport = () => {
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={data}
+                data={dashboard.activity}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 onMouseMove={(state) => {
                   if (state.isTooltipActive) {
@@ -176,7 +210,7 @@ const ProgressReport = () => {
                   stroke="#e2e8f0"
                 />
                 <XAxis
-                  dataKey="name"
+                  dataKey="day"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "#64748b", fontSize: 12, fontWeight: "bold" }}
@@ -197,7 +231,7 @@ const ProgressReport = () => {
                   barSize={40}
                   animationDuration={1500}
                 >
-                  {data.map((entry, index) => (
+                  {dashboard.activity.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={focusBar === index ? "#5edff4" : "#1e293b"} // Dark Blue (#1e293b) -> Light Blue on hover
@@ -224,37 +258,47 @@ const ProgressReport = () => {
             Detailed Progress
           </h3>
           <div className="space-y-6 relative z-10 flex-1 overflow-y-auto custom-scrollbar pr-2">
-            {courseProgress.map((course, i) => (
-              <div key={i} className="group">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-sm text-slate-100 line-clamp-1 flex-1 pr-4 group-hover:text-[#5edff4] transition-colors">
-                    {course.title}
-                  </h4>
-                  <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
-                    {course.progress}%
-                  </span>
-                </div>
+            {dashboard.currentCourse ? (
+              (() => {
+                const progress = Math.round(
+                  (dashboard.currentCourse.watchedHours /
+                    dashboard.currentCourse.totalHours) *
+                    100
+                );
 
-                {/* Progress Bar */}
-                <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden mb-2">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${course.progress}%` }}
-                    transition={{ duration: 1, delay: 0.5 + i * 0.1 }}
-                    className="h-full bg-[#5edff4] rounded-full shadow-[0_0_10px_#5edff4]"
-                  />
-                </div>
+                return (
+                  <div className="group">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-sm text-slate-100 line-clamp-1">
+                        {dashboard.currentCourse.title}
+                      </h4>
+                      <span className="text-xs font-medium text-slate-400">
+                        {progress}%
+                      </span>
+                    </div>
 
-                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                  <span>
-                    {course.watched} / {course.total} watched
-                  </span>
-                  <span className="text-slate-500">
-                    Active {course.lastActive}
-                  </span>
-                </div>
-              </div>
-            ))}
+                    <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden mb-2">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 1 }}
+                        className="h-full bg-[#5edff4] rounded-full"
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-[10px] text-slate-400">
+                      <span>
+                        {dashboard.currentCourse.watchedHours}h /{" "}
+                        {dashboard.currentCourse.totalHours}h watched
+                      </span>
+                      <span>Active recently</span>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <p className="text-xs text-slate-400">No active course yet</p>
+            )}
           </div>
 
           <button className="w-full mt-auto pt-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
