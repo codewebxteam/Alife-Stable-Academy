@@ -45,18 +45,18 @@ const StudentDashboard = () => {
   const enrolledCourses =
     stats.find((s) => s.label === "Enrolled Courses")?.value || 0;
 
-  const upcomingEvents = [
-    {
-      title: "Live Q&A with Dr. Angela",
-      time: "Tomorrow, 10:00 AM",
-      type: "Live",
-    },
-    {
-      title: "React Project Submission",
-      time: "Sep 25, 11:59 PM",
-      type: "Deadline",
-    },
-  ];
+  // const upcomingEvents = [
+  //   {
+  //     title: "Live Q&A with Dr. Angela",
+  //     time: "Tomorrow, 10:00 AM",
+  //     type: "Live",
+  //   },
+  //   {
+  //     title: "React Project Submission",
+  //     time: "Sep 25, 11:59 PM",
+  //     type: "Deadline",
+  //   },
+  // ];
 
   useEffect(() => {
     if (!currentUser) return;
@@ -150,7 +150,7 @@ const progressPercent = Math.min(
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-2 relative rounded-[2rem] overflow-hidden bg-slate-900 text-white p-8 md:p-10 shadow-2xl shadow-slate-900/20 flex flex-col justify-between min-h-[280px]"
+          className="lg:col-span-2 relative rounded-4xl overflow-hidden bg-slate-900 text-white p-8 md:p-10 shadow-2xl shadow-slate-900/20 flex flex-col justify-between min-h-70"
         >
           {/* Background Effects */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-[#5edff4]/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
@@ -163,7 +163,7 @@ const progressPercent = Math.min(
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
               Hello,{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5edff4] to-[#0891b2]">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-[#5edff4] to-[#0891b2]">
                 {currentUser?.displayName?.split(" ")[0] || "Student"}
               </span>
             </h1>
@@ -197,7 +197,7 @@ const progressPercent = Math.min(
                 onClick={() => navigate("/dashboard/explore")}
                 className="
         px-6 py-3
-        bg-gradient-to-r from-purple-500 to-indigo-500
+        bg-linear-to-r from-purple-500 to-indigo-500
         text-white font-bold
         rounded-xl
         hover:opacity-90
@@ -219,9 +219,9 @@ const progressPercent = Math.min(
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ delay: 0.1 }}
-  className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden"
+  className="bg-white rounded-4xl border border-slate-200 p-8 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden"
 >
-  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#5edff4] to-purple-500" />
+  <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-[#5edff4] to-purple-500" />
 
   <div className="size-24 rounded-full border-4 border-[#5edff4]/20 flex items-center justify-center mb-4 relative">
     <Zap className="size-10 text-[#5edff4] fill-[#5edff4]" />
@@ -239,7 +239,7 @@ const progressPercent = Math.min(
   {/* Progress Bar */}
   <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
     <div
-      className="h-full bg-gradient-to-r from-[#5edff4] to-purple-500 transition-all"
+      className="h-full bg-linear-to-r from-[#5edff4] to-purple-500 transition-all"
       style={{ width: `${progressPercent}%` }}
     />
   </div>
@@ -292,7 +292,7 @@ const progressPercent = Math.min(
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm"
+            className="bg-white rounded-4xl border border-slate-200 p-8 shadow-sm"
           >
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -306,7 +306,7 @@ const progressPercent = Math.min(
                 <option>Last Week</option>
               </select>
             </div>
-            <div className="h-64 w-full min-h-[200px]">
+            <div className="h-64 w-full min-h-50">
               {activityData.length > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={activityData}>
@@ -331,7 +331,7 @@ const progressPercent = Math.min(
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm group cursor-pointer hover:border-[#5edff4] transition-colors"
+            className="bg-white rounded-4xl border border-slate-200 p-6 shadow-sm group cursor-pointer hover:border-[#5edff4] transition-colors"
             onClick={() => navigate("/dashboard/my-courses")}
           >
             <div className="flex items-center justify-between mb-6">
@@ -346,7 +346,7 @@ const progressPercent = Math.min(
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm group cursor-pointer hover:border-[#5edff4] transition-colors"
+                className="bg-white rounded-4xl border border-slate-200 p-6 shadow-sm group cursor-pointer hover:border-[#5edff4] transition-colors"
                 onClick={() => navigate("/dashboard/my-courses")}
               >
                 <div className="flex items-center justify-between mb-6">
@@ -383,7 +383,7 @@ const progressPercent = Math.min(
                       </div>
                       <div className="w-full h-2 bg-slate-100 rounded-full">
                         <div
-                          className="h-full bg-gradient-to-r from-[#5edff4] to-[#0891b2]"
+                          className="h-full bg-linear-to-r from-[#5edff4] to-[#0891b2]"
                           style={{ width: `${continueLearning.progress}%` }}
                         />
                       </div>
@@ -402,7 +402,7 @@ const progressPercent = Math.min(
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5 }}
-            className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col justify-between"
+            className="bg-white rounded-4xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between"
           >
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
@@ -526,7 +526,7 @@ const progressPercent = Math.min(
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.6 }}
-            className="bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden flex flex-col items-center text-center"
+            className="bg-slate-900 rounded-4xl p-8 text-white relative overflow-hidden flex flex-col items-center text-center"
           >
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
             <div className="size-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-4 relative z-10 border border-white/10">

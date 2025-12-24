@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,9 +14,13 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase/config";
+
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
+  const [dashboard, setDashboard] = useState(null);
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -24,13 +28,35 @@ const Sidebar = ({ isOpen, onClose }) => {
     await logout();
     navigate("/");
   };
+  
+  useEffect(() => {
+  if (!currentUser) return;
+
+  const ref = doc(db, "dashboard", currentUser.uid);
+
+  const unsub = onSnapshot(ref, (snap) => {
+    if (snap.exists()) {
+      setDashboard(snap.data());
+    }
+  });
+
+  return () => unsub();
+}, [currentUser]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: PlayCircle, label: "My Learning", path: "/dashboard/my-courses" },
     { icon: BookOpen, label: "E-Book Library", path: "/dashboard/ebooks" },
     { icon: Award, label: "Certificates", path: "/dashboard/certificates" }, // [NEW]
-    { icon: BarChart2, label: "Progress Report", path: "/dashboard/progress" },
+    ...(dashboard?.stats?.enrolledCourses > 0
+    ? [
+        {
+          icon: BarChart2,
+          label: "Progress Report",
+          path: "/dashboard/progress",
+        },
+      ]
+    : []),
     {
       icon: ShoppingCart,
       label: "Explore Courses",
@@ -159,7 +185,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 z-[60] lg:hidden shadow-2xl"
+              className="fixed inset-y-0 left-0 w-72 z-60 lg:hidden shadow-2xl"
             >
               {SidebarContent}
             </motion.div>
