@@ -46,12 +46,13 @@ import StudentIntelligence from "./pages/partner/StudentIntelligence";
 // --- [NEW] Admin Pages ---
 import AdminLayout from "./pages/Admin/AdminLayout";
 import IntelligenceHub from "./components/Admin/IntelligenceHub";
+import PartnerIntelligence from "./components/Admin/PartnerIntelligence"; //
+import StudentData from "./components/Admin/StudentData";
 import SalesManager from "./components/Admin/SalesManager";
 import PaymentManager from "./components/Admin/PaymentManager";
 import CourseManager from "./components/Admin/CourseManager";
 import EBookManager from "./components/Admin/EBookManager";
 import AdminSettings from "./components/Admin/AdminSettings";
-
 
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
@@ -216,6 +217,10 @@ const AppContent = () => {
         {/* --- [NEW] ADMIN DASHBOARD ROUTES (SIDEBAR SUPPORT) --- */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<IntelligenceHub />} />
+          {/* ✨ Added Partner and Student Routes */}
+          <Route path="partners" element={<PartnerIntelligence />} />
+          <Route path="students" element={<StudentData />} />
+
           <Route path="sales" element={<SalesManager />} />
           <Route path="payments" element={<PaymentManager />} />
           <Route path="courses" element={<CourseManager />} />
