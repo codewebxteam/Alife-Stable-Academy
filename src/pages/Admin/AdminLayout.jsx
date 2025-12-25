@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-<<<<<<< HEAD
-import { 
-  LayoutDashboard, TrendingUp, GraduationCap, BookOpen, 
-  Settings, LogOut, Bell, Search, ShieldCheck, CreditCard,
-  Menu, X, Command, Upload
-=======
 import {
   LayoutDashboard,
   TrendingUp,
@@ -22,8 +16,8 @@ import {
   Command,
   Users,
   Briefcase,
-  AlertCircle, // ✨ Added extra icons
->>>>>>> 09cb99733833ff9909975d8dc4cf5063de27cbf0
+  AlertCircle,
+  Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -58,16 +52,12 @@ const AdminLayout = () => {
       icon: <GraduationCap size={20} />,
     },
     { label: "E-Books", path: "/Admin/ebooks", icon: <BookOpen size={20} /> },
-<<<<<<< HEAD
     { label: "Bunny CDN", path: "/Admin/bunny", icon: <Upload size={20} /> },
-    { label: "Settings", path: "/Admin/settings", icon: <Settings size={20} /> },
-=======
     {
       label: "Settings",
       path: "/Admin/settings",
       icon: <Settings size={20} />,
     },
->>>>>>> 09cb99733833ff9909975d8dc4cf5063de27cbf0
   ];
 
   useEffect(() => {
