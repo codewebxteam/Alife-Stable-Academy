@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect} from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -18,6 +18,8 @@ import {
   Tag,
   Percent,
   Banknote,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   collection,
@@ -26,7 +28,10 @@ import {
   query,
   orderBy,
   Timestamp,
-  where
+  where,
+  deleteDoc,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
@@ -36,7 +41,7 @@ const CouponIntelligence = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCoupon, setSelectedCoupon] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
-   const [coupons, setCoupons] = useState([]);
+  const [coupons, setCoupons] = useState([]);
   const [redemptions, setRedemptions] = useState([]);
   const [couponCode, setCouponCode] = useState("");
   const [discountType, setDiscountType] = useState("percentage");
@@ -45,6 +50,8 @@ const CouponIntelligence = () => {
   const [value, setValue] = useState("");
   const [limit, setLimit] = useState("");
   const [expiry, setExpiry] = useState("");
+  const [editingCoupon, setEditingCoupon] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { currentUser } = useAuth();
   const partnerId = currentUser?.uid;
 
@@ -140,11 +147,9 @@ const CouponIntelligence = () => {
     const now = new Date();
     return list.map((c) => ({
       ...c,
-      status:
-        c.expiry?.toDate?.() < now ? "Expired" : c.status,
+      status: c.expiry?.toDate?.() < now ? "Expired" : c.status,
     }));
   };
-
 
   useEffect(() => {
     if (!partnerId) return;
@@ -154,7 +159,7 @@ const CouponIntelligence = () => {
       orderBy("createdAt", "desc")
     );
 
-     const unsubCoupons = onSnapshot(couponRef, (snap) => {
+    const unsubCoupons = onSnapshot(couponRef, (snap) => {
       const raw = snap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -164,7 +169,7 @@ const CouponIntelligence = () => {
 
     const redemptionRef = query(
       collection(db, "couponRedemptions"),
-       where("partnerId", "==", partnerId),
+      where("partnerId", "==", partnerId),
       orderBy("createdAt", "desc")
     );
 
@@ -191,36 +196,87 @@ const CouponIntelligence = () => {
     setCouponCode(result);
   };
 
-  const formatDate = (ts) =>
-  ts?.toDate?.().toLocaleDateString("en-IN");
+  const formatDate = (ts) => ts?.toDate?.().toLocaleDateString("en-IN");
 
+  const handleDeleteCoupon = async (couponId) => {
+    const confirmDelete = window.confirm("Delete this coupon?");
+    if (!confirmDelete) return;
 
-   const handleCreateCoupon = async () => {
-    if (!currentUser || !partnerId) {
-    alert("User not ready. Please wait.");
-    return;
-  }
-    if (!couponCode || !value || !limit || !expiry) return;
-    
+    await deleteDoc(doc(db, "coupons", couponId));
+  };
+  const handleEditCoupon = (coupon) => {
+    setEditingCoupon(coupon);
+    setCouponCode(coupon.code);
+    setDiscountType(coupon.type === "Percentage" ? "percentage" : "flat");
+    setValue(coupon.value);
+    setLimit(coupon.limit);
+    setExpiry(coupon.expiry?.toDate?.().toISOString().split("T")[0]);
+    setShowCreateModal(true);
+  };
 
+  //  const handleCreateCoupon = async () => {
+  //   if (!currentUser || !partnerId) {
+  //   alert("User not ready. Please wait.");
+  //   return;
+  // }
+  //   if (!couponCode || !value || !limit || !expiry) return;
 
-    await addDoc(collection(db, "coupons"), {
-      partnerId: partnerId,
-      code: couponCode.toUpperCase(),
-      type: discountType === "percentage" ? "Percentage" : "Flat",
-      value: Number(value),
-      limit: Number(limit),
-      used: 0,
-      status: "Active",
-      expiry: Timestamp.fromDate(new Date(expiry)),
-      createdAt: Timestamp.now(),
-    });
+  //   await addDoc(collection(db, "coupons"), {
+  //     partnerId: partnerId,
+  //     code: couponCode.toUpperCase(),
+  //     type: discountType === "percentage" ? "Percentage" : "Flat",
+  //     value: Number(value),
+  //     limit: Number(limit),
+  //     used: 0,
+  //     status: "Active",
+  //     expiry: Timestamp.fromDate(new Date(expiry)),
+  //     createdAt: Timestamp.now(),
+  //   });
 
-    setShowCreateModal(false);
-    setCouponCode("");
-    setValue("");
-    setLimit("");
-    setExpiry("");
+  //   setShowCreateModal(false);
+  //   setCouponCode("");
+  //   setValue("");
+  //   setLimit("");
+  //   setExpiry("");
+  // };
+
+  const handleCreateCoupon = async () => {
+    if (isSaving) return; // ⛔ prevent double call
+    setIsSaving(true);
+
+    try {
+      if (!currentUser || !partnerId) return;
+      if (!couponCode || !value || !limit || !expiry) return;
+
+      const payload = {
+        partnerId,
+        code: couponCode.toUpperCase(),
+        type: discountType === "percentage" ? "Percentage" : "Flat",
+        value: Number(value),
+        limit: Number(limit),
+        expiry: Timestamp.fromDate(new Date(expiry)),
+      };
+
+      if (editingCoupon) {
+        await updateDoc(doc(db, "coupons", editingCoupon.id), payload);
+      } else {
+        await addDoc(collection(db, "coupons"), {
+          ...payload,
+          used: 0,
+          status: "Active",
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      setShowCreateModal(false);
+      setEditingCoupon(null);
+      setCouponCode("");
+      setValue("");
+      setLimit("");
+      setExpiry("");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const currentCoupons = coupons.slice(
@@ -231,8 +287,6 @@ const CouponIntelligence = () => {
     (redemptionPage - 1) * ITEMS_PER_PAGE,
     redemptionPage * ITEMS_PER_PAGE
   );
-  
-
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
@@ -256,7 +310,11 @@ const CouponIntelligence = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <StatMini label="Live Coupons" val={coupons.length} color="blue" />
-          <StatMini label="Total Redeemed" val={redemptions.length} color="emerald" />
+          <StatMini
+            label="Total Redeemed"
+            val={redemptions.length}
+            color="emerald"
+          />
           <StatMini label="Revenue Burn" val="Auto" color="orange" />
         </div>
 
@@ -312,8 +370,33 @@ const CouponIntelligence = () => {
                       </p>
                     </td>
                     <td className="px-10 py-6">
-                      <StatusBadge status={c.status} />
+                      <div className="flex items-center gap-4">
+                        <StatusBadge status={c.status} />
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCoupon(c);
+                          }}
+                          className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                          title="Edit Coupon"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCoupon(c.id);
+                          }}
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="Delete Coupon"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
+
                     <td className="px-10 py-6 text-right">
                       <Eye
                         size={18}
@@ -366,7 +449,7 @@ const CouponIntelligence = () => {
                         {log.studentName}
                       </p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">
-                       {formatDate(log.createdAt)}
+                        {formatDate(log.createdAt)}
                       </p>
                     </td>
                     <td className="px-10 py-7">
@@ -449,8 +532,14 @@ const CouponIntelligence = () => {
                     selectedCoupon.type === "Percentage" ? "%" : "₹"
                   } OFF`}
                 />
-                <InfoRow label="Valid Until" val={formatDate(selectedCoupon.expiry)} />
-                <InfoRow label="Created On" val={formatDate(selectedCoupon.createdAt)} />
+                <InfoRow
+                  label="Valid Until"
+                  val={formatDate(selectedCoupon.expiry)}
+                />
+                <InfoRow
+                  label="Created On"
+                  val={formatDate(selectedCoupon.createdAt)}
+                />
                 <InfoRow label="Status" val={selectedCoupon.status} highlight />
               </div>
               <button
@@ -633,7 +722,7 @@ const CouponIntelligence = () => {
                     <input
                       type="number"
                       value={limit}
-                       onChange={(e) => setLimit(e.target.value)}
+                      onChange={(e) => setLimit(e.target.value)}
                       placeholder="1 for One-time"
                       className="w-full bg-slate-50 p-4 rounded-2xl text-sm font-bold outline-none"
                     />
@@ -651,8 +740,18 @@ const CouponIntelligence = () => {
                   </div>
                 </div>
               </div>
-              <button onClick={handleCreateCoupon} className="w-full py-5 bg-slate-950 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest mt-12 hover:bg-slate-800 transition-all shadow-xl">
-                Activate Campaign
+              <button
+                disabled={isSaving}
+                onClick={handleCreateCoupon}
+                className={`w-full py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest mt-12 transition-all shadow-xl
+    ${
+      isSaving
+        ? "bg-slate-400 cursor-not-allowed"
+        : "bg-slate-950 hover:bg-slate-800 text-white"
+    }
+  `}
+              >
+                {isSaving ? "Saving..." : "Activate Campaign"}
               </button>
             </motion.div>
           </div>
