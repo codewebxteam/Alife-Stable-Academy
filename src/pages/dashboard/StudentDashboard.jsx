@@ -27,6 +27,17 @@ import {
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
+const formatSeconds = (totalSeconds = 0) => {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
+
+
 const StudentDashboard = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -79,7 +90,8 @@ const StudentDashboard = () => {
         },
         {
           label: "Active Hours",
-          value: `${data.stats.activeHours}h`,
+         value: formatSeconds(data.stats.activeHours),
+
           icon: Clock,
           color: "text-purple-400",
           bg: "bg-purple-400/10",

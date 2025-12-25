@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,7 +9,6 @@ import {
 import { useAuth } from "./context/AuthContext";
 import { useAgency, AgencyProvider } from "./context/AgencyContext";
 import { EBookProvider } from "./context/EBookContext";
-import { db } from "./firebase/config";
 
 // --- Components ---
 import Navbar from "./components/Navbar";
@@ -28,18 +27,19 @@ import ContactUs from "./pages/ContactUs";
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import StudentDashboard from "./pages/dashboard/StudentDashboard";
 import MyCourses from "./pages/dashboard/MyCourses";
+import LearningCourse from "./pages/dashboard/LearningCourse"; // ✅ IMPORTANT
 import EBookLibrary from "./pages/dashboard/EBookLibrary";
 import ProgressReport from "./pages/dashboard/ProgressReport";
 import ExploreCourses from "./pages/dashboard/ExploreCourses";
 import Certificates from "./pages/dashboard/Certificates";
 import Profile from "./pages/dashboard/Profile";
 
-// --- [NEW] Partner Pages ---
+// --- Partner Pages ---
 import PartnerLayout from "./pages/partner/PartnerLayout";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import AgencySetup from "./pages/partner/AgencySetup";
 
-// --- Scroll To Top Helper ---
+// --- Scroll To Top ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -48,45 +48,44 @@ const ScrollToTop = () => {
   return null;
 };
 
-// --- [UPDATED] Protected Route Wrapper (For Students) ---
+// --- Protected Route (Student) ---
 const ProtectedRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
   if (loading) return null;
   if (!currentUser) return <Navigate to="/" replace />;
 
-  if (userData && userData.role === "partner") {
+  if (userData?.role === "partner") {
     return <Navigate to="/partner-dashboard" replace />;
   }
 
   return children;
 };
 
-// --- [UPDATED] Partner Route Wrapper (Strictly for Agency Owners) ---
+// --- Partner Route ---
 const PartnerRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
   if (loading) return null;
   if (!currentUser) return <Navigate to="/" replace />;
 
-  if (userData && userData.role !== "partner") {
+  if (userData?.role !== "partner") {
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 };
 
-// --- Sub-Component to handle Agency Loading UI ---
+// --- AppContent ---
 const AppContent = () => {
   const { loading: agencyLoading, isAgencyMode, agencyData } = useAgency();
-  const { currentUser, userData } = useAuth();
 
   if (agencyLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
+      <div className="h-screen flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5edff4]"></div>
-          <p className="text-slate-400 font-bold animate-pulse">
+          <div className="animate-spin h-12 w-12 border-2 border-[#5edff4] border-t-transparent rounded-full" />
+          <p className="text-slate-400 font-bold">
             {isAgencyMode
               ? `Loading ${agencyData?.agencyName}...`
               : "Initializing Academy..."}
@@ -99,8 +98,9 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
+
       <Routes>
-        {/* PUBLIC ROUTES */}
+        {/* ---------- PUBLIC ROUTES ---------- */}
         <Route
           path="/"
           element={
@@ -111,6 +111,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/courses"
           element={
@@ -121,6 +122,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/courses/:id"
           element={
@@ -131,6 +133,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/ebooks"
           element={
@@ -141,6 +144,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/ebooks/:id"
           element={
@@ -151,6 +155,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/about"
           element={
@@ -161,6 +166,7 @@ const AppContent = () => {
             </>
           }
         />
+
         <Route
           path="/contact"
           element={
@@ -172,7 +178,7 @@ const AppContent = () => {
           }
         />
 
-        {/* AGENCY SETUP ROUTE */}
+        {/* ---------- PARTNER ROUTES ---------- */}
         <Route
           path="/agency-setup"
           element={
@@ -184,7 +190,6 @@ const AppContent = () => {
           }
         />
 
-        {/* PARTNER DASHBOARD ROUTES */}
         <Route
           path="/partner-dashboard"
           element={
@@ -194,26 +199,10 @@ const AppContent = () => {
           }
         >
           <Route index element={<PartnerDashboard />} />
-          <Route
-            path="students"
-            element={
-              <div className="p-10 text-center font-bold text-slate-400">
-                Student Management
-              </div>
-            }
-          />
-          <Route
-            path="reports"
-            element={
-              <div className="p-10 text-center font-bold text-slate-400">
-                Reports
-              </div>
-            }
-          />
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* STUDENT DASHBOARD ROUTES */}
+        {/* ---------- STUDENT DASHBOARD ---------- */}
         <Route
           path="/dashboard"
           element={
@@ -224,6 +213,13 @@ const AppContent = () => {
         >
           <Route index element={<StudentDashboard />} />
           <Route path="my-courses" element={<MyCourses />} />
+
+          {/* ✅ THIS IS THE FIX */}
+          <Route
+            path="my-learning/:id"
+            element={<LearningCourse />}
+          />
+
           <Route path="ebooks" element={<EBookLibrary />} />
           <Route path="progress" element={<ProgressReport />} />
           <Route path="explore" element={<ExploreCourses />} />
@@ -231,13 +227,14 @@ const AppContent = () => {
           <Route path="profile" element={<Profile />} />
         </Route>
 
+        {/* ---------- FALLBACK ---------- */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
 };
 
-// --- MAIN APP WRAPPER ---
+// --- MAIN APP ---
 const App = () => {
   return (
     <Router>

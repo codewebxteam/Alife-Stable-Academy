@@ -1,78 +1,78 @@
 import React, { useEffect, useState } from "react";
 import { Search, Filter } from "lucide-react";
-import CourseCard from "../../components/dashboard/CourseCard";
-import { COURSES_DATA } from "../../data/coursesData";
-import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
+import { COURSES_DATA } from "../../data/coursesData";
+import { getMyEnrollmentsFirebase } from "../../services/enrollment.service";
+import CourseCard from "../../components/dashboard/CourseCard";
 
 const MyCourses = () => {
   const { currentUser } = useAuth();
   const [myCourses, setMyCourses] = useState([]);
-  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
     if (!currentUser) return;
 
-    const ref = collection(
-      db,
-      "users",
-      currentUser.uid,
-      "enrolledCourses"
-    );
+    const load = async () => {
+      console.log("🟢 UID:", currentUser.uid);
+      const enrollments = await getMyEnrollmentsFirebase(
+        currentUser.uid
+      );
 
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
-      const merged = snapshot.docs
-        .map((docSnap) => {
-          const data = docSnap.data();
+      const merged = enrollments
+        .map((e) => {
           const course = COURSES_DATA.find(
-            (c) => c.id === data.courseId
+            (c) => c.id === e.courseId
           );
 
           if (!course) return null;
 
           return {
             ...course,
-            progress: data.progress,
-            completed: data.completed,
-            lastActive: data.lastActive?.toDate?.() || null,
+            progress: e.progress ?? 0,
+            completed: e.completed ?? false,
+            lastActive: e.lastActive?.seconds
+              ? e.lastActive.seconds * 1000
+              : Date.now(),
           };
         })
         .filter(Boolean);
 
+      console.log("🧠 FINAL COURSES:", merged);
       setMyCourses(merged);
-    });
+    };
 
-    return () => unsubscribe();
+    load();
   }, [currentUser]);
-
-  const filteredCourses = myCourses.filter((course) => {
-    if (activeTab === "progress") return course.progress < 100;
-    if (activeTab === "completed") return course.progress === 100;
-    return true;
-  });
 
   return (
     <div className="space-y-8 pb-10">
-      <h1 className="text-3xl font-bold">My Learning</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">My Learning</h1>
 
-      <div className="flex gap-6 border-b">
-        <button onClick={() => setActiveTab("all")}>All</button>
-        <button onClick={() => setActiveTab("progress")}>In Progress</button>
-        <button onClick={() => setActiveTab("completed")}>Completed</button>
+        <div className="flex gap-2">
+          <Search />
+          <Filter />
+        </div>
       </div>
 
-      {filteredCourses.length > 0 ? (
+      {myCourses.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+          {myCourses.map((c) => (
+            <CourseCard key={c.id} course={c} />
           ))}
         </div>
       ) : (
-        <div className="text-center py-20">
-          <p>No courses yet</p>
-          <Link to="/courses">Explore Courses</Link>
+        <div className="text-center py-20 bg-white rounded-3xl border">
+          <p className="mb-4 text-slate-500">
+            You haven't enrolled in any courses yet.
+          </p>
+          <Link
+            to="/courses"
+            className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold"
+          >
+            Explore Courses
+          </Link>
         </div>
       )}
     </div>

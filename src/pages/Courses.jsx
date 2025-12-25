@@ -1,90 +1,66 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Star, BookOpen, Clock } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "../components/AuthModal";
 import FAQSection from "../components/FAQSection";
 import { COURSES_DATA } from "../data/coursesData";
-import { enrollCourseFirebase } from "../utils/courseEnrollment";
-
-const CATEGORIES = [
-  "All",
-  "Development",
-  "Design",
-  "Data Science",
-  "Marketing",
-  "Finance",
-];
+import { enrollCourseFirebase } from "../services/enrollment.service";
 
 const Courses = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
+  const [loadingId, setLoadingId] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [search, setSearch] = useState("");
 
-  const filteredCourses = COURSES_DATA.filter((course) => {
-    const matchesCategory =
-      activeCategory === "All" || course.category === activeCategory;
-    const matchesSearch =
-      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filtered = COURSES_DATA.filter((c) =>
+    c.title.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const handleBuyClick = async (course) => {
+  const handleBuy = async (course) => {
     if (!currentUser) {
       setIsAuthOpen(true);
       return;
     }
 
-    await enrollCourseFirebase(currentUser.uid, course.id);
-
-    // 🔥 redirect to My Learning
-    navigate("/dashboard/my-learning");
+    try {
+      setLoadingId(course.id);
+      await enrollCourseFirebase(currentUser.uid, course.id);
+      navigate("/dashboard/my-learning");
+    } catch (e) {
+      console.error("❌ enroll failed", e);
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 font-sans">
-      <div className="pt-20 md:pt-32 pb-20">
-        <div className="max-w-7xl mx-auto px-6 mb-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-              <h1 className="text-3xl md:text-5xl font-bold text-slate-900">
-                Explore Courses
-              </h1>
-              <p className="text-slate-500">
-                Transform your career with industry-leading skills.
-              </p>
-            </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto px-6 py-20">
+        <h1 className="text-4xl font-bold mb-6">Explore Courses</h1>
 
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-4 top-4 size-5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-full border"
-              />
-            </div>
-          </div>
+        <div className="relative w-full max-w-md mb-10">
+          <Search className="absolute left-3 top-3 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search courses..."
+            className="pl-10 py-3 w-full border rounded-xl"
+          />
         </div>
 
-        <div className="max-w-7xl mx-auto px-6">
-          <AnimatePresence>
-            <motion.div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredCourses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  onBuy={() => handleBuyClick(course)}
-                />
-              ))}
-            </motion.div>
-          </AnimatePresence>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filtered.map((course) => (
+            <ExploreCourseCard
+              key={course.id}
+              course={course}
+              loading={loadingId === course.id}
+              onBuy={() => handleBuy(course)}
+            />
+          ))}
         </div>
       </div>
 
@@ -93,40 +69,44 @@ const Courses = () => {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        defaultMode="login"
       />
     </div>
   );
 };
 
-const CourseCard = ({ course, onBuy }) => (
-  <motion.div className="bg-white rounded-3xl border shadow-xl p-6 flex flex-col">
-    <Link to={`/courses/${course.id}`}>
-      <img
-        src={course.image}
-        alt={course.title}
-        className="h-40 w-full object-cover rounded-xl"
-      />
-    </Link>
+export default Courses;
 
-    <h3 className="font-bold text-lg mt-4">{course.title}</h3>
+/* ---------------- CARD ---------------- */
 
-    <div className="mt-auto grid grid-cols-2 gap-3 pt-4">
-      <Link
-        to={`/courses/${course.id}`}
-        className="border rounded-xl py-2 text-center font-bold text-sm"
-      >
-        Explore
+const ExploreCourseCard = ({ course, onBuy, loading }) => {
+  return (
+    <motion.div className="bg-white rounded-3xl border shadow-lg p-6 flex flex-col">
+      <Link to={`/courses/${course.id}`}>
+        <img
+          src={course.image}
+          alt={course.title}
+          className="h-40 w-full object-cover rounded-xl"
+        />
       </Link>
 
-      <button
-        onClick={onBuy}
-        className="bg-slate-900 text-white rounded-xl py-2 font-bold text-sm"
-      >
-        {course.price === "Free" ? "Enroll" : "Buy Now"}
-      </button>
-    </div>
-  </motion.div>
-);
+      <h3 className="font-bold text-lg mt-4">{course.title}</h3>
 
-export default Courses;
+      <div className="mt-auto grid grid-cols-2 gap-3 pt-4">
+        <Link
+          to={`/courses/${course.id}`}
+          className="border rounded-xl py-2 text-center font-bold text-sm"
+        >
+          Explore
+        </Link>
+
+        <button
+          onClick={onBuy}
+          disabled={loading}
+          className="bg-slate-900 text-white rounded-xl py-2 font-bold text-sm disabled:opacity-60"
+        >
+          {loading ? "Enrolling..." : "Buy Now"}
+        </button>
+      </div>
+    </motion.div>
+  );
+};

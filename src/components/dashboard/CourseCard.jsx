@@ -4,7 +4,7 @@ import { PlayCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const CourseCard = ({ course }) => {
-  // ✅ REAL progress (no random)
+  // ✅ REAL progress
   const progress = course.progress ?? 0;
 
   return (
@@ -15,7 +15,7 @@ const CourseCard = ({ course }) => {
       whileHover={{ y: -5 }}
       className="bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/50 overflow-hidden flex flex-col h-full group"
     >
-      {/* Thumbnail Area */}
+      {/* Thumbnail */}
       <div className="relative h-48 bg-slate-900 overflow-hidden">
         <img
           src={
@@ -26,9 +26,10 @@ const CourseCard = ({ course }) => {
           className="w-full h-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-60 transition-all duration-500"
         />
 
+        {/* ▶️ PLAY → LEARNING COURSE */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <Link
-            to={`/courses/${course.id}`}
+            to={`/dashboard/my-learning/${course.id}`}   // ✅ CORRECT ROUTE
             className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/50 text-white hover:bg-[#5edff4] hover:border-[#5edff4] hover:text-slate-900 transition-all"
           >
             <PlayCircle className="size-8" />
@@ -41,10 +42,10 @@ const CourseCard = ({ course }) => {
         </div>
       </div>
 
-      {/* Content Area */}
+      {/* Content */}
       <div className="p-6 flex flex-col flex-1">
         <div className="mb-4">
-          <h3 className="font-bold text-lg text-slate-900 leading-tight mb-2 line-clamp-2 group-hover:text-[#0891b2] transition-colors">
+          <h3 className="font-bold text-lg text-slate-900 mb-2 line-clamp-2 group-hover:text-[#0891b2] transition-colors">
             {course.title}
           </h3>
 
@@ -57,7 +58,7 @@ const CourseCard = ({ course }) => {
           </p>
         </div>
 
-        {/* Progress Bar */}
+        {/* Progress */}
         <div className="mt-auto space-y-4">
           <div>
             <div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5">
@@ -70,13 +71,14 @@ const CourseCard = ({ course }) => {
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
-                className="h-full bg-linear-to-r from-[#5edff4] to-[#0891b2] rounded-full"
+                className="h-full bg-gradient-to-r from-[#5edff4] to-[#0891b2]"
               />
             </div>
           </div>
 
+          {/* 👉 RESUME LEARNING */}
           <Link
-            to={`/courses/${course.id}`}
+            to={`/dashboard/my-learning/${course.id}`}   // ✅ CORRECT ROUTE
             className="w-full block text-center py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20"
           >
             {progress === 100 ? "View Certificate" : "Resume Learning"}

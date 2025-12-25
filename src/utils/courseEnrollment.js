@@ -1,30 +1,55 @@
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/config";
-import {
-  doc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-} from "firebase/firestore";
 
-export const enrollCourseFirebase = async (uid, courseId) => {
-  const ref = doc(
-    db,
-    "users",
-    uid,
-    "enrolledCourses",
-    String(courseId)
-  );
+export const updateDashboardFromLearning = async (
+  uid,
+  courseId,
+  progress,
+  watchedSeconds
+) => {
+  if (!uid) return;
 
-  const snap = await getDoc(ref);
+  const dashboardRef = doc(db, "dashboard", uid);
+  const snap = await getDoc(dashboardRef);
 
-  // already enrolled → kuch nahi karo
-  if (snap.exists()) return;
+  if (!snap.exists()) return;
 
-  await setDoc(ref, {
-    courseId,
-    progress: 0,
-    completed: false,
-    enrolledAt: serverTimestamp(),
-    lastActive: serverTimestamp(),
+  const data = snap.data();
+
+  // 🗓️ find today index (M,T,W,T,F,S,S)
+  const today = new Date();
+  const dayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1;
+
+  const watchedHours = watchedSeconds / 3600;
+
+  // clone activity safely
+  const updatedActivity = [...data.activity];
+  updatedActivity[dayIndex] = {
+    ...updatedActivity[dayIndex],
+    hours: Number(
+      (updatedActivity[dayIndex].hours + watchedHours).toFixed(2)
+    ),
+  };
+
+  await updateDoc(dashboardRef, {
+    currentCourse: {
+      courseId,
+      progress,
+      lastWatchedAt: serverTimestamp(),
+    },
+
+    activity: updatedActivity,
+
+    "stats.activeHours": Number(
+      (data.stats.activeHours + watchedHours).toFixed(2)
+    ),
+
+    meta: {
+      ...data.meta,
+      lastActive: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
   });
+
+  console.log("📊 Dashboard learning stats updated");
 };
