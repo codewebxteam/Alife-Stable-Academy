@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect} from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../context/AuthContext";
 import {
   Ticket,
   Plus,
@@ -25,6 +26,7 @@ import {
   query,
   orderBy,
   Timestamp,
+  where
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
@@ -43,6 +45,8 @@ const CouponIntelligence = () => {
   const [value, setValue] = useState("");
   const [limit, setLimit] = useState("");
   const [expiry, setExpiry] = useState("");
+  const { currentUser } = useAuth();
+  const partnerId = currentUser?.uid;
 
   // const COUPONS = [
   //   {
@@ -132,24 +136,35 @@ const CouponIntelligence = () => {
   //   },
   // ];
 
+  const normalizeCoupons = (list) => {
+    const now = new Date();
+    return list.map((c) => ({
+      ...c,
+      status:
+        c.expiry?.toDate?.() < now ? "Expired" : c.status,
+    }));
+  };
+
 
   useEffect(() => {
+    if (!partnerId) return;
     const couponRef = query(
       collection(db, "coupons"),
+      where("partnerId", "==", partnerId),
       orderBy("createdAt", "desc")
     );
 
-    const unsubCoupons = onSnapshot(couponRef, (snap) => {
-      setCoupons(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-      );
+     const unsubCoupons = onSnapshot(couponRef, (snap) => {
+      const raw = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setCoupons(normalizeCoupons(raw));
     });
 
     const redemptionRef = query(
       collection(db, "couponRedemptions"),
+       where("partnerId", "==", partnerId),
       orderBy("createdAt", "desc")
     );
 
@@ -166,7 +181,7 @@ const CouponIntelligence = () => {
       unsubCoupons();
       unsubRedemptions();
     };
-  }, []);
+  }, [partnerId]);
 
   const generateRandomCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -181,9 +196,16 @@ const CouponIntelligence = () => {
 
 
    const handleCreateCoupon = async () => {
+    if (!currentUser || !partnerId) {
+    alert("User not ready. Please wait.");
+    return;
+  }
     if (!couponCode || !value || !limit || !expiry) return;
+    
+
 
     await addDoc(collection(db, "coupons"), {
+      partnerId: partnerId,
       code: couponCode.toUpperCase(),
       type: discountType === "percentage" ? "Percentage" : "Flat",
       value: Number(value),
@@ -209,6 +231,8 @@ const CouponIntelligence = () => {
     (redemptionPage - 1) * ITEMS_PER_PAGE,
     redemptionPage * ITEMS_PER_PAGE
   );
+  
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
