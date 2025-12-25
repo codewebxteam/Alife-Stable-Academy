@@ -51,6 +51,7 @@ import PaymentManager from "./components/Admin/PaymentManager";
 import CourseManager from "./components/Admin/CourseManager";
 import EBookManager from "./components/Admin/EBookManager";
 import AdminSettings from "./components/Admin/AdminSettings";
+import BunnyUploader from "./components/Admin/BunnyUploader";
 
 
 // --- Scroll To Top Helper ---
@@ -220,6 +221,7 @@ const AppContent = () => {
           <Route path="payments" element={<PaymentManager />} />
           <Route path="courses" element={<CourseManager />} />
           <Route path="ebooks" element={<EBookManager />} />
+          <Route path="bunny" element={<BunnyUploader />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 

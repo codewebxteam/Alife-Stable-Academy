@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, TrendingUp, GraduationCap, BookOpen, 
   Settings, LogOut, Bell, Search, ShieldCheck, CreditCard,
-  Menu, X, Command
+  Menu, X, Command, Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,6 +18,7 @@ const AdminLayout = () => {
     { label: "Payments", path: "/Admin/payments", icon: <CreditCard size={20} /> },
     { label: "Courses", path: "/Admin/courses", icon: <GraduationCap size={20} /> },
     { label: "E-Books", path: "/Admin/ebooks", icon: <BookOpen size={20} /> },
+    { label: "Bunny CDN", path: "/Admin/bunny", icon: <Upload size={20} /> },
     { label: "Settings", path: "/Admin/settings", icon: <Settings size={20} /> },
   ];
 
