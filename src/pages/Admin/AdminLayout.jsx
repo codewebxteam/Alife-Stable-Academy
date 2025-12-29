@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+ import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   TrendingUp,
   GraduationCap,
   BookOpen,
-  Settings,
   LogOut,
   Bell,
   Search,
@@ -13,11 +12,9 @@ import {
   CreditCard,
   Menu,
   X,
-  Command,
   Users,
   Briefcase,
-  AlertCircle,
-  Upload
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -25,9 +22,9 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false); // ✨ State for Logout Modal
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Modern Navigation Config
+  // Updated Navigation Config - Bunny CDN and Settings removed
   const navItems = [
     {
       label: "Intelligence",
@@ -38,8 +35,8 @@ const AdminLayout = () => {
       label: "Partners",
       path: "/Admin/partners",
       icon: <Briefcase size={20} />,
-    }, // ✨ Added Partners Tab
-    { label: "Students", path: "/Admin/students", icon: <Users size={20} /> }, // ✨ Added Students Tab
+    },
+    { label: "Students", path: "/Admin/students", icon: <Users size={20} /> },
     { label: "Sales", path: "/Admin/sales", icon: <TrendingUp size={20} /> },
     {
       label: "Payments",
@@ -52,25 +49,17 @@ const AdminLayout = () => {
       icon: <GraduationCap size={20} />,
     },
     { label: "E-Books", path: "/Admin/ebooks", icon: <BookOpen size={20} /> },
-    { label: "Bunny CDN", path: "/Admin/bunny", icon: <Upload size={20} /> },
-    {
-      label: "Settings",
-      path: "/Admin/settings",
-      icon: <Settings size={20} />,
-    },
   ];
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // ✨ Handle Logout Trigger
   const handleLogoutClick = () => {
     setShowLogoutConfirm(true);
   };
 
   const confirmLogout = () => {
-    // Perform any logout logic here (e.g., clearing tokens)
     setShowLogoutConfirm(false);
     navigate("/");
   };
@@ -249,7 +238,7 @@ const AdminLayout = () => {
         </main>
       </div>
 
-      {/* ✨ 4. LOGOUT CONFIRMATION MODAL */}
+      {/* 4. LOGOUT CONFIRMATION MODAL */}
       <AnimatePresence>
         {showLogoutConfirm && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
