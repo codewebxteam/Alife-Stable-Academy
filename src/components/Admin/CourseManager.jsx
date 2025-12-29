@@ -1,7 +1,7 @@
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Plus, Edit3, GraduationCap, Trash2, X, 
-  Upload, Video, CheckCircle2, ArrowRight, ArrowLeft,
+  Upload, CheckCircle2, ArrowRight, ArrowLeft,
   Sparkles, Layers, DollarSign, Rocket, ChevronUp, ChevronDown, 
   Layout, BookOpen
 } from "lucide-react";
@@ -119,7 +119,6 @@ const CourseManager = () => {
   return (
     <div className="flex flex-col lg:flex-row gap-8 h-full min-h-[500px]">
       
-      {/* 1. LEFT CARD: CTA (Sticky on Desktop) */}
       <div className="w-full lg:w-[400px]">
         <div className="bg-slate-950 p-8 lg:p-10 rounded-[40px] text-white flex flex-col justify-between shadow-2xl sticky top-28 overflow-hidden">
           <div className="absolute top-0 right-0 size-64 bg-indigo-500/20 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
@@ -143,7 +142,6 @@ const CourseManager = () => {
         </div>
       </div>
       
-      {/* 2. RIGHT SIDE: COURSE LIST WITH SCROLLER */}
       <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar max-h-[75vh]">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Active Inventory ({courses.length})</h3>
@@ -184,7 +182,6 @@ const CourseManager = () => {
         </AnimatePresence>
       </div>
 
-      {/* --- CREATION MODAL --- */}
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 lg:p-4">
@@ -194,7 +191,6 @@ const CourseManager = () => {
               className="bg-white w-full max-w-6xl rounded-[40px] lg:rounded-[54px] shadow-2xl relative z-10 overflow-hidden flex flex-col lg:flex-row h-[90vh] lg:h-[85vh]"
             >
               
-              {/* Sidebar Guide (Clickable Tabs) */}
               <div className="w-full lg:w-[320px] bg-slate-950 p-8 lg:p-10 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
                 <div className="absolute top-0 left-0 size-64 bg-indigo-500/20 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
                 <div className="relative z-10">
@@ -203,7 +199,7 @@ const CourseManager = () => {
                     {steps.map((step) => (
                       <button 
                         key={step.id} 
-                        onClick={() => setCurrentStep(step.id)} // Clickable progress
+                        onClick={() => setCurrentStep(step.id)}
                         className={`w-full flex items-center gap-4 text-left p-3 rounded-2xl transition-all ${currentStep === step.id ? "bg-white/10 opacity-100" : "opacity-30 hover:opacity-60"}`}
                       >
                         <div className={`size-10 rounded-xl flex items-center justify-center font-black border-2 transition-colors ${currentStep === step.id ? "bg-indigo-500 border-indigo-500" : "border-slate-800"}`}>
@@ -216,7 +212,6 @@ const CourseManager = () => {
                 </div>
               </div>
 
-              {/* Form Side */}
               <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
                 <div className="p-6 lg:p-8 border-b border-slate-50 flex justify-between items-center">
                   <div className="flex items-center gap-2">
@@ -233,7 +228,7 @@ const CourseManager = () => {
                       className="max-w-3xl mx-auto space-y-10"
                     >
                       {currentStep === 1 && <IdentityTab formData={formData} setFormData={setFormData} />}
-                      {currentStep === 2 && <CurriculumTab formData={formData} setFormData={setFormData} />}
+                      {currentStep === 2 && <CurriculumTab />}
                       {currentStep === 3 && <PricingTab formData={formData} setFormData={setFormData} />}
                       {currentStep === 4 && <ReviewTab formData={formData} />}
                     </motion.div>
@@ -269,8 +264,6 @@ const CourseManager = () => {
     </div>
   );
 };
-
-// --- TAB COMPONENTS (Identity, Pricing, etc.) ---
 
 const IdentityTab = ({ formData, setFormData }) => {
   const extractVideoId = (url) => {
@@ -322,7 +315,7 @@ const IdentityTab = ({ formData, setFormData }) => {
 );
 };
 
-const CurriculumTab = ({ formData }) => (
+const CurriculumTab = () => (
   <div className="space-y-6">
     <div className="p-10 bg-indigo-50 rounded-[40px] border border-indigo-100 text-center border-dashed">
       <Upload size={40} className="mx-auto text-indigo-200 mb-4" />
@@ -351,7 +344,6 @@ const ReviewTab = ({ formData }) => (
   </div>
 );
 
-// --- CUSTOM PRICE CONTROL (Arrows Optimized) ---
 const PriceControl = ({ label, value, onChange, color }) => (
   <div className={`p-8 bg-${color}-50/50 rounded-[40px] border border-${color}-100 transition-all`}>
     <p className={`text-[10px] font-black text-${color}-600 uppercase tracking-widest mb-4`}>{label}</p>
