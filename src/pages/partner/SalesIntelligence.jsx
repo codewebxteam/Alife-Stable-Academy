@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -10,134 +10,164 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  TrendingUp,
   ShoppingBag,
   BookOpen,
   GraduationCap,
   Filter,
   ChevronDown,
-  Search,
-  ArrowUpRight,
   Calendar,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
-// --- DATA ENGINE: ASSET PERFORMANCE ---
-const ASSET_PERFORMANCE = [
-  {
-    id: "A1",
-    name: "React Pro Mastery",
-    type: "Course",
-    units: 45,
-    revenue: "₹1,12,455",
-  },
-  {
-    id: "A2",
-    name: "UI/UX Bootcamp",
-    type: "Course",
-    units: 32,
-    revenue: "₹1,59,968",
-  },
-  {
-    id: "A3",
-    name: "JS Survival Guide",
-    type: "E-Book",
-    units: 128,
-    revenue: "₹63,872",
-  },
-  {
-    id: "A4",
-    name: "Backend Fundamentals",
-    type: "Course",
-    units: 12,
-    revenue: "₹38,400",
-  },
-  {
-    id: "A5",
-    name: "Python AI Guide",
-    type: "E-Book",
-    units: 85,
-    revenue: "₹67,915",
-  },
-  {
-    id: "A6",
-    name: "Modern CSS Mastery",
-    type: "Course",
-    units: 10,
-    revenue: "₹15,000",
-  },
-];
-
-// --- DATA ENGINE: DAILY LOGS ---
-const DAILY_LOGS = [
-  { date: "23 Dec 2023", courses: 12, ebooks: 24, totalRevenue: "₹45,000" },
-  { date: "22 Dec 2023", courses: 8, ebooks: 15, totalRevenue: "₹28,500" },
-  { date: "21 Dec 2023", courses: 15, ebooks: 40, totalRevenue: "₹52,200" },
-  { date: "20 Dec 2023", courses: 5, ebooks: 10, totalRevenue: "₹12,400" },
-  { date: "19 Dec 2023", courses: 20, ebooks: 55, totalRevenue: "₹68,900" },
-  { date: "18 Dec 2023", courses: 7, ebooks: 12, totalRevenue: "₹18,200" },
-  { date: "17 Dec 2023", courses: 10, ebooks: 20, totalRevenue: "₹30,000" },
-];
-
-// --- CHART DATA ---
-const WEEKLY_TREND = [
-  { name: "Sun", courses: 10, ebooks: 20 },
-  { name: "Mon", courses: 4, ebooks: 12 },
-  { name: "Tue", courses: 7, ebooks: 18 },
-  { name: "Wed", courses: 5, ebooks: 10 },
-  { name: "Thu", courses: 12, ebooks: 25 },
-  { name: "Fri", courses: 9, ebooks: 15 },
-  { name: "Sat", courses: 15, ebooks: 30 },
-];
-
-const MONTHLY_TREND = [
-  { name: "Jan", courses: 40, ebooks: 100 },
-  { name: "Feb", courses: 35, ebooks: 80 },
-  { name: "Mar", courses: 50, ebooks: 120 },
-  { name: "Apr", courses: 45, ebooks: 90 },
-  { name: "May", courses: 60, ebooks: 150 },
-  { name: "Jun", courses: 55, ebooks: 130 },
-  { name: "Jul", courses: 70, ebooks: 180 },
-  { name: "Aug", courses: 65, ebooks: 160 },
-  { name: "Sep", courses: 80, ebooks: 200 },
-  { name: "Oct", courses: 75, ebooks: 190 },
-  { name: "Nov", courses: 90, ebooks: 220 },
-  { name: "Dec", courses: 100, ebooks: 250 },
-];
+import { listenToOrders } from "../../firebase/orders.service";
+import { listenToPartners } from "../../firebase/partners.service";
 
 const SalesIntelligence = () => {
   const [timeRange, setTimeRange] = useState("7D");
   const [chartView, setChartView] = useState("Weekly");
 
-  // Pagination States
+  const [partners, setPartners] = useState([]);
+  const [orders, setOrders] = useState([]);
+
   const [assetPage, setAssetPage] = useState(1);
   const [timelinePage, setTimelinePage] = useState(1);
 
-  // Logic: Items Per Page
   const assetItemsPerPage = 5;
-  const timelineItemsPerPage = 6; // ✨ Set to 6 as requested
+  const timelineItemsPerPage = 6;
 
-  const currentAssets = ASSET_PERFORMANCE.slice(
+  useEffect(() => {
+    const unsub = listenToPartners(setPartners);
+    return () => unsub && unsub();
+  }, []);
+
+  const activePartner = useMemo(() => {
+    return partners.find((p) => p.status === "Active") || partners[0] || null;
+  }, [partners]);
+
+  useEffect(() => {
+    if (!activePartner?.id) return;
+    const unsub = listenToOrders(activePartner.id, setOrders);
+    return () => unsub && unsub();
+  }, [activePartner]);
+
+  const computed = useMemo(() => {
+    const assetsMap = {};
+    const dailyMap = {};
+    const weeklyMap = {};
+    const monthlyMap = {};
+
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const months = [
+      "Jan","Feb","Mar","Apr","May","Jun",
+      "Jul","Aug","Sep","Oct","Nov","Dec",
+    ];
+
+    let courseRevenue = 0;
+    let ebookRevenue = 0;
+    let courseUnits = 0;
+    let ebookUnits = 0;
+
+    orders.forEach((o) => {
+      if (!o.createdAt?.toDate) return;
+
+      const dt = o.createdAt.toDate();
+      const dayKey = dt.toDateString();
+      const weekKey = days[dt.getDay()];
+      const monthKey = months[dt.getMonth()];
+
+      if (!assetsMap[o.assetName]) {
+        assetsMap[o.assetName] = {
+          id: o.assetName,
+          name: o.assetName,
+          type: o.type === "course" ? "Course" : "E-Book",
+          units: 0,
+          revenue: 0,
+        };
+      }
+
+      assetsMap[o.assetName].units += 1;
+      assetsMap[o.assetName].revenue += Number(o.saleValue);
+
+      if (!dailyMap[dayKey]) {
+        dailyMap[dayKey] = {
+          date: dayKey,
+          courses: 0,
+          ebooks: 0,
+          totalRevenue: 0,
+        };
+      }
+
+      if (o.type === "course") {
+        courseUnits += 1;
+        courseRevenue += Number(o.saleValue);
+        dailyMap[dayKey].courses += 1;
+      } else {
+        ebookUnits += 1;
+        ebookRevenue += Number(o.saleValue);
+        dailyMap[dayKey].ebooks += 1;
+      }
+
+      dailyMap[dayKey].totalRevenue += Number(o.saleValue);
+
+      weeklyMap[weekKey] ||= { name: weekKey, courses: 0, ebooks: 0 };
+      monthlyMap[monthKey] ||= { name: monthKey, courses: 0, ebooks: 0 };
+
+      if (o.type === "course") {
+        weeklyMap[weekKey].courses += 1;
+        monthlyMap[monthKey].courses += 1;
+      } else {
+        weeklyMap[weekKey].ebooks += 1;
+        monthlyMap[monthKey].ebooks += 1;
+      }
+    });
+
+    const assets = Object.values(assetsMap)
+      .map((a) => ({
+        ...a,
+        revenue: `₹${a.revenue.toLocaleString()}`,
+      }))
+      .sort((a, b) => b.units - a.units);
+
+    const timeline = Object.values(dailyMap).map((d) => ({
+      ...d,
+      totalRevenue: `₹${d.totalRevenue.toLocaleString()}`,
+    }));
+
+    return {
+      assets,
+      timeline,
+      weeklyTrend: days.map(
+        (d) => weeklyMap[d] || { name: d, courses: 0, ebooks: 0 }
+      ),
+      monthlyTrend: months.map(
+        (m) => monthlyMap[m] || { name: m, courses: 0, ebooks: 0 }
+      ),
+      courseRevenue,
+      ebookRevenue,
+      courseUnits,
+      ebookUnits,
+    };
+  }, [orders]);
+
+  const currentAssets = computed.assets.slice(
     (assetPage - 1) * assetItemsPerPage,
     assetPage * assetItemsPerPage
   );
-  const currentTimeline = DAILY_LOGS.slice(
+
+  const currentTimeline = computed.timeline.slice(
     (timelinePage - 1) * timelineItemsPerPage,
     timelinePage * timelineItemsPerPage
   );
 
-  const assetTotalPages = Math.ceil(
-    ASSET_PERFORMANCE.length / assetItemsPerPage
-  );
+  const assetTotalPages = Math.ceil(computed.assets.length / assetItemsPerPage);
   const timelineTotalPages = Math.ceil(
-    DAILY_LOGS.length / timelineItemsPerPage
+    computed.timeline.length / timelineItemsPerPage
   );
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* --- HEADER --- */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight">
@@ -149,21 +179,6 @@ const SalesIntelligence = () => {
           </div>
 
           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            {timeRange === "Custom" && (
-              <div className="flex items-center gap-2 px-2">
-                <input
-                  type="date"
-                  className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none"
-                />
-                <span className="text-slate-300 text-[10px] font-black uppercase">
-                  To
-                </span>
-                <input
-                  type="date"
-                  className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none"
-                />
-              </div>
-            )}
             <div className="relative">
               <select
                 value={timeRange}
@@ -188,19 +203,18 @@ const SalesIntelligence = () => {
           </div>
         </div>
 
-        {/* --- KPI GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             label="Course Revenue"
-            val="₹4,12,500"
-            sub="Units: 142"
+            val={`₹${computed.courseRevenue.toLocaleString()}`}
+            sub={`Units: ${computed.courseUnits}`}
             icon={<GraduationCap />}
             color="indigo"
           />
           <StatCard
             label="E-Book Revenue"
-            val="₹98,200"
-            sub="Units: 540"
+            val={`₹${computed.ebookRevenue.toLocaleString()}`}
+            sub={`Units: ${computed.ebookUnits}`}
             icon={<BookOpen />}
             color="orange"
           />
@@ -209,16 +223,17 @@ const SalesIntelligence = () => {
               Top 2 Courses
             </p>
             <div className="space-y-3">
-              <TopAsset
-                name="React Pro Mastery"
-                units="45"
-                color="bg-indigo-500"
-              />
-              <TopAsset
-                name="UI/UX Bootcamp"
-                units="32"
-                color="bg-indigo-300"
-              />
+              {computed.assets
+                .filter((a) => a.type === "Course")
+                .slice(0, 2)
+                .map((a) => (
+                  <TopAsset
+                    key={a.id}
+                    name={a.name}
+                    units={a.units}
+                    color="bg-indigo-500"
+                  />
+                ))}
             </div>
           </div>
           <div className="bg-white p-7 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
@@ -226,54 +241,30 @@ const SalesIntelligence = () => {
               Top 2 E-Books
             </p>
             <div className="space-y-3">
-              <TopAsset
-                name="JS Survival Guide"
-                units="128"
-                color="bg-orange-500"
-              />
-              <TopAsset name="Python AI" units="85" color="bg-orange-300" />
+              {computed.assets
+                .filter((a) => a.type === "E-Book")
+                .slice(0, 2)
+                .map((a) => (
+                  <TopAsset
+                    key={a.id}
+                    name={a.name}
+                    units={a.units}
+                    color="bg-orange-500"
+                  />
+                ))}
             </div>
           </div>
         </div>
 
-        {/* --- VOLUME TREND --- */}
         <div className="bg-white p-8 sm:p-10 rounded-[48px] border border-slate-100 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
-            <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                Acquisition Volume Trend
-              </h3>
-              <p className="text-xs text-slate-400 font-medium italic">
-                Delivery lifecycle tracking
-              </p>
-            </div>
-            <div className="flex p-1 bg-slate-100 rounded-xl">
-              <button
-                onClick={() => setChartView("Weekly")}
-                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
-                  chartView === "Weekly"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-400"
-                }`}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setChartView("Monthly")}
-                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
-                  chartView === "Monthly"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-400"
-                }`}
-              >
-                Monthly
-              </button>
-            </div>
-          </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
-                data={chartView === "Weekly" ? WEEKLY_TREND : MONTHLY_TREND}
+                data={
+                  chartView === "Weekly"
+                    ? computed.weeklyTrend
+                    : computed.monthlyTrend
+                }
               >
                 <defs>
                   <linearGradient id="colorInd" x1="0" y1="0" x2="0" y2="1">
@@ -319,7 +310,6 @@ const SalesIntelligence = () => {
           </div>
         </div>
 
-        {/* --- TABLES --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-8 border-b border-slate-50 flex justify-between items-center">

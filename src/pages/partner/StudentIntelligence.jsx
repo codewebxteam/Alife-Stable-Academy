@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -24,144 +24,117 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-// --- DYNAMIC DATA ENGINE ---
-const STUDENT_RECORDS = [
-  {
-    id: "STU-1001",
-    name: "Aryan Sharma",
-    email: "aryan@example.com",
-    phone: "+91 98765 43210",
-    joinDate: "20 Dec 2025",
-    status: "Active",
-    learningState: "Completed",
-    certStatus: "Issued",
-    progress: 100,
-    assets: [
-      {
-        name: "React Pro Mastery",
-        type: "Course",
-        price: "2499",
-        date: "20 Dec 2025",
-      },
-      {
-        name: "Tailwind Guide",
-        type: "E-Book",
-        price: "499",
-        date: "21 Dec 2025",
-      },
-    ],
-  },
-  {
-    id: "STU-1002",
-    name: "Sanya Iyer",
-    email: "sanya@example.com",
-    phone: "+91 88776 55443",
-    joinDate: "18 Dec 2025",
-    status: "Active",
-    learningState: "In-Progress",
-    certStatus: "N/A",
-    progress: 65,
-    assets: [
-      {
-        name: "UI/UX Bootcamp",
-        type: "Course",
-        price: "4999",
-        date: "18 Dec 2025",
-      },
-    ],
-  },
-  {
-    id: "STU-1003",
-    name: "Vikram Raj",
-    email: "vikram@example.com",
-    phone: "+91 70045 12345",
-    joinDate: "15 Dec 2025",
-    status: "Active",
-    learningState: "Completed",
-    certStatus: "Pending",
-    progress: 100,
-    assets: [
-      {
-        name: "Python for AI",
-        type: "Course",
-        price: "4500",
-        date: "15 Dec 2025",
-      },
-    ],
-  },
-  {
-    id: "STU-1004",
-    name: "Priya Das",
-    email: "priya.das@live.com",
-    phone: "+91 91223 34455",
-    joinDate: "10 Dec 2023",
-    status: "Active",
-    learningState: "Not Started",
-    certStatus: "N/A",
-    progress: 0,
-    assets: [
-      {
-        name: "Node.js Mastery",
-        type: "Course",
-        price: "3200",
-        date: "10 Dec 2023",
-      },
-    ],
-  },
-  {
-    id: "STU-1005",
-    name: "Rahul Roy",
-    email: "rahul.roy@gmail.com",
-    phone: "+91 88990 11223",
-    joinDate: "05 Dec 2023",
-    status: "Active",
-    learningState: "In-Progress",
-    certStatus: "N/A",
-    progress: 92,
-    assets: [
-      {
-        name: "Modern CSS",
-        type: "Course",
-        price: "1500",
-        date: "05 Dec 2023",
-      },
-      {
-        name: "JS Pocket Book",
-        type: "E-Book",
-        price: "199",
-        date: "06 Dec 2023",
-      },
-    ],
-  },
-];
+import { listenToOrders } from "../../firebase/orders.service";
+import { listenToPartners } from "../../firebase/partners.service";
 
 const StudentIntelligence = () => {
+  const [partners, setPartners] = useState([]);
+  const [orders, setOrders] = useState([]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [globalTime, setGlobalTime] = useState("7D");
-  const [customDates, setCustomDates] = useState({ start: "", end: "" }); // ✨ Custom Date State
+  const [customDates, setCustomDates] = useState({ start: "", end: "" });
   const [auditFilter, setAuditFilter] = useState("All");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  useEffect(() => {
+    const unsub = listenToPartners(setPartners);
+    return () => unsub && unsub();
+  }, []);
+
+  const activePartner = useMemo(() => {
+    return partners.find((p) => p.status === "Active") || partners[0] || null;
+  }, [partners]);
+
+  useEffect(() => {
+    if (!activePartner?.id) return;
+    const unsub = listenToOrders(activePartner.id, setOrders);
+    return () => unsub && unsub();
+  }, [activePartner]);
+
+  const students = useMemo(() => {
+    const map = {};
+
+    orders.forEach((o) => {
+      if (!o.studentEmail) return;
+
+      if (!map[o.studentEmail]) {
+        map[o.studentEmail] = {
+          id: o.studentEmail,
+          name: o.studentName,
+          email: o.studentEmail,
+          phone: "",
+          joinDate: o.createdAt?.toDate
+            ? o.createdAt.toDate().toDateString()
+            : "",
+          learningState: "Completed",
+          certStatus: "N/A",
+          progress: 100,
+          assets: [],
+        };
+      }
+
+      map[o.studentEmail].assets.push({
+        name: o.assetName,
+        type: o.type === "course" ? "Course" : "E-Book",
+        price: o.saleValue,
+        date: o.createdAt?.toDate
+          ? o.createdAt.toDate().toDateString()
+          : "",
+      });
+    });
+
+    return Object.values(map).sort((a, b) =>
+      b.id.localeCompare(a.id)
+    );
+  }, [orders]);
+
+  const kpis = useMemo(() => {
+    let completed = 0;
+    let inProgress = 0;
+    let notStarted = 0;
+    let pendingCert = 0;
+
+    students.forEach((s) => {
+      if (s.learningState === "Completed") completed += 1;
+      if (s.learningState === "In-Progress") inProgress += 1;
+      if (s.learningState === "Not Started") notStarted += 1;
+      if (s.certStatus === "Pending") pendingCert += 1;
+    });
+
+    return { completed, inProgress, notStarted, pendingCert };
+  }, [students]);
+
   const filteredStudents = useMemo(() => {
-    return STUDENT_RECORDS.filter((s) => {
-      const matchesSearch =
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.id.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesAudit =
-        auditFilter === "All" ||
-        (auditFilter === "Completed" && s.learningState === "Completed") ||
-        (auditFilter === "InProgress" && s.learningState === "In-Progress") ||
-        (auditFilter === "NotStarted" && s.learningState === "Not Started") ||
-        (auditFilter === "PendingCert" && s.certStatus === "Pending") ||
-        (auditFilter === "IssuedCert" && s.certStatus === "Issued");
-      return matchesSearch && matchesAudit;
-    }).sort((a, b) => b.id.localeCompare(a.id));
-  }, [searchQuery, auditFilter]);
+    return students
+      .filter((s) => {
+        const matchesSearch =
+          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+        const matchesAudit =
+          auditFilter === "All" ||
+          (auditFilter === "Completed" &&
+            s.learningState === "Completed") ||
+          (auditFilter === "InProgress" &&
+            s.learningState === "In-Progress") ||
+          (auditFilter === "NotStarted" &&
+            s.learningState === "Not Started") ||
+          (auditFilter === "PendingCert" &&
+            s.certStatus === "Pending") ||
+          (auditFilter === "IssuedCert" &&
+            s.certStatus === "Issued");
+
+        return matchesSearch && matchesAudit;
+      })
+      .sort((a, b) => b.id.localeCompare(a.id));
+  }, [students, searchQuery, auditFilter]);
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+
   const currentData = filteredStudents.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -170,7 +143,6 @@ const StudentIntelligence = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* --- HEADER & GLOBAL FILTER --- */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
@@ -182,7 +154,6 @@ const StudentIntelligence = () => {
           </div>
 
           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            {/* ✨ CUSTOM DATE PICKER LOGIC ✨ */}
             <AnimatePresence>
               {globalTime === "Custom" && (
                 <motion.div
@@ -194,7 +165,10 @@ const StudentIntelligence = () => {
                     type="date"
                     className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none border-none"
                     onChange={(e) =>
-                      setCustomDates({ ...customDates, start: e.target.value })
+                      setCustomDates({
+                        ...customDates,
+                        start: e.target.value,
+                      })
                     }
                   />
                   <span className="text-slate-300 text-[10px] font-black uppercase tracking-tighter">
@@ -204,7 +178,10 @@ const StudentIntelligence = () => {
                     type="date"
                     className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none border-none"
                     onChange={(e) =>
-                      setCustomDates({ ...customDates, end: e.target.value })
+                      setCustomDates({
+                        ...customDates,
+                        end: e.target.value,
+                      })
                     }
                   />
                 </motion.div>
@@ -235,11 +212,10 @@ const StudentIntelligence = () => {
           </div>
         </div>
 
-        {/* --- KPI GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
             title="Course Completed"
-            val="42"
+            val={String(kpis.completed)}
             icon={<CheckCircle2 />}
             color="emerald"
             onClick={() => setAuditFilter("Completed")}
@@ -247,7 +223,7 @@ const StudentIntelligence = () => {
           />
           <KPICard
             title="Pending Certificates"
-            val="08"
+            val={String(kpis.pendingCert)}
             icon={<Award />}
             color="orange"
             onClick={() => setAuditFilter("PendingCert")}
@@ -255,7 +231,7 @@ const StudentIntelligence = () => {
           />
           <KPICard
             title="Active Learning"
-            val="124"
+            val={String(kpis.inProgress)}
             icon={<PlayCircle />}
             color="blue"
             onClick={() => setAuditFilter("InProgress")}
@@ -263,7 +239,7 @@ const StudentIntelligence = () => {
           />
           <KPICard
             title="Yet to Start"
-            val="15"
+            val={String(kpis.notStarted)}
             icon={<AlertCircle />}
             color="indigo"
             onClick={() => setAuditFilter("NotStarted")}
@@ -271,7 +247,6 @@ const StudentIntelligence = () => {
           />
         </div>
 
-        {/* --- STUDENT MASTER LEDGER --- */}
         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-4">
@@ -309,7 +284,6 @@ const StudentIntelligence = () => {
               <thead>
                 <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <th className="px-10 py-6">Identity / ID</th>
-                  {/* ✨ UPDATED PURCHASES COLUMN ✨ */}
                   <th className="px-10 py-6 text-center">Purchases (C / E)</th>
                   <th className="px-10 py-6 text-center">Learning Progress</th>
                   <th className="px-10 py-6 text-center">Certificate</th>
@@ -338,7 +312,6 @@ const StudentIntelligence = () => {
                         </div>
                       </div>
                     </td>
-                    {/* ✨ ASSET COUNT MIX ✨ */}
                     <td className="px-10 py-7">
                       <div className="flex items-center justify-center gap-2">
                         <span className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black tracking-tighter">
@@ -372,15 +345,7 @@ const StudentIntelligence = () => {
                       </div>
                     </td>
                     <td className="px-10 py-7 text-center">
-                      <span
-                        className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                          student.certStatus === "Issued"
-                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                            : student.certStatus === "Pending"
-                            ? "bg-orange-50 text-orange-600 border-orange-100"
-                            : "bg-slate-50 text-slate-400 border-slate-100"
-                        }`}
-                      >
+                      <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border bg-slate-50 text-slate-400 border-slate-100">
                         {student.certStatus}
                       </span>
                     </td>
@@ -426,7 +391,6 @@ const StudentIntelligence = () => {
         </div>
       </div>
 
-      {/* --- MODAL: STUDENT POPUP --- */}
       <AnimatePresence>
         {selectedStudent && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -525,8 +489,8 @@ const StudentIntelligence = () => {
                   icon={<ShieldCheck size={14} />}
                 >
                   <p className="text-sm font-black text-emerald-500 uppercase tracking-tight">
-                    {selectedStudent.learningState} ({selectedStudent.progress}
-                    %)
+                    {selectedStudent.learningState} (
+                    {selectedStudent.progress}%)
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">
                     Certificate: {selectedStudent.certStatus}
@@ -548,7 +512,6 @@ const StudentIntelligence = () => {
   );
 };
 
-// --- HELPERS ---
 const KPICard = ({ title, val, icon, color, onClick, active }) => {
   const styles = {
     emerald: "bg-emerald-50 text-emerald-600 border-emerald-200",
@@ -591,19 +554,5 @@ const DetailBox = ({ label, icon, children }) => (
     {children}
   </div>
 );
-
-const StatusBadge = ({ status }) => {
-  const s = {
-    Active: "bg-emerald-50 text-emerald-600",
-    Blocked: "bg-red-50 text-red-600",
-  };
-  return (
-    <span
-      className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${s[status]}`}
-    >
-      {status}
-    </span>
-  );
-};
 
 export default StudentIntelligence;
