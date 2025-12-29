@@ -38,8 +38,8 @@ const AdminLayout = () => {
       label: "Partners",
       path: "/Admin/partners",
       icon: <Briefcase size={20} />,
-    }, // ✨ Added Partners Tab
-    { label: "Students", path: "/Admin/students", icon: <Users size={20} /> }, // ✨ Added Students Tab
+    },
+    { label: "Students", path: "/Admin/students", icon: <Users size={20} /> },
     { label: "Sales", path: "/Admin/sales", icon: <TrendingUp size={20} /> },
     {
       label: "Payments",

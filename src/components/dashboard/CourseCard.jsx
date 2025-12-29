@@ -1,11 +1,33 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { PlayCircle, Clock, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const CourseCard = ({ course }) => {
-  // Mock Progress (In a real app, this comes from the database)
-  const progress = course.progress || Math.floor(Math.random() * 100);
+const CourseCard = ({ course, onPlay }) => {
+  const progress = course.progress || 0;
+  const isCompleted = course.status === "completed";
+  const [timeAgo, setTimeAgo] = useState("");
+
+  useEffect(() => {
+    const calculateTimeAgo = () => {
+      if (!course.lastAccessed) return "Never";
+      const now = new Date();
+      const lastAccess = new Date(course.lastAccessed);
+      const diffMs = now - lastAccess;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    };
+
+    setTimeAgo(calculateTimeAgo());
+    const interval = setInterval(() => setTimeAgo(calculateTimeAgo()), 60000);
+    return () => clearInterval(interval);
+  }, [course.lastAccessed]);
 
   return (
     <motion.div
@@ -26,17 +48,17 @@ const CourseCard = ({ course }) => {
           className="w-full h-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-60 transition-all duration-500"
         />
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <Link
-            to={`/courses/${course.id}`}
+          <button
+            onClick={() => onPlay && onPlay(course)}
             className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/50 text-white hover:bg-[#5edff4] hover:border-[#5edff4] hover:text-slate-900 transition-all"
           >
             <PlayCircle className="size-8" />
-          </Link>
+          </button>
         </div>
 
         {/* Progress Badge */}
         <div className="absolute bottom-3 right-3 px-3 py-1 bg-slate-900/80 backdrop-blur-md rounded-lg text-xs font-bold text-[#5edff4] border border-white/10">
-          {progress}% Complete
+          {isCompleted ? "Completed" : `${Math.round(progress)}%`}
         </div>
       </div>
 
@@ -48,7 +70,7 @@ const CourseCard = ({ course }) => {
           </h3>
           <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
             <span className="size-2 rounded-full bg-green-500" />
-            Last Active: 2 days ago
+            Last Active: {timeAgo}
           </p>
         </div>
 
@@ -57,7 +79,7 @@ const CourseCard = ({ course }) => {
           <div>
             <div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5">
               <span>Progress</span>
-              <span>{progress}/100%</span>
+              <span>{Math.round(progress)}/100%</span>
             </div>
             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <motion.div
@@ -69,12 +91,12 @@ const CourseCard = ({ course }) => {
             </div>
           </div>
 
-          <Link
-            to={`/courses/${course.id}`}
+          <button
+            onClick={() => onPlay && onPlay(course)}
             className="w-full block text-center py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20"
           >
-            {progress === 100 ? "View Certificate" : "Resume Learning"}
-          </Link>
+            {isCompleted ? "View Certificate" : "Continue Learning"}
+          </button>
         </div>
       </div>
     </motion.div>
