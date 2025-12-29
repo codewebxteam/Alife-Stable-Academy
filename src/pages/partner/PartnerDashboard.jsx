@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
@@ -15,82 +15,200 @@ import {
   TrendingUp,
   BookOpen,
   GraduationCap,
-  Calendar,
   ChevronDown,
   ArrowUpRight,
   Filter,
   User,
-  Search,
   Clock,
   ArrowRight,
 } from "lucide-react";
 
-// --- ADVANCED DATA ENGINE ---
-const DASHBOARD_DATA = {
-  Today: {
-    revenue: { total: "4,500", product: "3,200", comm: "1,300" },
-    courses: {
-      total: 12,
-      top: [
-        { name: "React Pro Mastery", units: 8 },
-        { name: "UI/UX Design Bootcamp", units: 4 },
-      ],
-    },
-    ebooks: {
-      total: 8,
-      top: [
-        { name: "JavaScript Survival Guide", units: 5 },
-        { name: "CSS Artistry", units: 3 },
-      ],
-    },
-    payout: "1,200",
-    graph: [
-      { name: "Mon", sales: 2, comm: 400 },
-      { name: "Tue", sales: 1, comm: 200 },
-      { name: "Wed", sales: 5, comm: 900 },
-      { name: "Thu", sales: 3, comm: 600 },
-      { name: "Fri", sales: 4, comm: 800 },
-      { name: "Sat", sales: 6, comm: 1100 },
-      { name: "Sun", sales: 2, comm: 400 },
-    ],
-    monthlyGraph: [
-      { name: "Jan", sales: 45, comm: 8000 },
-      { name: "Feb", sales: 52, comm: 9500 },
-      { name: "Mar", sales: 48, comm: 8800 },
-      { name: "Apr", sales: 61, comm: 11000 },
-      { name: "May", sales: 55, comm: 10200 },
-      { name: "Jun", sales: 67, comm: 12500 },
-      { name: "Jul", sales: 72, comm: 14000 },
-      { name: "Aug", sales: 68, comm: 13200 },
-      { name: "Sep", sales: 75, comm: 15000 },
-      { name: "Oct", sales: 82, comm: 16500 },
-      { name: "Nov", sales: 88, comm: 17800 },
-      { name: "Dec", sales: 95, comm: 19000 },
-    ],
-  },
-  // Add other ranges as needed...
-};
+import { listenToOrders } from "./../../firebase/orders.service";
+import { listenToPartners } from "./../../firebase/partners.service";
+import { listenToPayoutHistory } from "./../../firebase/payouts.service";
 
 const PartnerDashboard = () => {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState("7D");
-  const [graphView, setGraphView] = useState("weekly"); // 'weekly' | 'monthly'
+  const [graphView, setGraphView] = useState("weekly");
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
   const [isRequesting, setIsRequesting] = useState(false);
 
-  const activeData = useMemo(() => DASHBOARD_DATA["Today"], []); // Simplified for demo logic
+  const [orders, setOrders] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [payoutHistory, setPayoutHistory] = useState([]);
+
+  useEffect(() => {
+    const unsubPartners = listenToPartners(setPartners);
+    return () => {
+      unsubPartners && unsubPartners();
+    };
+  }, []);
+
+  const activePartner = useMemo(() => {
+    return partners.find((p) => p.status === "Active") || partners[0] || null;
+  }, [partners]);
+
+  useEffect(() => {
+    if (!activePartner?.id) return;
+    const unsubOrders = listenToOrders(activePartner.id, setOrders);
+    return () => {
+      unsubOrders && unsubOrders();
+    };
+  }, [activePartner]);
+
+  useEffect(() => {
+    if (!activePartner?.id) return;
+    const unsub = listenToPayoutHistory(activePartner.id, setPayoutHistory);
+    return () => unsub && unsub();
+  }, [activePartner]);
+
+  const partnerOrders = useMemo(() => {
+    if (!activePartner?.id) return [];
+    return orders.filter((o) => o.partnerId === activePartner.id);
+  }, [orders, activePartner]);
+
+  const activeData = useMemo(() => {
+    const productRevenue = partnerOrders.reduce(
+      (sum, o) => sum + Number(o.saleValue || 0),
+      0
+    );
+    const commissionRevenue = partnerOrders.reduce(
+      (sum, o) => sum + Number(o.commission || 0),
+      0
+    );
+
+    const courses = partnerOrders.filter((o) => o.type === "course");
+    const ebooks = partnerOrders.filter((o) => o.type === "ebook");
+
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const months = [
+      "Jan","Feb","Mar","Apr","May","Jun",
+      "Jul","Aug","Sep","Oct","Nov","Dec",
+    ];
+
+    const weeklyGraph = days.map((d, i) => {
+      const filtered = partnerOrders.filter((o) => {
+        if (!o.createdAt?.toDate) return false;
+        const dt = o.createdAt.toDate();
+        return dt >= startOfWeek && dt < endOfWeek && dt.getDay() === i;
+      });
+      return {
+        name: d,
+        sales: filtered.length,
+        comm: filtered.reduce(
+          (s, o) => s + Number(o.commission || 0),
+          0
+        ),
+      };
+    });
+
+    const monthlyGraph = months.map((m, i) => {
+      const filtered = partnerOrders.filter((o) => {
+        if (!o.createdAt?.toDate) return false;
+        const dt = o.createdAt.toDate();
+        return (
+          dt.getFullYear() === now.getFullYear() &&
+          dt.getMonth() === i
+        );
+      });
+      return {
+        name: m,
+        sales: filtered.length,
+        comm: filtered.reduce(
+          (s, o) => s + Number(o.commission || 0),
+          0
+        ),
+      };
+    });
+
+    const assetTotals = {};
+    partnerOrders.forEach((o) => {
+      assetTotals[o.assetName] =
+        (assetTotals[o.assetName] || 0) + Number(o.saleValue || 0);
+    });
+    const maxAsset = Math.max(...Object.values(assetTotals), 1);
+
+    const assetPulseValues = {
+      "React Pro Mastery": Math.round(
+        ((assetTotals["React Pro Mastery"] || 0) / maxAsset) * 100
+      ),
+      "UI/UX Design Bootcamp": Math.round(
+        ((assetTotals["UI/UX Design Bootcamp"] || 0) / maxAsset) * 100
+      ),
+      "JavaScript Survival Guide": Math.round(
+        ((assetTotals["JavaScript Survival Guide"] || 0) / maxAsset) * 100
+      ),
+      "Next.js 14 Guide": Math.round(
+        ((assetTotals["Next.js 14 Guide"] || 0) / maxAsset) * 100
+      ),
+    };
+
+    const payoutPending = payoutHistory.reduce(
+      (s, p) => s + Number(p.pending || 0),
+      0
+    );
+
+    return {
+      revenue: {
+        total: (productRevenue + commissionRevenue).toLocaleString(),
+        product: productRevenue.toLocaleString(),
+        comm: commissionRevenue.toLocaleString(),
+      },
+      courses: {
+        total: courses.length,
+        top: Object.entries(
+          courses.reduce((acc, c) => {
+            acc[c.assetName] = (acc[c.assetName] || 0) + 1;
+            return acc;
+          }, {})
+        )
+          .slice(0, 2)
+          .map(([name, units]) => ({ name, units })),
+      },
+      ebooks: {
+        total: ebooks.length,
+        top: Object.entries(
+          ebooks.reduce((acc, e) => {
+            acc[e.assetName] = (acc[e.assetName] || 0) + 1;
+            return acc;
+          }, {})
+        )
+          .slice(0, 2)
+          .map(([name, units]) => ({ name, units })),
+      },
+      payout: payoutPending,
+      graph: weeklyGraph,
+      monthlyGraph,
+      assetPulseValues,
+    };
+  }, [partnerOrders, payoutHistory]);
 
   const handleRequestPayout = () => {
     setIsRequesting(true);
-    setTimeout(() => {
-      setIsRequesting(false);
-    }, 2000);
+    setTimeout(() => setIsRequesting(false), 2000);
+  };
+
+  const timeAgo = (ts) => {
+    if (!ts?.toDate) return "Just now";
+    const diff = Date.now() - ts.toDate().getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins <= 0) return "Just now";
+    if (mins < 60) return `${mins} mins ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs} hrs ago`;
   };
 
   return (
     <div className="p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900 selection:bg-indigo-100">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* --- DYNAMIC HEADER & SMART FILTER --- */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900">
@@ -148,7 +266,6 @@ const PartnerDashboard = () => {
           </div>
         </div>
 
-        {/* --- KPI CARDS GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             label="Total Revenue"
@@ -181,16 +298,14 @@ const PartnerDashboard = () => {
             value={activeData.courses.total}
             icon={<GraduationCap className="text-indigo-500" />}
             footer={
-              <div className="space-y-2 mt-5 pt-5 border-t border-slate-50">
+              <div className="space-y-1 mt-5 pt-5 border-t border-slate-50">
                 {activeData.courses.top.map((c, i) => (
                   <div
                     key={i}
-                    className="flex justify-between text-[10px] font-bold italic text-slate-500"
+                    className="flex justify-between items-center text-[10px] font-bold text-slate-500"
                   >
-                    <span>{c.name}</span>
-                    <span className="text-slate-900 not-italic">
-                      {c.units} Units
-                    </span>
+                    <span className="truncate">{c.name}</span>
+                    <span className="text-slate-900">{c.units} Units</span>
                   </div>
                 ))}
               </div>
@@ -202,16 +317,14 @@ const PartnerDashboard = () => {
             value={activeData.ebooks.total}
             icon={<BookOpen className="text-emerald-500" />}
             footer={
-              <div className="space-y-2 mt-5 pt-5 border-t border-slate-50">
+              <div className="space-y-1 mt-5 pt-5 border-t border-slate-50">
                 {activeData.ebooks.top.map((e, i) => (
                   <div
                     key={i}
-                    className="flex justify-between text-[10px] font-bold italic text-slate-500"
+                    className="flex justify-between items-center text-[10px] font-bold text-slate-500"
                   >
-                    <span>{e.name}</span>
-                    <span className="text-slate-900 not-italic">
-                      {e.units} Units
-                    </span>
+                    <span className="truncate">{e.name}</span>
+                    <span className="text-slate-900">{e.units} Units</span>
                   </div>
                 ))}
               </div>
@@ -240,7 +353,6 @@ const PartnerDashboard = () => {
           </div>
         </div>
 
-        {/* --- ANALYTICS SECTION --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 bg-white rounded-[48px] p-10 border border-slate-100 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-12">
@@ -325,22 +437,22 @@ const PartnerDashboard = () => {
             <div className="space-y-8">
               <PerformanceBar
                 label="React Pro Mastery"
-                val={82}
+                val={activeData.assetPulseValues["React Pro Mastery"]}
                 color="#6366f1"
               />
               <PerformanceBar
                 label="UI/UX Design Bootcamp"
-                val={68}
+                val={activeData.assetPulseValues["UI/UX Design Bootcamp"]}
                 color="#10b981"
               />
               <PerformanceBar
                 label="JavaScript Survival Guide"
-                val={45}
+                val={activeData.assetPulseValues["JavaScript Survival Guide"]}
                 color="#f59e0b"
               />
               <PerformanceBar
                 label="Next.js 14 Guide"
-                val={30}
+                val={activeData.assetPulseValues["Next.js 14 Guide"]}
                 color="#ec4899"
               />
 
@@ -360,7 +472,6 @@ const PartnerDashboard = () => {
           </div>
         </div>
 
-        {/* --- ENHANCED LIVE ACQUISITION FEED --- */}
         <div className="bg-white rounded-[48px] border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-10 border-b border-slate-50 flex justify-between items-center">
             <div>
@@ -394,9 +505,9 @@ const PartnerDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {[1, 2, 3, 4].map((item) => (
+                {partnerOrders.slice(0, 4).map((o) => (
                   <tr
-                    key={item}
+                    key={o.id}
                     onClick={() => navigate("/partner-dashboard/students")}
                     className="group hover:bg-slate-50/50 transition-all cursor-pointer"
                   >
@@ -407,21 +518,23 @@ const PartnerDashboard = () => {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-800">
-                            Aryan Sharma
+                            {o.studentName}
                           </p>
                           <p className="text-[10px] text-slate-400 font-medium italic">
-                            aryan.dev@example.com
+                            {o.studentEmail}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-10 py-7 text-center">
                       <span className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase border border-indigo-100">
-                        React Pro Mastery
+                        {o.assetName}
                       </span>
                     </td>
                     <td className="px-10 py-7">
-                      <p className="text-sm font-black text-slate-900">₹749</p>
+                      <p className="text-sm font-black text-slate-900">
+                        ₹{o.saleValue}
+                      </p>
                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
                         Verified Purchase
                       </p>
@@ -429,10 +542,10 @@ const PartnerDashboard = () => {
                     <td className="px-10 py-7 text-right">
                       <div className="flex flex-col items-end">
                         <span className="text-emerald-500 font-black flex items-center gap-1">
-                          <ArrowUpRight size={14} /> +₹250
+                          <ArrowUpRight size={14} /> +₹{o.commission}
                         </span>
                         <span className="text-[9px] text-slate-300 font-medium">
-                          Just now
+                          {timeAgo(o.createdAt)}
                         </span>
                       </div>
                     </td>
@@ -446,8 +559,6 @@ const PartnerDashboard = () => {
     </div>
   );
 };
-
-// --- HIGHLY REUSABLE COMPONENTS ---
 
 const StatCard = ({ label, value, icon, footer }) => (
   <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm group">
@@ -488,7 +599,7 @@ const PerformanceBar = ({ label, val, color }) => (
 );
 
 const CustomTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
+  if (active && payload && payload.length >= 2) {
     return (
       <div className="bg-slate-900 text-white p-6 rounded-[24px] shadow-2xl border border-white/10 backdrop-blur-md">
         <p className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">
@@ -504,7 +615,9 @@ const CustomTooltip = ({ active, payload }) => {
             </span>
           </div>
           <div className="flex justify-between gap-10">
-            <span className="text-xs font-bold text-slate-400">Units Sold</span>
+            <span className="text-xs font-bold text-slate-400">
+              Units Sold
+            </span>
             <span className="text-xs font-black text-indigo-400">
               {payload[1].value} Units
             </span>

@@ -543,4 +543,6 @@ const InvoiceRow = ({ label, val, highlight }) => (
   </div>
 );
 
+
 export default SalesManager;
+
