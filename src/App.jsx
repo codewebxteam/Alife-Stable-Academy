@@ -9,6 +9,7 @@ import {
 import { useAuth } from "./context/AuthContext";
 import { useAgency, AgencyProvider } from "./context/AgencyContext";
 import { EBookProvider } from "./context/EBookContext";
+import { CourseProvider } from "./context/CourseContext";
 import { db } from "./firebase/config";
 
 // --- Components ---
@@ -46,13 +47,14 @@ import StudentIntelligence from "./pages/partner/StudentIntelligence";
 // --- [NEW] Admin Pages ---
 import AdminLayout from "./pages/Admin/AdminLayout";
 import IntelligenceHub from "./components/Admin/IntelligenceHub";
-import PartnerIntelligence from "./components/Admin/PartnerIntelligence"; //
+import PartnerIntelligence from "./components/Admin/PartnerIntelligence";
 import StudentData from "./components/Admin/StudentData";
 import SalesManager from "./components/Admin/SalesManager";
 import PaymentManager from "./components/Admin/PaymentManager";
 import CourseManager from "./components/Admin/CourseManager";
 import EBookManager from "./components/Admin/EBookManager";
 import AdminSettings from "./components/Admin/AdminSettings";
+import BunnyUploader from "./components/Admin/BunnyUploader";
 
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
@@ -217,14 +219,13 @@ const AppContent = () => {
         {/* --- [NEW] ADMIN DASHBOARD ROUTES (SIDEBAR SUPPORT) --- */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<IntelligenceHub />} />
-          {/* ✨ Added Partner and Student Routes */}
           <Route path="partners" element={<PartnerIntelligence />} />
           <Route path="students" element={<StudentData />} />
-
           <Route path="sales" element={<SalesManager />} />
           <Route path="payments" element={<PaymentManager />} />
           <Route path="courses" element={<CourseManager />} />
           <Route path="ebooks" element={<EBookManager />} />
+          <Route path="bunny" element={<BunnyUploader />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 
@@ -257,7 +258,9 @@ const App = () => {
     <Router>
       <AgencyProvider>
         <EBookProvider>
-          <AppContent />
+          <CourseProvider>
+            <AppContent />
+          </CourseProvider>
         </EBookProvider>
       </AgencyProvider>
     </Router>

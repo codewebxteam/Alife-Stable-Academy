@@ -419,3 +419,5 @@ const TabButton = ({ label, active, onClick, icon }) => (
 );
 
 export default PaymentManager;
+
+

@@ -1,13 +1,29 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Filter } from "lucide-react";
+import { Link } from "react-router-dom";
 import CourseCard from "../../components/dashboard/CourseCard";
-import { COURSES_DATA } from "../../data/coursesData"; // Importing your existing data
+import CourseVideoPlayer from "../../components/CourseVideoPlayer";
+import { useCourse } from "../../context/CourseContext";
 
 const MyCourses = () => {
-  // Simulate "Enrolled" courses by just taking the first 4 for now
-  // In real app: const { currentUser } = useAuth(); const myCourses = currentUser.enrolledCourses;
-  const myCourses = COURSES_DATA.slice(0, 4);
+  const { enrolledCourses } = useCourse();
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedCourse, setSelectedCourse] = useState(null);
+
+  const filteredCourses = enrolledCourses.filter(course => {
+    if (filterStatus === "all") return true;
+    if (filterStatus === "in-progress") return course.status === "in-progress";
+    if (filterStatus === "completed") return course.status === "completed";
+    return true;
+  });
+
+  const inProgressCount = enrolledCourses.filter(c => c.status === "in-progress").length;
+  const completedCount = enrolledCourses.filter(c => c.status === "completed").length;
+
+  const handlePlayCourse = (course) => {
+    setSelectedCourse(course);
+  };
 
   return (
     <div className="space-y-8 pb-10">
@@ -36,39 +52,70 @@ const MyCourses = () => {
         </div>
       </div>
 
-      {/* Tabs (Optional) */}
+      {/* Tabs */}
       <div className="flex gap-6 border-b border-slate-200">
-        <button className="pb-3 text-sm font-bold text-[#0891b2] border-b-2 border-[#0891b2]">
-          All Courses ({myCourses.length})
+        <button 
+          onClick={() => setFilterStatus("all")}
+          className={`pb-3 text-sm font-bold transition-colors ${
+            filterStatus === "all" 
+              ? "text-[#0891b2] border-b-2 border-[#0891b2]" 
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          All Courses ({enrolledCourses.length})
         </button>
-        <button className="pb-3 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
-          In Progress
+        <button 
+          onClick={() => setFilterStatus("in-progress")}
+          className={`pb-3 text-sm font-bold transition-colors ${
+            filterStatus === "in-progress" 
+              ? "text-[#0891b2] border-b-2 border-[#0891b2]" 
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          In Progress ({inProgressCount})
         </button>
-        <button className="pb-3 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
-          Completed
+        <button 
+          onClick={() => setFilterStatus("completed")}
+          className={`pb-3 text-sm font-bold transition-colors ${
+            filterStatus === "completed" 
+              ? "text-[#0891b2] border-b-2 border-[#0891b2]" 
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Completed ({completedCount})
         </button>
       </div>
 
       {/* Course Grid */}
-      {myCourses.length > 0 ? (
+      {filteredCourses.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {myCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+          {filteredCourses.map((course) => (
+            <CourseCard key={course.courseId} course={course} onPlay={handlePlayCourse} />
           ))}
         </div>
       ) : (
-        // Empty State
         <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
           <p className="text-slate-500 mb-4">
-            You haven't enrolled in any courses yet.
+            {filterStatus === "all" 
+              ? "You haven't enrolled in any courses yet." 
+              : `No ${filterStatus.replace("-", " ")} courses.`}
           </p>
-          <Link
-            to="/courses"
-            className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-[#5edff4] hover:text-slate-900 transition-all"
-          >
-            Explore Courses
-          </Link>
+          {filterStatus === "all" && (
+            <Link
+              to="/courses"
+              className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-[#5edff4] hover:text-slate-900 transition-all"
+            >
+              Explore Courses
+            </Link>
+          )}
         </div>
+      )}
+      
+      {selectedCourse && (
+        <CourseVideoPlayer 
+          course={selectedCourse} 
+          onClose={() => setSelectedCourse(null)} 
+        />
       )}
     </div>
   );

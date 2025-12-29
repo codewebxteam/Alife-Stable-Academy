@@ -24,7 +24,17 @@ export const EBookProvider = ({ children }) => {
     const docRef = doc(db, "purchasedBooks", currentUser.uid);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      setPurchasedBooks(docSnap.data().bookIds || []);
+      const bookIds = docSnap.data().bookIds || [];
+      setPurchasedBooks(bookIds);
+      
+      // Sync with dashboard
+      const dashboardRef = doc(db, "dashboard", currentUser.uid);
+      const dashboardSnap = await getDoc(dashboardRef);
+      if (dashboardSnap.exists()) {
+        await updateDoc(dashboardRef, {
+          "stats.ebooks": bookIds.length
+        });
+      }
     }
   };
 
@@ -35,6 +45,15 @@ export const EBookProvider = ({ children }) => {
     
     const docRef = doc(db, "purchasedBooks", currentUser.uid);
     await setDoc(docRef, { bookIds: newPurchased }, { merge: true });
+    
+    // Update dashboard stats
+    const dashboardRef = doc(db, "dashboard", currentUser.uid);
+    const dashboardSnap = await getDoc(dashboardRef);
+    if (dashboardSnap.exists()) {
+      await updateDoc(dashboardRef, {
+        "stats.ebooks": newPurchased.length
+      });
+    }
   };
 
   return (

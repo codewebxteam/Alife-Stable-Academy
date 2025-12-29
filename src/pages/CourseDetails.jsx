@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Check, UserCheck, Star, Globe } from "lucide-react";
 import { COURSES_DATA } from "../data/coursesData";
-import { useAuth } from "../context/AuthContext"; // [NEW] Import Auth Context
+import { useAuth } from "../context/AuthContext";
+import { useCourse } from "../context/CourseContext";
 
 // Components
 import CourseHero from "../components/course-details/CourseHero";
@@ -12,23 +13,24 @@ import AuthModal from "../components/AuthModal";
 
 const CourseDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const course =
     COURSES_DATA.find((c) => c.id.toString() === id) || COURSES_DATA[0];
 
-  // [NEW] Real Auth State
   const { currentUser } = useAuth();
+  const { enrollCourse } = useCourse();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // [NEW] Smart Enroll Handler
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (currentUser) {
-      // 1. User IS Logged In -> Process Enrollment
-      alert(
-        `🎉 Successfully enrolled in ${course.title}!\n\nWelcome aboard, ${currentUser.displayName}!`
-      );
-      // TODO: In future, save this to Firestore 'users' collection
+      try {
+        await enrollCourse(course);
+        navigate('/dashboard/my-courses');
+      } catch (error) {
+        console.error("Enrollment error:", error);
+        alert(error.message || "Enrollment failed. Please try again.");
+      }
     } else {
-      // 2. User IS NOT Logged In -> Open Login Modal
       setIsAuthOpen(true);
     }
   };

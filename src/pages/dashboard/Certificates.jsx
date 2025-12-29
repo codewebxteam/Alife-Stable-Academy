@@ -1,36 +1,47 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Award, Download, Lock, PlayCircle, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useAuth } from "../../context/AuthContext";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config";
 
 const Certificates = () => {
-  // Mock Data: Combining enrolled courses with their progress status
-  const certificatesData = [
-    {
-      id: 1,
-      courseTitle: "Complete Web Development Bootcamp",
-      instructor: "Dr. Angela Yu",
-      issueDate: "March 15, 2025",
-      progress: 100, // Completed -> Unlocked
-      certificateId: "CERT-WEB-2025",
-    },
-    {
-      id: 2,
-      courseTitle: "UI/UX Design Masterclass",
-      instructor: "Abhinav Chhikara",
-      issueDate: null,
-      progress: 65, // In Progress -> Locked
-      certificateId: null,
-    },
-    {
-      id: 3,
-      courseTitle: "React JS - The Complete Guide",
-      instructor: "Maximilian Schwarzmüller",
-      issueDate: null,
-      progress: 12, // In Progress -> Locked
-      certificateId: null,
-    },
-  ];
+  const { currentUser } = useAuth();
+  const [certificates, setCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchCertificates();
+    }
+  }, [currentUser]);
+
+  const fetchCertificates = async () => {
+    try {
+      // Get enrolled courses with progress from My Courses
+      const enrolledDoc = await getDoc(doc(db, "enrolledCourses", currentUser.uid));
+      const enrolledCourses = enrolledDoc.exists() ? enrolledDoc.data().courses || [] : [];
+
+      // Create certificates data from enrolled courses
+      const certsData = enrolledCourses.map(course => {
+        return {
+          id: course.courseId,
+          courseTitle: course.title,
+          instructor: course.instructor || "Platform Instructor",
+          issueDate: course.progress === 100 ? new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null,
+          progress: course.progress || 0,
+          certificateId: course.progress === 100 ? `CERT-${course.courseId.slice(0, 8).toUpperCase()}` : null,
+          status: course.status
+        };
+      });
+
+      setCertificates(certsData);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+    }
+    setLoading(false);
+  };
 
   return (
     <div className="space-y-8 pb-10">
@@ -41,11 +52,35 @@ const Certificates = () => {
         </p>
       </div>
 
-      <div className="grid gap-6">
-        {certificatesData.map((cert) => (
-          <CertificateCard key={cert.id} data={cert} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5edff4]"></div>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {certificates.length > 0 ? (
+            certificates.map((cert) => (
+              <CertificateCard key={cert.id} data={cert} />
+            ))
+          ) : (
+            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
+              <Award size={48} className="mx-auto text-slate-300 mb-4" />
+              <h3 className="text-lg font-bold text-slate-900 mb-2">
+                No Certificates Yet
+              </h3>
+              <p className="text-slate-500 mb-6">
+                Purchase and complete videos to earn certificates
+              </p>
+              <Link
+                to="/courses"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#5edff4] text-slate-900 rounded-xl font-bold hover:bg-[#4ecee4] transition-all"
+              >
+                Browse Videos <ArrowRight size={18} />
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useCourse } from "../../context/CourseContext";
 import {
   BarChart,
   Bar,
@@ -24,11 +25,12 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
 const StudentDashboard = () => {
   const { currentUser } = useAuth();
+  const { enrolledCourses } = useCourse();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,7 @@ const StudentDashboard = () => {
     streak: 0,
   });
 
-  const enrolledCourses =
-    stats.find((s) => s.label === "Enrolled Courses")?.value || 0;
+  const enrolledCoursesCount = enrolledCourses.length;
 
   // const upcomingEvents = [
   //   {
@@ -63,16 +64,21 @@ const StudentDashboard = () => {
 
     const ref = doc(db, "dashboard", currentUser.uid);
 
-    const unsubscribe = onSnapshot(ref, (snap) => {
+    const unsubscribe = onSnapshot(ref, async (snap) => {
       if (!snap.exists()) return;
 
       const data = snap.data();
 
-      // Stats cards
+      if (data.stats.enrolledCourses !== enrolledCoursesCount) {
+        await updateDoc(ref, {
+          "stats.enrolledCourses": enrolledCoursesCount
+        });
+      }
+
       setStats([
         {
           label: "Enrolled Courses",
-          value: data.stats.enrolledCourses,
+          value: enrolledCoursesCount,
           icon: PlayCircle,
           color: "text-[#5edff4]",
           bg: "bg-[#5edff4]/10",
@@ -113,7 +119,7 @@ const StudentDashboard = () => {
     });
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser, enrolledCoursesCount]);
 
   if (loading) {
     return (
@@ -174,7 +180,7 @@ const progressPercent = Math.min(
             </p>
           </div>
           <div className="relative z-10 pt-8 flex gap-4">
-            {enrolledCourses > 0 ? (
+            {enrolledCoursesCount > 0 ? (
               <button
                 onClick={() => navigate("/dashboard/my-courses")}
                 className="
@@ -414,7 +420,7 @@ const progressPercent = Math.min(
 
             {/* Actions */}
             <div className="space-y-3">
-              {enrolledCourses > 0 ? (
+              {enrolledCoursesCount > 0 ? (
                 <>
                   {/* Continue Learning */}
                   <button
@@ -515,7 +521,7 @@ const progressPercent = Math.min(
 
             {/* Footer Hint (NOT a button) */}
             <div className="mt-6 text-center text-xs text-slate-400">
-              {enrolledCourses > 0
+              {enrolledCoursesCount > 0
                 ? "Keep your learning streak alive 🚀"
                 : "Your learning journey starts here ✨"}
             </div>
