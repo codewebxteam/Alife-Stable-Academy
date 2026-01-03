@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { intelligenceService } from "../../services/intelligenceService";
 import {
   AreaChart,
   Area,
@@ -36,8 +37,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-// --- PRO-LEVEL DATA STREAMS ---
-const WEEKLY_DATA = [
+
+
+// Fallback data for graphs
+const FALLBACK_WEEKLY = [
   { name: "Sun", partner: 4000, direct: 2400 },
   { name: "Mon", partner: 3000, direct: 1398 },
   { name: "Tue", partner: 5000, direct: 9800 },
@@ -47,52 +50,85 @@ const WEEKLY_DATA = [
   { name: "Sat", partner: 3490, direct: 4300 },
 ];
 
-const MONTHLY_DATA = [
+const FALLBACK_MONTHLY = [
   { name: "Jan", partner: 45000, direct: 22000 },
   { name: "Feb", partner: 52000, direct: 28000 },
   { name: "Mar", partner: 48000, direct: 35000 },
   { name: "Apr", partner: 61000, direct: 42000 },
   { name: "May", partner: 55000, direct: 39000 },
   { name: "Jun", partner: 67000, direct: 51000 },
-  { name: "Jul", partner: 72000, direct: 58000 },
-  { name: "Aug", partner: 69000, direct: 62000 },
-  { name: "Sep", partner: 75000, direct: 68000 },
-  { name: "Oct", partner: 82000, direct: 71000 },
-  { name: "Nov", partner: 88000, direct: 79000 },
-  { name: "Dec", partner: 95000, direct: 85000 },
-];
-
-const COURSE_PIE = [
-  { name: "React Pro", value: 400, color: "#6366f1" },
-  { name: "UI/UX Master", value: 300, color: "#8b5cf6" },
-  { name: "Node Backend", value: 200, color: "#10b981" },
-  { name: "Python AI", value: 100, color: "#f59e0b" },
-];
-
-const EBOOK_PIE = [
-  { name: "JS Pocket", value: 500, color: "#f43f5e" },
-  { name: "Tailwind Guide", value: 350, color: "#3b82f6" },
-  { name: "Freelance 101", value: 250, color: "#10b981" },
 ];
 
 const IntelligenceHub = () => {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState("7D");
   const [velocityToggle, setVelocityToggle] = useState("Weekly");
+  const [loading, setLoading] = useState(true);
 
-  // ✨ Mock List for Critical Alerts (Can be 10, 15, or 50)
-  const INACTIVE_PARTNERS = [
-    "Nexus Digital",
-    "Global Learn Academy",
-    "Creative Minds",
-    "EduTech Pro",
-    "Skyline Institute",
-    "Alpha Learning",
-    "Pioneer Academy",
-  ];
+  // Real-time data states
+  const [revenueData, setRevenueData] = useState({ totalRevenue: 0, directRevenue: 0, partnerRevenue: 0 });
+  const [courseData, setCourseData] = useState({ total: 0, self: 0, partner: 0 });
+  const [studentData, setStudentData] = useState({ total: 0, self: 0, partner: 0 });
+  const [topPartners, setTopPartners] = useState([]);
+  const [velocityData, setVelocityData] = useState([]);
+  const [coursePieData, setCoursePieData] = useState([]);
+  const [ebookPieData, setEbookPieData] = useState([]);
+  const [academicData, setAcademicData] = useState({ notStarted: 0, inProgress: 0, completed: 0, eligible: 0, issued: 0, pending: 0 });
+  const [liquidityData, setLiquidityData] = useState({ payoutsPending: 0, withdrawalQueue: 0 });
+  const [inactivePartners, setInactivePartners] = useState([]);
+  const [hotAsset, setHotAsset] = useState({ name: "N/A", units: 0 });
+
+  // Fetch all data on mount
+  useEffect(() => {
+    fetchAllData();
+  }, [timeRange, velocityToggle]);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [revenue, courses, students, partners, velocity, coursePie, ebookPie, academic, liquidity, inactive, asset] = await Promise.all([
+        intelligenceService.getRevenueData(timeRange),
+        intelligenceService.getCourseAcquisitions(),
+        intelligenceService.getStudentCount(),
+        intelligenceService.getTopPartners(),
+        intelligenceService.getRevenueVelocity(velocityToggle),
+        intelligenceService.getCourseSalesDistribution(),
+        intelligenceService.getEbookSalesDistribution(),
+        intelligenceService.getAcademicIntelligence(),
+        intelligenceService.getLiquidityData(),
+        intelligenceService.getInactivePartners(),
+        intelligenceService.getHotAssetSpotlight()
+      ]);
+
+      setRevenueData(revenue);
+      setCourseData(courses);
+      setStudentData(students);
+      setTopPartners(partners);
+      setVelocityData(velocity.length > 0 ? velocity : (velocityToggle === "Weekly" ? FALLBACK_WEEKLY : FALLBACK_MONTHLY));
+      setCoursePieData(coursePie);
+      setEbookPieData(ebookPie);
+      setAcademicData(academic);
+      setLiquidityData(liquidity);
+      setInactivePartners(inactive);
+      setHotAsset(asset);
+    } catch (error) {
+      console.error("Error fetching intelligence data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-10">
+      {loading && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="size-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm font-black text-slate-600 uppercase tracking-widest">Loading Intelligence Data...</p>
+          </div>
+        </div>
+      )}
+      
       {/* --- OMNI-FILTER --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -148,40 +184,40 @@ const IntelligenceHub = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MacroCard
           title="Net Revenue Ecosystem"
-          val="₹18.4L"
+          val={revenueData.totalRevenue >= 100000 ? `₹${(revenueData.totalRevenue / 100000).toFixed(1)}L` : `₹${revenueData.totalRevenue.toLocaleString()}`}
           subData={[
-            { label: "Direct", value: "₹7.3L" },
-            { label: "Partner", value: "₹11.1L" },
+            { label: "Direct", value: revenueData.directRevenue >= 100000 ? `₹${(revenueData.directRevenue / 100000).toFixed(1)}L` : `₹${revenueData.directRevenue.toLocaleString()}` },
+            { label: "Partner", value: revenueData.partnerRevenue >= 100000 ? `₹${(revenueData.partnerRevenue / 100000).toFixed(1)}L` : `₹${revenueData.partnerRevenue.toLocaleString()}` },
           ]}
           icon={<Globe size={20} />}
           color="indigo"
         />
         <MacroCard
           title="Course Acquisitions"
-          val="2,840"
+          val={courseData.total.toLocaleString()}
           subData={[
-            { label: "Self", value: "1,200" },
-            { label: "Partner", value: "1,640" },
+            { label: "Self", value: courseData.self.toLocaleString() },
+            { label: "Partner", value: courseData.partner.toLocaleString() },
           ]}
           icon={<GraduationCap size={20} />}
           color="emerald"
         />
         <MacroCard
           title="Growth Partners"
-          val="Nexus & Sky"
+          val={topPartners.length > 0 ? `${topPartners[0]?.name?.split(' ')[0] || 'N/A'}${topPartners[1] ? ' & ' + topPartners[1]?.name?.split(' ')[0] : ''}` : "N/A"}
           subData={[
-            { label: "Rev", value: "₹4.2L" },
-            { label: "Rev", value: "₹3.8L" },
+            { label: "Rev", value: topPartners[0] ? `₹${(topPartners[0].revenue / 100000).toFixed(1)}L` : "₹0" },
+            { label: "Rev", value: topPartners[1] ? `₹${(topPartners[1].revenue / 100000).toFixed(1)}L` : "₹0" },
           ]}
           icon={<Briefcase size={20} />}
           color="orange"
         />
         <MacroCard
           title="Student Universe"
-          val="12,450"
+          val={studentData.total.toLocaleString()}
           subData={[
-            { label: "Self", value: "4.5k" },
-            { label: "Partner", value: "7.9k" },
+            { label: "Self", value: studentData.self >= 1000 ? `${(studentData.self / 1000).toFixed(1)}k` : studentData.self },
+            { label: "Partner", value: studentData.partner >= 1000 ? `${(studentData.partner / 1000).toFixed(1)}k` : studentData.partner },
           ]}
           icon={<Users size={20} />}
           color="blue"
@@ -226,61 +262,61 @@ const IntelligenceHub = () => {
           <div className="h-[380px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
-                data={velocityToggle === "Weekly" ? WEEKLY_DATA : MONTHLY_DATA}
+                data={velocityData}
               >
-                <defs>
-                  <linearGradient id="colorPartner" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorDirect" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#F1F5F9"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fontWeight: 700 }}
-                  dy={10}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fontWeight: 700 }}
-                  tickFormatter={(val) => `₹${val / 1000}k`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "24px",
-                    border: "none",
-                    boxShadow: "0 25px 50px -12px rgb(0 0 0 / 0.15)",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="partner"
-                  stroke="#6366f1"
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorPartner)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="direct"
-                  stroke="#10b981"
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorDirect)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+                  <defs>
+                    <linearGradient id="colorPartner" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorDirect" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#F1F5F9"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fontWeight: 700 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fontWeight: 700 }}
+                    tickFormatter={(val) => `₹${val / 1000}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "24px",
+                      border: "none",
+                      boxShadow: "0 25px 50px -12px rgb(0 0 0 / 0.15)",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="partner"
+                    stroke="#6366f1"
+                    strokeWidth={4}
+                    fillOpacity={1}
+                    fill="url(#colorPartner)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="direct"
+                    stroke="#10b981"
+                    strokeWidth={4}
+                    fillOpacity={1}
+                    fill="url(#colorDirect)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
           </div>
         </div>
 
@@ -304,7 +340,7 @@ const IntelligenceHub = () => {
                   />
                 </div>
                 <h4 className="text-3xl font-black text-emerald-400 tracking-tighter">
-                  ₹4,25,000
+                  ₹{liquidityData.payoutsPending.toLocaleString()}
                 </h4>
               </div>
               <div
@@ -321,7 +357,7 @@ const IntelligenceHub = () => {
                   />
                 </div>
                 <h4 className="text-3xl font-black text-orange-400 tracking-tighter">
-                  12 Requests
+                  {liquidityData.withdrawalQueue} Requests
                 </h4>
               </div>
             </div>
@@ -336,25 +372,31 @@ const IntelligenceHub = () => {
               Course Sales Share
             </h3>
             <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={COURSE_PIE}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={8}
-                    dataKey="value"
-                  >
-                    {COURSE_PIE.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {coursePieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={coursePieData}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={8}
+                      dataKey="value"
+                    >
+                      {coursePieData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-xs text-slate-400 font-bold">No course data available</p>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
-              {COURSE_PIE.map((a) => (
+              {coursePieData.length > 0 ? coursePieData.map((a) => (
                 <div
                   key={a.name}
                   className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-500"
@@ -365,7 +407,9 @@ const IntelligenceHub = () => {
                   />{" "}
                   {a.name}
                 </div>
-              ))}
+              )) : (
+                <div className="col-span-2 text-center text-xs text-slate-400 font-bold">No data</div>
+              )}
             </div>
           </div>
         </div>
@@ -389,7 +433,7 @@ const IntelligenceHub = () => {
                     {state}
                   </p>
                   <h4 className="text-2xl font-black text-slate-900 tracking-tighter">
-                    {[450, 1200, 850][i]}
+                    {[academicData.notStarted, academicData.inProgress, academicData.completed][i]}
                   </h4>
                 </div>
                 <div className="size-10 bg-white rounded-xl flex items-center justify-center text-slate-300 group-hover:text-indigo-500 shadow-sm transition-all">
@@ -403,9 +447,9 @@ const IntelligenceHub = () => {
               Certification Audit
             </h4>
             {[
-              { l: "Eligible", v: 120, c: "text-indigo-600" },
-              { l: "Issued", v: 850, c: "text-emerald-600" },
-              { l: "Stuck/Pending", v: 12, c: "text-red-500" },
+              { l: "Eligible", v: academicData.eligible, c: "text-indigo-600" },
+              { l: "Issued", v: academicData.issued, c: "text-emerald-600" },
+              { l: "Stuck/Pending", v: academicData.pending, c: "text-red-500" },
             ].map((item) => (
               <div
                 key={item.l}
@@ -431,25 +475,31 @@ const IntelligenceHub = () => {
             E-Book Sales Distribution
           </h3>
           <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={EBOOK_PIE}
-                  innerRadius={0}
-                  outerRadius={90}
-                  paddingAngle={0}
-                  dataKey="value"
-                >
-                  {EBOOK_PIE.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {ebookPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={ebookPieData}
+                    innerRadius={0}
+                    outerRadius={90}
+                    paddingAngle={0}
+                    dataKey="value"
+                  >
+                    {ebookPieData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-xs text-slate-400 font-bold">No ebook data available</p>
+              </div>
+            )}
           </div>
           <div className="space-y-3 mt-6">
-            {EBOOK_PIE.map((e) => (
+            {ebookPieData.length > 0 ? ebookPieData.map((e) => (
               <div
                 key={e.name}
                 className="flex justify-between items-center text-[10px] font-black uppercase"
@@ -463,7 +513,9 @@ const IntelligenceHub = () => {
                 </span>
                 <span className="text-slate-900">{e.value} Units</span>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-xs text-slate-400 font-bold">No data</div>
+            )}
           </div>
         </div>
 
@@ -484,7 +536,7 @@ const IntelligenceHub = () => {
             </p>
 
             {/* Show Top 3 Inactive Partners ✨ */}
-            {INACTIVE_PARTNERS.slice(0, 3).map((p) => (
+            {inactivePartners.length > 0 ? inactivePartners.slice(0, 3).map((p) => (
               <div
                 key={p}
                 className="flex justify-between items-center p-5 bg-red-50/50 border border-red-100 rounded-[24px] group hover:bg-red-500 transition-all duration-500"
@@ -499,16 +551,20 @@ const IntelligenceHub = () => {
                   <ExternalLink size={14} />
                 </button>
               </div>
-            ))}
+            )) : (
+              <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
+                <p className="text-xs text-slate-400 font-bold">No inactive partners</p>
+              </div>
+            )}
 
             {/* Show remaining count if more than 3 ✨ */}
-            {INACTIVE_PARTNERS.length > 3 && (
+            {inactivePartners.length > 3 && (
               <div
                 onClick={() => navigate("/admin/partners")}
                 className="flex justify-center items-center p-4 bg-slate-50 border border-slate-100 border-dashed rounded-[24px] cursor-pointer hover:bg-slate-100 transition-all group"
               >
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-slate-900">
-                  + {INACTIVE_PARTNERS.length - 3} Others Pending Inspection
+                  + {inactivePartners.length - 3} Others Pending Inspection
                 </p>
                 <ChevronRight
                   size={14}
@@ -525,12 +581,12 @@ const IntelligenceHub = () => {
                   Hot Asset Spotlight
                 </p>
                 <h4 className="text-lg font-black text-slate-900 leading-none">
-                  React Pro Mastery
+                  {hotAsset.name}
                 </h4>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-black text-indigo-600 tracking-tighter">
-                  840
+                  {hotAsset.units}
                 </p>
                 <p className="text-[9px] font-black text-indigo-400 uppercase">
                   Total Units

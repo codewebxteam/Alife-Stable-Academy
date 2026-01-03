@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase,
@@ -18,57 +18,17 @@ import {
   Award,
   CheckCircle2,
   X,
-  FileSpreadsheet, // ✨ Excel icon added
+  FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
-import PartnerProfile from "./PartnerProfile"; // ✨ Corrected Import
-
-// --- MOCK DATA ENGINE ---
-const PARTNER_DATABASE = Array.from({ length: 45 })
-  .map((_, i) => ({
-    id: `PRT-${1000 + i}`,
-    agency: i < 5 ? `Elite Academy ${i + 1}` : `Partner Institute ${i + 1}`,
-    owner: `Rajesh Kumar ${i + 1}`,
-    email: `director@agency${i + 1}.com`,
-    phone: `+91 98765 ${10000 + i}`,
-    domain: `agency${i + 1}.alifestable.com`,
-    // ✨ Mixed dates to demonstrate filtering
-    joinDate:
-      i % 3 === 0
-        ? new Date().toLocaleDateString("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-        : "12 Dec 2023",
-    status: i % 10 === 0 ? "Inactive" : "Active",
-    sales: {
-      courses: 120 + i * 5,
-      ebooks: 45 + i * 2,
-      totalUnits: 165 + i * 7,
-    },
-    financials: {
-      generated: 250000 + i * 5000,
-      earned: 125000 + i * 2500,
-      paid: 100000 + i * 2000,
-      pending: 125000 + i * 2500 - (100000 + i * 2000),
-    },
-    payoutHistory: [
-      {
-        id: "TXN-101",
-        date: "20/12/2023",
-        time: "14:30",
-        amount: 50000,
-        utr: "SBI998877",
-        payer: "Admin",
-        status: "Verified",
-      },
-    ],
-  }))
-  .sort((a, b) => b.financials.earned - a.financials.earned);
+import PartnerProfile from "./PartnerProfile";
+import { listenToPartners } from "../../firebase/partners.service";
+import * as XLSX from "xlsx";
 
 const PartnerIntelligence = () => {
   // State
-  const [partners, setPartners] = useState(PARTNER_DATABASE);
+  const [partners, setPartners] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPartner, setSelectedPartner] = useState(null);
 
   // Filters
@@ -81,12 +41,50 @@ const PartnerIntelligence = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // --- REAL-TIME FIREBASE CONNECTION ---
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = listenToPartners((data) => {
+      setPartners(data);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // --- EXCEL EXPORT FUNCTION ---
+  const exportToExcel = () => {
+    const exportData = filteredLedgerData.map((p) => ({
+      "Partner ID": p.id,
+      "Agency Name": p.agency,
+      "Owner": p.owner,
+      "Email": p.email,
+      "Phone": p.phone,
+      "Domain": p.domain,
+      "Status": p.status,
+      "Join Date": p.joinDate ? new Date(p.joinDate).toLocaleDateString("en-GB") : "N/A",
+      "Courses Sold": p.sales.courses,
+      "E-Books Sold": p.sales.ebooks,
+      "Total Units": p.sales.totalUnits,
+      "Revenue Generated": p.financials.generated,
+      "Commission Earned": p.financials.earned,
+      "Amount Paid": p.financials.paid,
+      "Pending Payout": p.financials.pending,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Partners");
+    XLSX.writeFile(wb, `Partners_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   // --- 1. TIME FILTER LOGIC (Global) ---
   const timeFilteredPartners = useMemo(() => {
     if (timeFilter === "All Time") return partners;
 
     const now = new Date();
     return partners.filter((p) => {
+      if (!p.joinDate) return false;
       const pDate = new Date(p.joinDate);
 
       if (timeFilter === "Today") {
@@ -171,6 +169,14 @@ const PartnerIntelligence = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="animate-spin text-indigo-600" size={48} />
+            <p className="text-sm font-bold text-slate-400">Loading Partners Data...</p>
+          </div>
+        </div>
+      ) : (
       <div className="max-w-7xl mx-auto space-y-10">
         {/* --- 1. HEADER WITH GLOBAL DATE FILTER --- */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
@@ -358,6 +364,7 @@ const PartnerIntelligence = () => {
 
               {/* ✨ DOWNLOAD EXCEL BUTTON */}
               <button
+                onClick={exportToExcel}
                 className="flex items-center justify-center size-10 bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-105 transition-all"
                 title="Download Excel Report"
               >
@@ -480,6 +487,7 @@ const PartnerIntelligence = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* --- 5. PARTNER PROFILE MODAL --- */}
       <AnimatePresence>
@@ -488,23 +496,6 @@ const PartnerIntelligence = () => {
             <PartnerProfile
               partner={selectedPartner}
               onClose={() => setSelectedPartner(null)}
-              onPaymentComplete={(id, amount, txn) => {
-                const updated = partners.map((p) => {
-                  if (p.id === id) {
-                    return {
-                      ...p,
-                      financials: {
-                        ...p.financials,
-                        paid: p.financials.paid + amount,
-                        pending: p.financials.pending - amount,
-                      },
-                      payoutHistory: [txn, ...p.payoutHistory],
-                    };
-                  }
-                  return p;
-                });
-                setPartners(updated);
-              }}
             />
           </div>
         )}

@@ -20,9 +20,11 @@ import {
   History,
   Calendar,
   List,
+  Loader2,
 } from "lucide-react";
+import { processPartnerPayout } from "../../firebase/partners.service";
 
-const PartnerProfile = ({ partner, onClose, onPaymentComplete }) => {
+const PartnerProfile = ({ partner, onClose }) => {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'history'
 
@@ -32,6 +34,7 @@ const PartnerProfile = ({ partner, onClose, onPaymentComplete }) => {
   );
   const [totalPaid, setTotalPaid] = useState(partner.financials.paid);
   const [payMode, setPayMode] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [payForm, setPayForm] = useState({
     payerName: "",
     amount: "",
@@ -51,9 +54,12 @@ const PartnerProfile = ({ partner, onClose, onPaymentComplete }) => {
     histPage * itemsPerPage
   );
 
-  // Handle Payment Verification
-  const processPayment = () => {
-    if (!payForm.amount || !payForm.utr || !payForm.payerName) return;
+  // Handle Payment Verification with Firebase
+  const processPayment = async () => {
+    if (!payForm.amount || !payForm.utr || !payForm.payerName) {
+      alert("Please fill all fields!");
+      return;
+    }
     const amountNum = parseInt(payForm.amount);
 
     if (amountNum > currentBalance) {
@@ -61,33 +67,32 @@ const PartnerProfile = ({ partner, onClose, onPaymentComplete }) => {
       return;
     }
 
-    // 1. Update Financials
-    setCurrentBalance((prev) => prev - amountNum);
-    setTotalPaid((prev) => prev + amountNum);
+    try {
+      setProcessing(true);
+      
+      // Process payout in Firebase
+      await processPartnerPayout(
+        partner.id,
+        amountNum,
+        payForm.utr,
+        payForm.payerName
+      );
 
-    // 2. Add to History (Newest First)
-    const newTxn = {
-      id: `TXN-${Math.floor(Math.random() * 99999)}`,
-      date: new Date().toLocaleDateString(),
-      time: new Date().toLocaleTimeString(),
-      amount: amountNum,
-      utr: payForm.utr,
-      payer: payForm.payerName,
-      status: "Verified",
-    };
+      // Update local state
+      setCurrentBalance((prev) => prev - amountNum);
+      setTotalPaid((prev) => prev + amountNum);
 
-    const updatedHistory = [newTxn, ...history];
-    setHistory(updatedHistory);
-
-    // 3. Reset Form
-    setPayForm({ payerName: "", amount: "", utr: "" });
-    setPayMode(false);
-
-    // 4. Callback to update Parent Data
-    if (onPaymentComplete) onPaymentComplete(partner.id, amountNum, newTxn);
-
-    // 5. Optional: Switch to history tab to show the new record
-    // setActiveTab("history");
+      // Reset Form
+      setPayForm({ payerName: "", amount: "", utr: "" });
+      setPayMode(false);
+      
+      alert("Payment processed successfully!");
+    } catch (error) {
+      console.error("Payment processing error:", error);
+      alert("Failed to process payment. Please try again.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -300,9 +305,18 @@ const PartnerProfile = ({ partner, onClose, onPaymentComplete }) => {
                       </div>
                       <button
                         onClick={processPayment}
-                        className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"
+                        disabled={processing}
+                        className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Send size={14} /> Verify & Transfer Funds
+                        {processing ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Send size={14} /> Verify & Transfer Funds
+                          </>
+                        )}
                       </button>
                     </motion.div>
                   ) : (

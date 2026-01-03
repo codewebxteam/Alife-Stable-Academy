@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
+import { useAgency } from "./AgencyContext";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { createOrder } from "../firebase/orders.service";
 
 const EBookContext = createContext();
 
@@ -9,6 +11,7 @@ export const useEBook = () => useContext(EBookContext);
 
 export const EBookProvider = ({ children }) => {
   const { currentUser } = useAuth();
+  const { isPartner, agency } = useAgency();
   const [purchasedBooks, setPurchasedBooks] = useState([]);
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export const EBookProvider = ({ children }) => {
     }
   };
 
-  const purchaseBook = async (bookId) => {
+  const purchaseBook = async (bookId, bookData) => {
     if (!currentUser) return;
     const newPurchased = [...purchasedBooks, bookId];
     setPurchasedBooks(newPurchased);
@@ -54,6 +57,22 @@ export const EBookProvider = ({ children }) => {
         "stats.ebooks": newPurchased.length
       });
     }
+
+    // Add to orders collection for admin tracking
+    const price = bookData?.price || 0;
+    await createOrder({
+      studentName: currentUser.displayName || currentUser.email,
+      studentEmail: currentUser.email,
+      userId: currentUser.uid,
+      assetName: bookData?.title || "E-Book",
+      type: "ebook",
+      saleValue: price,
+      commission: isPartner ? Math.round(price * 0.1) : 0,
+      partnerId: isPartner ? agency.id : "direct",
+      partnerName: isPartner ? agency.name : "Direct",
+      courseId: null,
+      ebookId: bookId,
+    });
   };
 
   return (

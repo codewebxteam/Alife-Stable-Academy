@@ -21,8 +21,8 @@ const CourseManager = () => {
     subtitle: "",
     category: "Development",
     level: "Beginner",
-    price: 299,
-    discountPrice: 999,
+    price: 299,           // Offer price (selling price)
+    discountPrice: 999,   // Listing price (original price - cut wala)
     youtubeUrl: "",
     youtubeId: "",
   };
@@ -327,8 +327,8 @@ const CurriculumTab = () => (
 
 const PricingTab = ({ formData, setFormData }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-    <PriceControl label="Listing Price" value={formData.price} color="indigo" onChange={v => setFormData({...formData, price: v})} />
-    <PriceControl label="Offer Price" value={formData.discountPrice} color="emerald" onChange={v => setFormData({...formData, discountPrice: v})} />
+    <PriceControl label="Listing Price (Original)" value={formData.discountPrice} color="slate" onChange={v => setFormData({...formData, discountPrice: v})} />
+    <PriceControl label="Offer Price (Selling)" value={formData.price} color="emerald" onChange={v => setFormData({...formData, price: v})} />
   </div>
 );
 

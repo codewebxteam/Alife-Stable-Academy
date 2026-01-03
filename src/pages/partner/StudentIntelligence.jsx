@@ -63,7 +63,7 @@ const StudentIntelligence = () => {
       if (!map[o.studentEmail]) {
         map[o.studentEmail] = {
           id: o.studentEmail,
-          name: o.studentName,
+          name: o.studentName || "Unknown",
           email: o.studentEmail,
           phone: "",
           joinDate: o.createdAt?.toDate
@@ -77,9 +77,9 @@ const StudentIntelligence = () => {
       }
 
       map[o.studentEmail].assets.push({
-        name: o.assetName,
-        type: o.type === "course" ? "Course" : "E-Book",
-        price: o.saleValue,
+        name: o.productName || o.assetName || "Unknown",
+        type: o.productType === "course" || o.type === "course" ? "Course" : "E-Book",
+        price: o.price || o.saleValue || 0,
         date: o.createdAt?.toDate
           ? o.createdAt.toDate().toDateString()
           : "",
@@ -87,7 +87,7 @@ const StudentIntelligence = () => {
     });
 
     return Object.values(map).sort((a, b) =>
-      b.id.localeCompare(a.id)
+      (b.id || "").localeCompare(a.id || "")
     );
   }, [orders]);
 
@@ -111,9 +111,9 @@ const StudentIntelligence = () => {
     return students
       .filter((s) => {
         const matchesSearch =
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.id.toLowerCase().includes(searchQuery.toLowerCase());
+          (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.id || "").toLowerCase().includes(searchQuery.toLowerCase());
 
         const matchesAudit =
           auditFilter === "All" ||
@@ -130,7 +130,7 @@ const StudentIntelligence = () => {
 
         return matchesSearch && matchesAudit;
       })
-      .sort((a, b) => b.id.localeCompare(a.id));
+      .sort((a, b) => (b.id || "").localeCompare(a.id || ""));
   }, [students, searchQuery, auditFilter]);
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
@@ -300,14 +300,14 @@ const StudentIntelligence = () => {
                     <td className="px-10 py-7">
                       <div className="flex items-center gap-4">
                         <div className="size-11 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-xs uppercase">
-                          {student.name[0]}
+                          {(student.name || "?")[0]}
                         </div>
                         <div>
                           <p className="text-sm font-black text-slate-900 tracking-tight">
-                            {student.name}
+                            {student.name || "Unknown"}
                           </p>
                           <p className="text-[10px] text-slate-400 font-bold uppercase">
-                            {student.id}
+                            {student.id || "N/A"}
                           </p>
                         </div>
                       </div>
@@ -410,14 +410,14 @@ const StudentIntelligence = () => {
               <div className="flex justify-between items-start mb-10">
                 <div className="flex items-center gap-6">
                   <div className="size-20 rounded-[32px] bg-slate-950 text-white flex items-center justify-center text-3xl font-black">
-                    {selectedStudent.name[0]}
+                    {(selectedStudent.name || "?")[0]}
                   </div>
                   <div>
                     <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">
-                      {selectedStudent.name}
+                      {selectedStudent.name || "Unknown"}
                     </h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">
-                      Audit ID: {selectedStudent.id}
+                      Audit ID: {selectedStudent.id || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -455,16 +455,16 @@ const StudentIntelligence = () => {
                         </div>
                         <div>
                           <p className="text-sm font-black text-slate-900">
-                            {asset.name}
+                            {asset.name || "Unknown Asset"}
                           </p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                            Purchased: {asset.date}
+                            Purchased: {asset.date || "N/A"}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-black text-slate-900">
-                          ₹{asset.price}
+                          ₹{asset.price || 0}
                         </p>
                         <p className="text-[9px] font-black text-emerald-500 uppercase">
                           Confirmed
@@ -478,10 +478,10 @@ const StudentIntelligence = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <DetailBox label="Contact Feed" icon={<Mail size={14} />}>
                   <p className="text-xs font-black text-slate-900 break-all">
-                    {selectedStudent.email}
+                    {selectedStudent.email || "N/A"}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
-                    {selectedStudent.phone}
+                    {selectedStudent.phone || "N/A"}
                   </p>
                 </DetailBox>
                 <DetailBox
@@ -489,11 +489,11 @@ const StudentIntelligence = () => {
                   icon={<ShieldCheck size={14} />}
                 >
                   <p className="text-sm font-black text-emerald-500 uppercase tracking-tight">
-                    {selectedStudent.learningState} (
-                    {selectedStudent.progress}%)
+                    {selectedStudent.learningState || "N/A"} (
+                    {selectedStudent.progress || 0}%)
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">
-                    Certificate: {selectedStudent.certStatus}
+                    Certificate: {selectedStudent.certStatus || "N/A"}
                   </p>
                 </DetailBox>
               </div>
