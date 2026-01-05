@@ -6,46 +6,32 @@ import {
   Mail,
   Phone,
   Globe,
-  Building2,
   GraduationCap,
   CreditCard,
   TrendingUp,
-  Award,
-  CheckCircle2,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Send,
-  ShieldCheck,
   History,
+  ShoppingBag,
+  PackageCheck,
   Calendar,
-  List,
-  Loader2,
+  Hash,
+  CheckCircle2,
 } from "lucide-react";
-import { processPartnerPayout } from "../../firebase/partners.service";
 
 const PartnerProfile = ({ partner, onClose }) => {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'history'
 
-  // Local State for Payout Logic
-  const [currentBalance, setCurrentBalance] = useState(
-    partner.financials.pending
+  // Purchase History State
+  // Default to empty array if no history exists
+  const [history] = useState(
+    partner.purchaseHistory || partner.payoutHistory || []
   );
-  const [totalPaid, setTotalPaid] = useState(partner.financials.paid);
-  const [payMode, setPayMode] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [payForm, setPayForm] = useState({
-    payerName: "",
-    amount: "",
-    utr: "",
-  });
 
-  // Payment History State (Pagination: 5 per page)
-  // Ensure history is sorted by date/newest first initially if needed, here we assume passed data is sorted or we prepend new ones.
-  const [history, setHistory] = useState(partner.payoutHistory || []);
+  // Pagination Settings
   const [histPage, setHistPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 5; // 5 items per page
 
   // Pagination Logic
   const totalPages = Math.ceil(history.length / itemsPerPage);
@@ -54,47 +40,6 @@ const PartnerProfile = ({ partner, onClose }) => {
     histPage * itemsPerPage
   );
 
-  // Handle Payment Verification with Firebase
-  const processPayment = async () => {
-    if (!payForm.amount || !payForm.utr || !payForm.payerName) {
-      alert("Please fill all fields!");
-      return;
-    }
-    const amountNum = parseInt(payForm.amount);
-
-    if (amountNum > currentBalance) {
-      alert("Amount exceeds pending balance!");
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      
-      // Process payout in Firebase
-      await processPartnerPayout(
-        partner.id,
-        amountNum,
-        payForm.utr,
-        payForm.payerName
-      );
-
-      // Update local state
-      setCurrentBalance((prev) => prev - amountNum);
-      setTotalPaid((prev) => prev + amountNum);
-
-      // Reset Form
-      setPayForm({ payerName: "", amount: "", utr: "" });
-      setPayMode(false);
-      
-      alert("Payment processed successfully!");
-    } catch (error) {
-      console.error("Payment processing error:", error);
-      alert("Failed to process payment. Please try again.");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   return (
     <motion.div
       initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -102,275 +47,176 @@ const PartnerProfile = ({ partner, onClose }) => {
       exit={{ scale: 0.95, opacity: 0, y: 20 }}
       className="bg-white w-full max-w-5xl rounded-[40px] shadow-2xl relative z-50 overflow-hidden flex flex-col max-h-[90vh]"
     >
-      {/* --- HEADER: IDENTITY --- */}
-      <div className="bg-slate-900 text-white p-8 sm:p-10 relative overflow-hidden flex-shrink-0">
+      {/* --- HEADER: IDENTITY SECTION --- */}
+      <div className="bg-slate-950 text-white p-8 sm:p-10 relative overflow-hidden flex-shrink-0">
         <div className="relative z-10 flex justify-between items-start">
-          <div className="flex items-center gap-6">
-            <div className="size-24 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center text-4xl font-black shadow-inner border border-white/20">
+          <div className="flex items-center gap-8">
+            {/* Avatar / Logo */}
+            <div className="size-24 rounded-[2rem] bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-4xl font-black shadow-2xl shadow-indigo-500/30 border-4 border-white/10">
               {partner.agency[0]}
             </div>
+
+            {/* Info */}
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-3xl font-black uppercase tracking-tight">
+              <div className="flex items-center gap-4 mb-3">
+                <h2 className="text-4xl font-black uppercase tracking-tighter">
                   {partner.agency}
                 </h2>
                 <span
-                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                     partner.status === "Active"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-red-500/20 text-red-400"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-red-500/10 text-red-400 border-red-500/20"
                   }`}
                 >
                   {partner.status}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-4 text-slate-400">
-                <span className="flex items-center gap-2 text-xs font-bold">
-                  <User size={14} /> {partner.owner}
-                </span>
-                <span className="flex items-center gap-2 text-xs font-bold">
-                  <Mail size={14} /> {partner.email}
-                </span>
-                <span className="flex items-center gap-2 text-xs font-bold">
-                  <Phone size={14} /> {partner.phone}
-                </span>
-                <span className="flex items-center gap-2 text-xs font-bold text-indigo-300">
-                  <Globe size={14} /> {partner.domain}
-                </span>
+
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-slate-400">
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <User size={14} className="text-indigo-400" />
+                  <span className="text-slate-300">{partner.owner}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <Mail size={14} className="text-indigo-400" />
+                  <span className="text-slate-300">{partner.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <Phone size={14} className="text-indigo-400" />
+                  <span className="text-slate-300">{partner.phone}</span>
+                </div>
+                {partner.domain && (
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <Globe size={14} className="text-indigo-400" />
+                    <span className="text-slate-300">{partner.domain}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all text-white"
+            className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all text-slate-400 hover:text-white"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Decorative BG */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        {/* Decorative Background Elements */}
+        <div className="absolute -top-24 -right-24 size-96 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[600px] bg-slate-800/20 rounded-full blur-[100px] pointer-events-none" />
       </div>
 
       {/* --- TABS NAVIGATION --- */}
-      <div className="px-8 sm:px-10 pt-6 pb-2 bg-[#F8FAFC]">
-        <div className="flex gap-1 p-1.5 bg-slate-200/50 rounded-2xl w-fit">
+      <div className="px-10 pt-8 pb-4 bg-[#F8FAFC] border-b border-slate-100/50">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-100 rounded-2xl w-fit shadow-sm">
           <button
             onClick={() => setActiveTab("overview")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
               activeTab === "overview"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-400 hover:text-slate-600"
+                ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20"
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <TrendingUp size={14} /> Financial Overview
+            <TrendingUp size={14} /> Agency Overview
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
               activeTab === "history"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-400 hover:text-slate-600"
+                ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20"
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <History size={14} /> Payment History
+            <History size={14} /> Purchase History
           </button>
         </div>
       </div>
 
-      {/* --- BODY: CONTENT AREA --- */}
-      <div className="p-8 sm:p-10 overflow-y-auto no-scrollbar flex-1 bg-[#F8FAFC]">
-        {/* TAB 1: OVERVIEW (Stats + Payout Action) */}
+      {/* --- CONTENT AREA --- */}
+      <div className="p-10 overflow-y-auto custom-scrollbar flex-1 bg-[#F8FAFC]">
+        {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
+            className="space-y-8 h-full"
           >
-            {/* 1. STATS GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatBox
-                label="Courses Sold"
+                label="Courses Purchased"
                 val={partner.sales.courses}
-                icon={<GraduationCap size={18} />}
+                icon={<GraduationCap size={20} />}
                 color="blue"
+                subText="Core Assets"
               />
               <StatBox
-                label="E-Books Sold"
+                label="E-Books Purchased"
                 val={partner.sales.ebooks}
-                icon={<CreditCard size={18} />}
+                icon={<CreditCard size={20} />}
                 color="orange"
+                subText="Digital Assets"
               />
               <StatBox
-                label="Total Revenue"
+                label="Total Lifetime Spend"
                 val={`₹${partner.financials.generated.toLocaleString()}`}
-                icon={<TrendingUp size={18} />}
-                color="indigo"
-              />
-              <StatBox
-                label="Commission Earned"
-                val={`₹${partner.financials.earned.toLocaleString()}`}
-                icon={<Award size={18} />}
+                icon={<ShoppingBag size={20} />}
                 color="emerald"
+                subText="Total Volume"
               />
             </div>
 
-            {/* 2. PAYOUT TERMINAL SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left: Balance Card */}
-              <div className="lg:col-span-1 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group">
-                <div className="relative z-10">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
-                    Remaining Payout
-                  </p>
-                  <h3
-                    className={`text-4xl font-black tracking-tighter ${
-                      currentBalance > 0 ? "text-slate-900" : "text-emerald-500"
-                    }`}
-                  >
-                    ₹{currentBalance.toLocaleString()}
-                  </h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1">
-                    <CheckCircle2 size={12} className="text-emerald-500" />{" "}
-                    Total Paid:{" "}
-                    <span className="text-slate-900">
-                      ₹{totalPaid.toLocaleString()}
-                    </span>
-                  </p>
-                </div>
-
-                {currentBalance > 0 ? (
-                  <button
-                    onClick={() => setPayMode(!payMode)}
-                    className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-xl relative z-10"
-                  >
-                    {payMode ? "Cancel Transaction" : "Initiate Payout"}
-                  </button>
-                ) : (
-                  <div className="mt-8 w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-center border border-emerald-100">
-                    All Settled
-                  </div>
-                )}
-
-                {/* Background Pattern */}
-                <div className="absolute -bottom-6 -right-6 size-32 bg-slate-50 rounded-full group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
+            {/* Empty State / Info Box */}
+            <div className="h-48 rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center p-8">
+              <div className="size-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4 text-slate-300">
+                <PackageCheck size={24} />
               </div>
-
-              {/* Right: Payment Form (Conditional) */}
-              <div className="lg:col-span-2">
-                <AnimatePresence mode="wait">
-                  {payMode ? (
-                    <motion.div
-                      key="form"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="bg-slate-900 p-8 rounded-[32px] text-white h-full flex flex-col justify-center"
-                    >
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="size-10 bg-white/10 rounded-xl flex items-center justify-center text-emerald-400">
-                          <ShieldCheck size={20} />
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-black uppercase">
-                            Secure Payout Terminal
-                          </h4>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">
-                            Verify details before proceeding
-                          </p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <InputGroup
-                          label="Payer Name (Admin)"
-                          placeholder="e.g. John Doe"
-                          val={payForm.payerName}
-                          setVal={(v) =>
-                            setPayForm({ ...payForm, payerName: v })
-                          }
-                        />
-                        <InputGroup
-                          label="Amount (₹)"
-                          placeholder={`Max: ${currentBalance}`}
-                          val={payForm.amount}
-                          setVal={(v) => setPayForm({ ...payForm, amount: v })}
-                          type="number"
-                        />
-                        <InputGroup
-                          label="UTR / Ref No."
-                          placeholder="Bank Ref ID"
-                          val={payForm.utr}
-                          setVal={(v) => setPayForm({ ...payForm, utr: v })}
-                        />
-                      </div>
-                      <button
-                        onClick={processPayment}
-                        disabled={processing}
-                        className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {processing ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" /> Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Send size={14} /> Verify & Transfer Funds
-                          </>
-                        )}
-                      </button>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="placeholder"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="h-full bg-white p-8 rounded-[32px] border border-slate-100 flex items-center justify-center text-center opacity-50 border-dashed min-h-[250px]"
-                    >
-                      <div>
-                        <CreditCard
-                          size={40}
-                          className="mx-auto text-slate-300 mb-2"
-                        />
-                        <p className="text-xs font-bold text-slate-400 uppercase">
-                          Select "Initiate Payout" to open terminal
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                Agency Status: {partner.status}
+              </h3>
+              <p className="text-xs text-slate-400 font-medium max-w-sm mt-2 leading-relaxed">
+                This partner actively purchases inventory through the partner
+                panel. Check the 'Purchase History' tab for a detailed ledger of
+                all transactions.
+              </p>
             </div>
           </motion.div>
         )}
 
-        {/* TAB 2: PAYMENT HISTORY LEDGER */}
+        {/* TAB 2: PURCHASE HISTORY (WITH PAGINATION) */}
         {activeTab === "history" && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm"
+            className="bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-100/50 overflow-hidden flex flex-col"
           >
-            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+            {/* Table Header */}
+            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-white">
               <div className="flex items-center gap-3">
-                <History size={16} className="text-slate-400" />
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <ShoppingBag size={16} />
+                </div>
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">
-                  Transaction History Ledger
+                  Order Ledger
                 </h4>
               </div>
-              <div className="px-3 py-1 bg-white rounded-lg border border-slate-200 text-[9px] font-black text-slate-400 uppercase">
-                Total Records: {history.length}
+              <div className="px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                Total Orders: {history.length}
               </div>
             </div>
 
-            <div className="overflow-x-auto min-h-[300px]">
+            {/* Table Content */}
+            <div className="overflow-x-auto min-h-[350px]">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-white text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
-                    <th className="px-6 py-4">Txn ID</th>
-                    <th className="px-6 py-4">Date & Time</th>
-                    <th className="px-6 py-4">Payer (Admin)</th>
-                    <th className="px-6 py-4">UTR No.</th>
-                    <th className="px-6 py-4 text-right">Amount</th>
+                  <tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                    <th className="px-8 py-5">Order ID</th>
+                    <th className="px-8 py-5">Date</th>
+                    <th className="px-8 py-5">Student / Beneficiary</th>
+                    <th className="px-8 py-5">Item Purchased</th>
+                    <th className="px-8 py-5 text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -378,33 +224,49 @@ const PartnerProfile = ({ partner, onClose }) => {
                     currentHistory.map((txn, i) => (
                       <tr
                         key={i}
-                        className="hover:bg-slate-50/50 transition-colors"
+                        className="group hover:bg-slate-50/80 transition-all cursor-default"
                       >
-                        <td className="px-6 py-4 text-xs font-bold text-slate-900">
-                          {txn.id}
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-2">
+                            <Hash size={12} className="text-slate-300" />
+                            <span className="text-xs font-black text-slate-700 font-mono">
+                              {txn.id || `#ORD-${1000 + i}`}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase">
-                          {txn.date} <span className="text-slate-300">|</span>{" "}
-                          {txn.time}
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-2 text-slate-500">
+                            <Calendar size={12} className="text-slate-300" />
+                            <span className="text-[10px] font-bold uppercase">
+                              {txn.date || "N/A"}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-700">
-                          {txn.payer || "System"}
+                        <td className="px-8 py-5 text-xs font-bold text-slate-800">
+                          {txn.studentName || txn.payer || "Unknown Student"}
                         </td>
-                        <td className="px-6 py-4 text-[10px] font-black text-indigo-500 uppercase bg-indigo-50 px-2 py-1 rounded w-fit">
-                          {txn.utr}
+                        <td className="px-8 py-5">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wide">
+                            <CheckCircle2 size={10} />
+                            {txn.item || txn.utr || "Course Bundle"}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 text-right text-xs font-black text-emerald-600">
-                          ₹{txn.amount.toLocaleString()}
+                        <td className="px-8 py-5 text-right">
+                          <span className="text-sm font-black text-emerald-600 tracking-tight">
+                            ₹{(txn.amount || 0).toLocaleString()}
+                          </span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td
-                        colSpan="5"
-                        className="px-6 py-12 text-center text-xs font-bold text-slate-400 italic"
-                      >
-                        No transactions recorded yet.
+                      <td colSpan="5" className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center justify-center opacity-40">
+                          <History size={48} className="text-slate-300 mb-4" />
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                            No Purchase History Found
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -412,28 +274,30 @@ const PartnerProfile = ({ partner, onClose }) => {
               </table>
             </div>
 
-            {/* History Pagination */}
-            {totalPages > 0 && (
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                <p className="text-[9px] font-black text-slate-400 uppercase">
-                  Page {histPage} of {totalPages}
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-5 border-t border-slate-100 bg-white flex justify-between items-center sticky bottom-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                  Showing Page{" "}
+                  <span className="text-slate-900">{histPage}</span> of{" "}
+                  {totalPages}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <button
                     onClick={() => setHistPage((p) => Math.max(1, p - 1))}
                     disabled={histPage === 1}
-                    className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50 hover:text-slate-900 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={14} /> Previous
                   </button>
                   <button
                     onClick={() =>
                       setHistPage((p) => Math.min(totalPages, p + 1))
                     }
                     disabled={histPage === totalPages}
-                    className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50 hover:text-slate-900 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 rounded-xl text-[10px] font-black uppercase text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-slate-200"
                   >
-                    <ChevronRight size={14} />
+                    Next Page <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
@@ -445,46 +309,38 @@ const PartnerProfile = ({ partner, onClose }) => {
   );
 };
 
-// --- HELPER COMPONENTS ---
-const StatBox = ({ label, val, color, icon }) => {
+// --- HELPER COMPONENT: STAT BOX ---
+const StatBox = ({ label, val, color, icon, subText }) => {
   const styles = {
-    indigo: "bg-indigo-50 text-indigo-600",
-    orange: "bg-orange-50 text-orange-600",
-    blue: "bg-blue-50 text-blue-600",
-    emerald: "bg-emerald-50 text-emerald-600",
+    indigo: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+    orange: "bg-orange-50 text-orange-600 ring-orange-100",
+    blue: "bg-blue-50 text-blue-600 ring-blue-100",
+    emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   };
   return (
-    <div className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-all">
-      <div
-        className={`size-10 rounded-xl flex items-center justify-center ${styles[color]}`}
-      >
-        {icon}
+    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+      <div className="flex justify-between items-start mb-4">
+        <div
+          className={`size-12 rounded-2xl flex items-center justify-center ring-4 transition-all group-hover:scale-110 ${styles[color]}`}
+        >
+          {icon}
+        </div>
+        {subText && (
+          <span className="px-3 py-1 bg-slate-50 text-slate-400 text-[9px] font-black uppercase rounded-lg">
+            {subText}
+          </span>
+        )}
       </div>
       <div>
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-slate-500 transition-colors">
           {label}
         </p>
-        <h4 className="text-lg font-black text-slate-900 tracking-tight">
+        <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
           {val}
         </h4>
       </div>
     </div>
   );
 };
-
-const InputGroup = ({ label, placeholder, val, setVal, type = "text" }) => (
-  <div className="space-y-1">
-    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
-      {label}
-    </label>
-    <input
-      type={type}
-      value={val}
-      onChange={(e) => setVal(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-slate-800 border-none rounded-xl text-xs font-bold text-white px-4 py-3 outline-none focus:ring-2 ring-emerald-500 placeholder:text-slate-600"
-    />
-  </div>
-);
 
 export default PartnerProfile;

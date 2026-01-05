@@ -28,7 +28,6 @@ const STUDENT_DATABASE = Array.from({ length: 55 }).map((_, i) => ({
   email: `student${i + 1}@example.com`,
   phone: `+91 90000 ${10000 + i}`,
   location: i % 3 === 0 ? "Mumbai, India" : "Delhi, India",
-  // ✨ Dynamic Dates for Filtering Demo
   joinDate:
     i % 3 === 0
       ? new Date().toLocaleDateString("en-GB", {
@@ -72,16 +71,16 @@ const StudentData = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   // Filters
-  const [timeFilter, setTimeFilter] = useState("All Time"); // ✨ Default All Time
+  const [timeFilter, setTimeFilter] = useState("All Time");
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
   const [searchQuery, setSearchQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("All"); // All, Direct, Partner
+  const [sourceFilter, setSourceFilter] = useState("All");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // --- 1. TIME FILTER LOGIC (Global Scope) ---
+  // --- 1. TIME FILTER LOGIC ---
   const timeFilteredStudents = useMemo(() => {
     if (timeFilter === "All Time") return students;
 
@@ -128,7 +127,7 @@ const StudentData = () => {
     });
   }, [students, timeFilter, customDates]);
 
-  // --- 2. SOURCE & SEARCH FILTER (Applied on Time Filtered Data) ---
+  // --- 2. SOURCE & SEARCH FILTER ---
   const filteredData = useMemo(() => {
     return timeFilteredStudents.filter((s) => {
       const matchesSearch =
@@ -148,7 +147,7 @@ const StudentData = () => {
     currentPage * itemsPerPage
   );
 
-  // --- MACRO METRICS (Dynamic based on Time Filter) ---
+  // --- MACRO METRICS ---
   const metrics = {
     total: timeFilteredStudents.length,
     active: timeFilteredStudents.filter((s) => s.status === "Active").length,
@@ -201,7 +200,6 @@ const StudentData = () => {
                 onChange={(e) => setTimeFilter(e.target.value)}
                 className="appearance-none bg-transparent text-xs font-black uppercase text-slate-700 outline-none pr-8 cursor-pointer"
               >
-                {/* ✨ Added All Time */}
                 {[
                   "All Time",
                   "Today",
@@ -224,7 +222,7 @@ const StudentData = () => {
           </div>
         </div>
 
-        {/* --- METRICS (Affected by Time Filter) --- */}
+        {/* --- METRICS --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
             label="Total Enrolled"
@@ -296,7 +294,6 @@ const StudentData = () => {
                 />
               </div>
 
-              {/* ✨ DOWNLOAD EXCEL BUTTON */}
               <button
                 className="flex items-center justify-center size-10 bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-105 transition-all"
                 title="Download Excel Report"
@@ -313,7 +310,7 @@ const StudentData = () => {
                   <th className="px-8 py-5">Identity</th>
                   <th className="px-8 py-5">Acquisition Source</th>
                   <th className="px-8 py-5 text-center">Portfolio</th>
-                  <th className="px-8 py-5 text-center">Progress</th>
+                  {/* ✨ Progress Column Removed as requested */}
                   <th className="px-8 py-5 text-right">Action</th>
                 </tr>
               </thead>
@@ -362,19 +359,7 @@ const StudentData = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-8 py-6 text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full"
-                            style={{ width: `${s.courses[0]?.progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400">
-                          {s.courses[0]?.progress || 0}% Complete
-                        </span>
-                      </div>
-                    </td>
+                    {/* ✨ Progress Cell Removed */}
                     <td className="px-8 py-6 text-right">
                       <button
                         onClick={(e) => {

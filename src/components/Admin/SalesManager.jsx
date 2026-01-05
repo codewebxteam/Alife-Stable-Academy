@@ -17,16 +17,15 @@ import {
   XCircle,
   BookOpen,
   CheckCircle2,
-  Clock,
+  TrendingUp, // Added for AOV icon
 } from "lucide-react";
 
-// --- MOCK TRANSACTION DATA (Fixed Logic) ---
+// --- MOCK TRANSACTION DATA (Commission Logic Removed) ---
 const TRANSACTIONS_DB = Array.from({ length: 85 })
   .map((_, i) => {
     const isEbook = i % 4 === 0; // Every 4th item is an E-Book
     const amount = isEbook ? 499 : i % 3 === 0 ? 4999 : 2499;
     const isPartnerSale = i % 2 === 0;
-    const partnerComm = isPartnerSale ? Math.floor(amount * 0.3) : 0; // Fixed integer commission
 
     return {
       id: `TXN-${8000 + i}`,
@@ -36,16 +35,13 @@ const TRANSACTIONS_DB = Array.from({ length: 85 })
         : i % 3 === 0
         ? "Full Stack Mastery"
         : "React Pro Bundle",
-      // ✨ FIX: Explicit Type Field for filtering
       type: isEbook ? "E-Book" : "Course",
       date: i % 5 === 0 ? new Date().toISOString().split("T")[0] : "2024-02-15",
       amount: amount,
       source: isPartnerSale ? "Partner" : "Self",
       partnerId: isPartnerSale ? `PRT-${1000 + (i % 5)}` : null,
       partnerName: isPartnerSale ? `Nexus Academy ${i % 5}` : null,
-      commission: partnerComm,
-      // ✨ FIX: Explicit Payout Status for commission card
-      payoutStatus: i % 3 === 0 ? "Paid" : "Pending",
+      // Removed: commission & payoutStatus
       status: "Success",
       gateway: i % 2 === 0 ? "Razorpay" : "PhonePe",
       invoiceId: `INV-${202400 + i}`,
@@ -112,7 +108,7 @@ const SalesManager = () => {
     currentPage * itemsPerPage
   );
 
-  // --- REAL-TIME METRICS (FIXED CALCULATIONS) ---
+  // --- REAL-TIME METRICS (Updated) ---
   const metrics = useMemo(() => {
     // Helper to safely count types
     const countTypes = (data) => ({
@@ -122,10 +118,11 @@ const SalesManager = () => {
 
     const selfData = filteredData.filter((t) => t.source === "Self");
     const partnerData = filteredData.filter((t) => t.source === "Partner");
+    const totalRev = filteredData.reduce((acc, curr) => acc + curr.amount, 0);
 
     return {
       total: {
-        rev: filteredData.reduce((acc, curr) => acc + curr.amount, 0),
+        rev: totalRev,
         counts: countTypes(filteredData),
       },
       self: {
@@ -136,15 +133,8 @@ const SalesManager = () => {
         rev: partnerData.reduce((acc, curr) => acc + curr.amount, 0),
         counts: countTypes(partnerData),
       },
-      commission: {
-        total: partnerData.reduce((acc, curr) => acc + curr.commission, 0),
-        paid: partnerData
-          .filter((t) => t.payoutStatus === "Paid")
-          .reduce((acc, curr) => acc + curr.commission, 0),
-        pending: partnerData
-          .filter((t) => t.payoutStatus === "Pending")
-          .reduce((acc, curr) => acc + curr.commission, 0),
-      },
+      // New Metric: Average Order Value (AOV)
+      aov: filteredData.length > 0 ? totalRev / filteredData.length : 0,
     };
   }, [filteredData]);
 
@@ -205,7 +195,7 @@ const SalesManager = () => {
           </div>
         </div>
 
-        {/* --- KPI CARDS (FIXED: DATA WILL SHOW NOW) --- */}
+        {/* --- KPI CARDS (Commission Card Replaced with AOV) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
             label="Total Sales"
@@ -255,20 +245,16 @@ const SalesManager = () => {
               </div>
             )}
           />
+          {/* Replaced Commission Card with Average Order Value */}
           <KPICard
-            label="Total Commission"
-            val={`₹${metrics.commission.total.toLocaleString()}`}
+            label="Average Order Value"
+            val={`₹${Math.round(metrics.aov).toLocaleString()}`}
             color="orange"
-            icon={<Wallet />}
+            icon={<TrendingUp />}
             renderSub={() => (
               <div className="flex flex-col gap-1 mt-2">
-                <span className="text-[9px] font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 size={10} /> Paid: ₹
-                  {metrics.commission.paid.toLocaleString()}
-                </span>
                 <span className="text-[9px] font-bold text-orange-500 flex items-center gap-1">
-                  <Clock size={10} /> Pending: ₹
-                  {metrics.commission.pending.toLocaleString()}
+                  Per Transaction Average
                 </span>
               </div>
             )}
@@ -334,7 +320,7 @@ const SalesManager = () => {
                   <th className="px-8 py-5">Txn ID & Date</th>
                   <th className="px-8 py-5">Student & Product</th>
                   <th className="px-8 py-5">Source</th>
-                  <th className="px-8 py-5">Financials</th>
+                  <th className="px-8 py-5">Total Amount</th>
                   <th className="px-8 py-5 text-center">Status</th>
                   <th className="px-8 py-5 text-right">Invoice</th>
                 </tr>
@@ -396,13 +382,6 @@ const SalesManager = () => {
                             ₹{t.amount.toLocaleString()}
                           </span>
                         </div>
-                        {t.source === "Partner" && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-bold text-orange-500 bg-orange-50 px-1.5 rounded">
-                              Comm: ₹{t.commission.toLocaleString()}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="px-8 py-6 text-center">
@@ -543,6 +522,4 @@ const InvoiceRow = ({ label, val, highlight }) => (
   </div>
 );
 
-
 export default SalesManager;
-

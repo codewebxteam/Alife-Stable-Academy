@@ -9,15 +9,9 @@ import {
   Calendar,
   GraduationCap,
   BookOpen,
-  Award,
   CheckCircle2,
-  Clock,
-  Shield,
-  ExternalLink,
   Download,
-  CreditCard,
   Globe,
-  Zap,
 } from "lucide-react";
 
 const StudentProfile = ({ student, onClose }) => {
@@ -92,7 +86,7 @@ const StudentProfile = ({ student, onClose }) => {
             {
               id: "history",
               label: "Purchase History",
-              icon: <Clock size={14} />,
+              icon: <CheckCircle2 size={14} />,
             },
             {
               id: "personal",
@@ -125,82 +119,32 @@ const StudentProfile = ({ student, onClose }) => {
             className="space-y-8"
           >
             {/* KPI Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <StatBox
                 label="Courses Enrolled"
                 val={student.courses.length}
                 icon={<BookOpen size={18} />}
                 color="blue"
               />
-              <StatBox
-                label="Certificates"
-                val={student.certificates.length}
-                icon={<Award size={18} />}
-                color="emerald"
-              />
-              <StatBox
-                label="Avg. Score"
-                val={`${student.avgScore}%`}
-                icon={<Zap size={18} />}
-                color="orange"
-              />
-              <StatBox
-                label="Learning Hours"
-                val="45h 20m"
-                icon={<Clock size={18} />}
-                color="indigo"
-              />
             </div>
 
-            {/* Course Progress List */}
+            {/* Course List (Just Names) */}
             <div className="space-y-4">
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-2">
-                Enrolled Courses & Progress
+                Enrolled Courses List
               </h4>
               {student.courses.map((course, i) => (
                 <div
                   key={i}
-                  className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-6"
+                  className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm flex items-center gap-6"
                 >
                   <div className="size-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                     <GraduationCap size={24} />
                   </div>
-                  <div className="flex-1 w-full">
-                    <div className="flex justify-between items-center mb-2">
-                      <h5 className="text-sm font-black text-slate-900">
-                        {course.name}
-                      </h5>
-                      <span
-                        className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${
-                          course.progress === 100
-                            ? "bg-emerald-50 text-emerald-600"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {course.progress === 100 ? "Completed" : "In Progress"}
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${course.progress}%` }}
-                        className={`h-full rounded-full ${
-                          course.progress === 100
-                            ? "bg-emerald-500"
-                            : "bg-indigo-500"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400">
-                      <span>{course.progress}% Completed</span>
-                      {course.certificateIssued ? (
-                        <span className="text-emerald-500 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Certificate Issued
-                        </span>
-                      ) : (
-                        <span>Certificate Locked</span>
-                      )}
-                    </div>
+                  <div className="flex-1">
+                    <h5 className="text-sm font-black text-slate-900">
+                      {course.name}
+                    </h5>
                   </div>
                 </div>
               ))}
