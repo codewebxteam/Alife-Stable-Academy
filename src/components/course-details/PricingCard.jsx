@@ -26,8 +26,22 @@ const PricingCard = ({ course, onEnroll }) => {
     return `₹${finalPrice.toLocaleString("en-IN")}`;
   };
 
+  // Offer price (selling price) - course.price
   const displayPrice = calculatePrice(course.price);
+  // Listing price (original/cut price) - course.originalPrice
   const displayOriginalPrice = calculatePrice(course.originalPrice);
+
+  // Calculate discount percentage
+  const calculateDiscount = () => {
+    if (course.price === "Free" || !course.originalPrice) return "100% off";
+    const offerPrice = parseInt(String(course.price).replace(/[^0-9]/g, ""));
+    const listingPrice = parseInt(String(course.originalPrice).replace(/[^0-9]/g, ""));
+    if (listingPrice > offerPrice) {
+      const discount = Math.round(((listingPrice - offerPrice) / listingPrice) * 100);
+      return `${discount}% off`;
+    }
+    return "Special Offer";
+  };
 
   return (
     <div className="lg:absolute lg:-top-80 lg:right-0 w-full lg:w-95">
@@ -55,16 +69,20 @@ const PricingCard = ({ course, onEnroll }) => {
         </div>
 
         <div className="p-8">
-          <div className="flex items-end gap-3 mb-6">
-            <span className="text-4xl font-bold text-slate-900">
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <span className="text-4xl font-black text-slate-900">
               {displayPrice}
             </span>
-            <span className="text-lg text-slate-400 line-through mb-1">
-              {displayOriginalPrice}
-            </span>
-            <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded mb-1">
-              {course.price === "Free" ? "100% off" : "Special Offer"}
-            </span>
+            {displayOriginalPrice && displayOriginalPrice !== displayPrice && (
+              <>
+                <span className="text-lg text-slate-400 line-through">
+                  {displayOriginalPrice}
+                </span>
+                <span className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
+                  {calculateDiscount()}
+                </span>
+              </>
+            )}
           </div>
 
           <button

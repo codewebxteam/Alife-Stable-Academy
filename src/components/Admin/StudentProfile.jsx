@@ -9,15 +9,9 @@ import {
   Calendar,
   GraduationCap,
   BookOpen,
-  Award,
   CheckCircle2,
-  Clock,
-  Shield,
-  ExternalLink,
   Download,
-  CreditCard,
   Globe,
-  Zap,
 } from "lucide-react";
 
 const StudentProfile = ({ student, onClose }) => {
@@ -91,7 +85,7 @@ const StudentProfile = ({ student, onClose }) => {
             {
               id: "history",
               label: "Purchase History",
-              icon: <Clock size={14} />,
+              icon: <CheckCircle2 size={14} />,
             },
             {
               id: "personal",
@@ -123,13 +117,14 @@ const StudentProfile = ({ student, onClose }) => {
             className="space-y-8"
           >
             {/* KPI Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <StatBox
                 label="Courses Enrolled"
                 val={student.courses.length}
                 icon={<BookOpen size={18} />}
                 color="blue"
               />
+<<<<<<< HEAD
               <StatBox
                 label="Certificates"
                 val={student.certificates.length}
@@ -148,21 +143,24 @@ const StudentProfile = ({ student, onClose }) => {
                 icon={<Clock size={18} />}
                 color="indigo"
               />
+=======
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
             </div>
 
-            {/* Course Progress List */}
+            {/* Course List (Just Names) */}
             <div className="space-y-4">
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-2">
-                Enrolled Courses & Progress
+                Enrolled Courses List
               </h4>
               {student.courses.map((course, i) => (
                 <div
                   key={i}
-                  className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-6"
+                  className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm flex items-center gap-6"
                 >
                   <div className="size-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                     <GraduationCap size={24} />
                   </div>
+<<<<<<< HEAD
                   <div className="flex-1 w-full">
                     <div className="flex justify-between items-center mb-2">
                       <h5 className="text-sm font-black text-slate-900">
@@ -197,6 +195,12 @@ const StudentProfile = ({ student, onClose }) => {
                         <span>Certificate Locked</span>
                       )}
                     </div>
+=======
+                  <div className="flex-1">
+                    <h5 className="text-sm font-black text-slate-900">
+                      {course.name}
+                    </h5>
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
                   </div>
                 </div>
               ))}

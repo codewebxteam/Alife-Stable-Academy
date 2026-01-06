@@ -1,5 +1,5 @@
 // src/firebase/partners.service.js
-import { collection, onSnapshot, doc, updateDoc, increment } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, increment, query, where, orderBy, Timestamp, arrayUnion } from "firebase/firestore";
 import { db } from "./config";
 
 /**
@@ -23,9 +23,10 @@ export const listenToPartners = (callback) => {
         domain: d.domain || "",
         status: d.status || "Inactive",
         joinDate: d.joinDate?.toDate?.() ?? null,
-        stats: {
-          coursesSold: d.stats?.coursesSold ?? 0,
-          ebooksSold: d.stats?.ebooksSold ?? 0,
+        sales: {
+          courses: d.stats?.coursesSold ?? 0,
+          ebooks: d.stats?.ebooksSold ?? 0,
+          totalUnits: (d.stats?.coursesSold ?? 0) + (d.stats?.ebooksSold ?? 0),
         },
         financials: {
           generated: d.financials?.generated ?? 0,
@@ -33,6 +34,7 @@ export const listenToPartners = (callback) => {
           paid: d.financials?.paid ?? 0,
           pending: d.financials?.pending ?? 0,
         },
+        payoutHistory: d.payoutHistory || [],
       };
     });
     callback(data);
@@ -58,4 +60,30 @@ export const updatePartnerAfterOrder = async ({
       ? { "stats.coursesSold": increment(1) }
       : { "stats.ebooksSold": increment(1) }),
   });
+};
+
+/**
+ * 💰 PROCESS PARTNER PAYOUT
+ */
+export const processPartnerPayout = async (partnerId, amount, utr, payer) => {
+  const ref = doc(db, "partners", partnerId);
+  
+  const payoutRecord = {
+    id: `TXN-${Date.now()}`,
+    date: new Date().toLocaleDateString("en-GB"),
+    time: new Date().toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' }),
+    amount: Number(amount),
+    utr: utr,
+    payer: payer,
+    status: "Verified",
+    timestamp: Timestamp.now(),
+  };
+  
+  await updateDoc(ref, {
+    "financials.paid": increment(Number(amount)),
+    "financials.pending": increment(-Number(amount)),
+    payoutHistory: arrayUnion(payoutRecord),
+  });
+  
+  return payoutRecord;
 };

@@ -28,7 +28,53 @@ import {
 import { db } from "../../firebase/config";
 import StudentProfile from "./StudentProfile";
 
+<<<<<<< HEAD
 
+=======
+// --- MOCK DATA ENGINE ---
+const STUDENT_DATABASE = Array.from({ length: 55 }).map((_, i) => ({
+  id: `STU-${2000 + i}`,
+  name: `Student ${i + 1}`,
+  email: `student${i + 1}@example.com`,
+  phone: `+91 90000 ${10000 + i}`,
+  location: i % 3 === 0 ? "Mumbai, India" : "Delhi, India",
+  joinDate:
+    i % 3 === 0
+      ? new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "15 Jan 2024",
+  source: i % 3 === 0 ? "Direct" : "Partner",
+  partnerName: i % 3 === 0 ? null : `Nexus Academy ${i % 5}`,
+  status: i % 15 === 0 ? "Inactive" : "Active",
+  courses: [
+    {
+      name: "React Pro Mastery",
+      progress: i % 2 === 0 ? 100 : 45,
+      certificateIssued: i % 2 === 0,
+    },
+    { name: "UI/UX Design", progress: 10, certificateIssued: false },
+  ],
+  certificates: i % 2 === 0 ? ["React Cert"] : [],
+  avgScore: 78 + (i % 20),
+  transactions: [
+    {
+      id: "ORD-998",
+      asset: "React Pro Mastery",
+      date: "15 Jan 2024",
+      amount: "2499",
+    },
+    {
+      id: "ORD-997",
+      asset: "UI/UX Design",
+      date: "10 Jan 2024",
+      amount: "1999",
+    },
+  ],
+}));
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
 
 const StudentData = () => {
   // State
@@ -46,6 +92,7 @@ const StudentData = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+<<<<<<< HEAD
   useEffect(() => {
     const fetchStudents = async () => {
       setLoading(true);
@@ -163,6 +210,9 @@ const StudentData = () => {
 
 
   // --- 1. TIME FILTER LOGIC (Global Scope) ---
+=======
+  // --- 1. TIME FILTER LOGIC ---
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
   const timeFilteredStudents = useMemo(() => {
     if (timeFilter === "All Time") return students;
 
@@ -209,7 +259,7 @@ const StudentData = () => {
     });
   }, [students, timeFilter, customDates]);
 
-  // --- 2. SOURCE & SEARCH FILTER (Applied on Time Filtered Data) ---
+  // --- 2. SOURCE & SEARCH FILTER ---
   const filteredData = useMemo(() => {
     return timeFilteredStudents.filter((s) => {
       const matchesSearch =
@@ -229,7 +279,7 @@ const StudentData = () => {
     currentPage * itemsPerPage
   );
 
-  // --- MACRO METRICS (Dynamic based on Time Filter) ---
+  // --- MACRO METRICS ---
   const metrics = {
     total: timeFilteredStudents.length,
     active: timeFilteredStudents.filter((s) => s.status === "Active").length,
@@ -290,7 +340,6 @@ const StudentData = () => {
                 onChange={(e) => setTimeFilter(e.target.value)}
                 className="appearance-none bg-transparent text-xs font-black uppercase text-slate-700 outline-none pr-8 cursor-pointer"
               >
-                {/* ✨ Added All Time */}
                 {[
                   "All Time",
                   "Today",
@@ -313,7 +362,7 @@ const StudentData = () => {
           </div>
         </div>
 
-        {/* --- METRICS (Affected by Time Filter) --- */}
+        {/* --- METRICS --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
             label="Total Enrolled"
@@ -385,7 +434,6 @@ const StudentData = () => {
                 />
               </div>
 
-              {/* ✨ DOWNLOAD EXCEL BUTTON */}
               <button
                 className="flex items-center justify-center size-10 bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-105 transition-all"
                 title="Download Excel Report"
@@ -402,7 +450,7 @@ const StudentData = () => {
                   <th className="px-8 py-5">Identity</th>
                   <th className="px-8 py-5">Acquisition Source</th>
                   <th className="px-8 py-5 text-center">Portfolio</th>
-                  <th className="px-8 py-5 text-center">Progress</th>
+                  {/* ✨ Progress Column Removed as requested */}
                   <th className="px-8 py-5 text-right">Action</th>
                 </tr>
               </thead>
@@ -451,19 +499,7 @@ const StudentData = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-8 py-6 text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full"
-                            style={{ width: `${s.courses[0]?.progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400">
-                          {s.courses[0]?.progress || 0}% Complete
-                        </span>
-                      </div>
-                    </td>
+                    {/* ✨ Progress Cell Removed */}
                     <td className="px-8 py-6 text-right">
                       <button
                         onClick={(e) => {

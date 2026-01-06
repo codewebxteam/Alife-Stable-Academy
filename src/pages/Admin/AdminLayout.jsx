@@ -1,4 +1,4 @@
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -6,15 +6,13 @@ import {
   GraduationCap,
   BookOpen,
   LogOut,
-  Bell,
-  Search,
-  ShieldCheck,
-  CreditCard,
   Menu,
   X,
   Users,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,24 +22,30 @@ const AdminLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Updated Navigation Config - Bunny CDN and Settings removed
+  // Updated Navigation Config
+  // 1. Renamed Intelligence -> Dashboard
+  // 2. Moved Sales after Dashboard
+  // 3. Removed Payments
   const navItems = [
     {
-      label: "Intelligence",
+      label: "Dashboard",
       path: "/Admin",
       icon: <LayoutDashboard size={20} />,
+    },
+    {
+      label: "Sales",
+      path: "/Admin/sales",
+      icon: <TrendingUp size={20} />,
     },
     {
       label: "Partners",
       path: "/Admin/partners",
       icon: <Briefcase size={20} />,
     },
-    { label: "Students", path: "/Admin/students", icon: <Users size={20} /> },
-    { label: "Sales", path: "/Admin/sales", icon: <TrendingUp size={20} /> },
     {
-      label: "Payments",
-      path: "/Admin/payments",
-      icon: <CreditCard size={20} />,
+      label: "Students",
+      path: "/Admin/students",
+      icon: <Users size={20} />,
     },
     {
       label: "Courses",
@@ -118,7 +122,7 @@ const AdminLayout = () => {
             onClick={handleLogoutClick}
             className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 font-black text-xs uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all"
           >
-            <LogOut size={18} /> <span>Exit Console</span>
+            <LogOut size={18} /> <span>Logout</span>
           </button>
         </div>
       </aside>
@@ -178,7 +182,7 @@ const AdminLayout = () => {
                 onClick={handleLogoutClick}
                 className="mt-auto w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-red-500 font-black text-[11px] uppercase tracking-widest bg-red-50"
               >
-                <LogOut size={18} /> <span>Terminate</span>
+                <LogOut size={18} /> <span>Logout</span>
               </button>
             </motion.aside>
           </>
@@ -201,27 +205,21 @@ const AdminLayout = () => {
                 Superuser / <span className="text-slate-900">Console</span>
               </p>
               <h2 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight uppercase tracking-tighter leading-none">
-                Intelligence Hub
+                Main Dashboard
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 bg-white p-1.5 sm:p-2 rounded-[24px] shadow-sm border border-slate-100">
-            <div className="hidden md:flex items-center gap-3 bg-[#F4F7FE] px-5 py-2.5 rounded-2xl border border-slate-100">
-              <Search size={16} className="text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-transparent border-none outline-none text-[11px] font-bold text-slate-700 w-32"
-              />
+          {/* STATIC RIGHT HEADER */}
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+              <Lock size={14} className="text-emerald-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                Secure Admin Console
+              </span>
             </div>
-
-            <button className="p-2 sm:p-3 text-slate-400 hover:text-slate-950 transition-all">
-              <Bell size={20} />
-            </button>
-
-            <div className="size-9 sm:size-10 rounded-xl bg-slate-950 text-white flex items-center justify-center font-black border-2 sm:border-4 border-slate-100 shadow-xl text-xs sm:text-sm">
-              AD
+            <div className="px-4 py-2.5 bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-xl shadow-slate-200">
+              v2.0
             </div>
           </div>
         </header>
@@ -259,24 +257,24 @@ const AdminLayout = () => {
                 <AlertCircle size={32} />
               </div>
               <h3 className="text-xl font-black text-slate-900 mb-2">
-                Exit Superuser Console?
+                Confirm Logout?
               </h3>
               <p className="text-sm text-slate-500 font-medium mb-8">
-                Are you sure you want to log out from the Admin Panel? You will
-                need to re-authenticate to gain control again.
+                Are you sure you want to end your session? You will need to sign
+                in again to access the admin console.
               </p>
               <div className="flex flex-col gap-3">
                 <button
                   onClick={confirmLogout}
                   className="w-full py-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-red-100"
                 >
-                  Confirm Exit
+                  Yes, Logout
                 </button>
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
                   className="w-full py-4 bg-slate-50 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all"
                 >
-                  Stay Active
+                  Cancel
                 </button>
               </div>
             </motion.div>

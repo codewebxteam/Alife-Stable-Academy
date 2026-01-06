@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthContext";
-import { doc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { useAgency } from "./AgencyContext";
+import { doc, setDoc, updateDoc, onSnapshot, addDoc, collection, Timestamp } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { createOrder, updateCourseProgress as updateOrderProgress } from "../firebase/orders.service";
 
 const CourseContext = createContext();
 
@@ -9,6 +11,7 @@ export const useCourse = () => useContext(CourseContext);
 
 export const CourseProvider = ({ children }) => {
   const { currentUser } = useAuth();
+  const { isPartner, agency } = useAgency();
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const updateTimeoutRef = useRef(null);
 
@@ -52,6 +55,14 @@ export const CourseProvider = ({ children }) => {
       throw new Error("Already enrolled in this course");
     }
     
+    // Calculate actual price - ALWAYS use offer price (course.price)
+    const offerPriceStr = String(course.price || "Free");
+    let actualPrice = 0;
+    if (offerPriceStr !== "Free") {
+      const numericPrice = parseInt(offerPriceStr.replace(/[^0-9]/g, ""));
+      actualPrice = isPartner ? Math.round(numericPrice * (agency.pricingMultiplier || 1)) : numericPrice;
+    }
+    
     const newCourse = {
       courseId,
       title: String(course.title || "Untitled Course"),
@@ -65,6 +76,7 @@ export const CourseProvider = ({ children }) => {
       totalDuration: String(course.duration || "0 hours"),
       watchedDuration: 0,
       price: String(course.price || "Free"),
+      originalPrice: String(course.originalPrice || course.price || "Free"),
       category: String(course.category || "General"),
       lectures: String(course.lectures || "0"),
       rating: Number(course.rating || 0),
@@ -78,6 +90,48 @@ export const CourseProvider = ({ children }) => {
     
     const docRef = doc(db, "enrolledCourses", currentUser.uid);
     await setDoc(docRef, { courses: updatedCourses }, { merge: true });
+
+    // Add payment entry for Intelligence Hub (using OFFER PRICE)
+    if (actualPrice > 0) {
+      await addDoc(collection(db, "payments"), {
+        amount: actualPrice,
+        status: "completed",
+        source: isPartner ? "partner" : "direct",
+        partnerId: isPartner ? agency.id : null,
+        partnerName: isPartner ? agency.name : null,
+        type: "purchase",
+        courseId: courseId,
+        courseName: course.title,
+        studentId: currentUser.uid,
+        studentEmail: currentUser.email,
+        createdAt: Timestamp.now()
+      });
+    }
+
+    // Add enrollment entry
+    await addDoc(collection(db, "enrollments"), {
+      courseName: course.title,
+      source: isPartner ? "partner" : "direct",
+      studentId: currentUser.uid,
+      courseId: courseId,
+      price: actualPrice,
+      createdAt: Timestamp.now()
+    });
+
+    // Add to orders collection for admin tracking
+    await createOrder({
+      studentName: currentUser.displayName || currentUser.email,
+      studentEmail: currentUser.email,
+      userId: currentUser.uid,
+      assetName: course.title,
+      type: "course",
+      saleValue: actualPrice,
+      commission: isPartner ? Math.round(actualPrice * 0.1) : 0,
+      partnerId: isPartner ? agency.id : "direct",
+      partnerName: isPartner ? agency.name : "Direct",
+      courseId: courseId,
+      ebookId: null,
+    });
   };
 
   const updateCourseProgress = useCallback(async (courseId, progress, watchedDuration) => {
@@ -106,6 +160,9 @@ export const CourseProvider = ({ children }) => {
         try {
           const docRef = doc(db, "enrolledCourses", currentUser.uid);
           await updateDoc(docRef, { courses: updatedCourses });
+          
+          // Update progress in orders collection
+          await updateOrderProgress(currentUser.uid, courseId, Math.min(Math.round(progress), 100));
         } catch (error) {
           console.error("Error updating progress:", error);
         }
