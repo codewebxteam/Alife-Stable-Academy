@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  Wallet,
+  Users,
   TrendingUp,
   BookOpen,
   GraduationCap,
@@ -20,613 +20,682 @@ import {
   Filter,
   User,
   Clock,
-  ArrowRight,
+  Plus,
+  X,
+  CheckCircle2,
+  DollarSign,
+  Briefcase,
+  FileText,
 } from "lucide-react";
-
-import { listenToOrders } from "./../../firebase/orders.service";
-import { listenToPartners } from "./../../firebase/partners.service";
-import { listenToPayoutHistory } from "./../../firebase/payouts.service";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+} from "firebase/firestore";
+import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
 
 const PartnerDashboard = () => {
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState("7D");
-  const [graphView, setGraphView] = useState("weekly");
-  const [customDates, setCustomDates] = useState({ start: "", end: "" });
-  const [isRequesting, setIsRequesting] = useState(false);
+  const { currentUser } = useAuth();
+  const partnerId = currentUser?.uid;
 
+  // --- STATES ---
   const [orders, setOrders] = useState([]);
-  const [partners, setPartners] = useState([]);
-  const [payoutHistory, setPayoutHistory] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [ebooks, setEbooks] = useState([]); // ✨ New: E-Books State
+  const [loading, setLoading] = useState(true);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [graphData, setGraphData] = useState([]); // ✨ New: Real Graph Data
 
+  // Enroll Form State
+  const [enrollData, setEnrollData] = useState({
+    productType: "Course", // ✨ New: Course or EBook
+    studentName: "",
+    studentEmail: "",
+    studentPassword: "",
+    selectedProductId: "", // Changed from selectedCourseId
+    sellingPrice: "",
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // --- FETCH DATA ---
   useEffect(() => {
-    const unsubPartners = listenToPartners(setPartners);
-    return () => {
-      unsubPartners && unsubPartners();
-    };
-  }, []);
+    fetchInitialData();
+  }, [partnerId]);
 
-  const activePartner = useMemo(() => {
-    return partners.find((p) => p.status === "Active") || partners[0] || null;
-  }, [partners]);
+  const fetchInitialData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Courses
+      const coursesSnap = await getDocs(collection(db, "courseVideos"));
+      const coursesList = coursesSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: "Course",
+      }));
+      setCourses(coursesList);
 
-  useEffect(() => {
-    if (!activePartner?.id) return;
-    const unsubOrders = listenToOrders(activePartner.id, setOrders);
-    return () => {
-      unsubOrders && unsubOrders();
-    };
-  }, [activePartner]);
+      // 2. Fetch E-Books (✨ Added)
+      const ebooksSnap = await getDocs(collection(db, "ebooks"));
+      const ebooksList = ebooksSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: "E-Book",
+      }));
+      setEbooks(ebooksList);
 
-  useEffect(() => {
-    if (!activePartner?.id) return;
-    const unsub = listenToPayoutHistory(activePartner.id, setPayoutHistory);
-    return () => unsub && unsub();
-  }, [activePartner]);
-
-  const partnerOrders = useMemo(() => {
-    if (!activePartner?.id) return [];
-    return orders.filter((o) => o.partnerId === activePartner.id);
-  }, [orders, activePartner]);
-
-  const activeData = useMemo(() => {
-    const productRevenue = partnerOrders.reduce(
-      (sum, o) => sum + Number(o.saleValue || 0),
-      0
-    );
-    const commissionRevenue = partnerOrders.reduce(
-      (sum, o) => sum + Number(o.commission || 0),
-      0
-    );
-
-    const courses = partnerOrders.filter((o) => o.type === "course");
-    const ebooks = partnerOrders.filter((o) => o.type === "ebook");
-
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7);
-
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = [
-      "Jan","Feb","Mar","Apr","May","Jun",
-      "Jul","Aug","Sep","Oct","Nov","Dec",
-    ];
-
-    const weeklyGraph = days.map((d, i) => {
-      const filtered = partnerOrders.filter((o) => {
-        if (!o.createdAt?.toDate) return false;
-        const dt = o.createdAt.toDate();
-        return dt >= startOfWeek && dt < endOfWeek && dt.getDay() === i;
-      });
-      return {
-        name: d,
-        sales: filtered.length,
-        comm: filtered.reduce(
-          (s, o) => s + Number(o.commission || 0),
-          0
-        ),
-      };
-    });
-
-    const monthlyGraph = months.map((m, i) => {
-      const filtered = partnerOrders.filter((o) => {
-        if (!o.createdAt?.toDate) return false;
-        const dt = o.createdAt.toDate();
-        return (
-          dt.getFullYear() === now.getFullYear() &&
-          dt.getMonth() === i
+      // 3. Fetch Orders
+      if (partnerId) {
+        const q = query(
+          collection(db, "orders"),
+          where("partnerId", "==", partnerId),
+          orderBy("createdAt", "desc")
         );
-      });
-      return {
-        name: m,
-        sales: filtered.length,
-        comm: filtered.reduce(
-          (s, o) => s + Number(o.commission || 0),
-          0
-        ),
-      };
-    });
-
-    const assetTotals = {};
-    partnerOrders.forEach((o) => {
-      assetTotals[o.assetName] =
-        (assetTotals[o.assetName] || 0) + Number(o.saleValue || 0);
-    });
-    const maxAsset = Math.max(...Object.values(assetTotals), 1);
-
-    const assetPulseValues = {
-      "React Pro Mastery": Math.round(
-        ((assetTotals["React Pro Mastery"] || 0) / maxAsset) * 100
-      ),
-      "UI/UX Design Bootcamp": Math.round(
-        ((assetTotals["UI/UX Design Bootcamp"] || 0) / maxAsset) * 100
-      ),
-      "JavaScript Survival Guide": Math.round(
-        ((assetTotals["JavaScript Survival Guide"] || 0) / maxAsset) * 100
-      ),
-      "Next.js 14 Guide": Math.round(
-        ((assetTotals["Next.js 14 Guide"] || 0) / maxAsset) * 100
-      ),
-    };
-
-    const payoutPending = payoutHistory.reduce(
-      (s, p) => s + Number(p.pending || 0),
-      0
-    );
-
-    return {
-      revenue: {
-        total: (productRevenue + commissionRevenue).toLocaleString(),
-        product: productRevenue.toLocaleString(),
-        comm: commissionRevenue.toLocaleString(),
-      },
-      courses: {
-        total: courses.length,
-        top: Object.entries(
-          courses.reduce((acc, c) => {
-            acc[c.assetName] = (acc[c.assetName] || 0) + 1;
-            return acc;
-          }, {})
-        )
-          .slice(0, 2)
-          .map(([name, units]) => ({ name, units })),
-      },
-      ebooks: {
-        total: ebooks.length,
-        top: Object.entries(
-          ebooks.reduce((acc, e) => {
-            acc[e.assetName] = (acc[e.assetName] || 0) + 1;
-            return acc;
-          }, {})
-        )
-          .slice(0, 2)
-          .map(([name, units]) => ({ name, units })),
-      },
-      payout: payoutPending,
-      graph: weeklyGraph,
-      monthlyGraph,
-      assetPulseValues,
-    };
-  }, [partnerOrders, payoutHistory]);
-
-  const handleRequestPayout = () => {
-    setIsRequesting(true);
-    setTimeout(() => setIsRequesting(false), 2000);
+        const ordersSnap = await getDocs(q);
+        const ordersList = ordersSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAtDate: doc.data().createdAt?.toDate
+            ? doc.data().createdAt.toDate()
+            : new Date(),
+        }));
+        setOrders(ordersList);
+        processGraphData(ordersList); // ✨ Process Real Data
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const timeAgo = (ts) => {
-    if (!ts?.toDate) return "Just now";
-    const diff = Date.now() - ts.toDate().getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins <= 0) return "Just now";
-    if (mins < 60) return `${mins} mins ago`;
-    const hrs = Math.floor(mins / 60);
-    return `${hrs} hrs ago`;
+  // --- REAL-TIME GRAPH LOGIC (Last 7 Days) ---
+  const processGraphData = (data) => {
+    const last7Days = [...Array(7)]
+      .map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      })
+      .reverse();
+
+    const chartData = last7Days.map((date) => {
+      const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+
+      // Filter orders for this specific day
+      const dayOrders = data.filter((o) => {
+        const orderDate = new Date(o.createdAtDate);
+        return orderDate.toDateString() === date.toDateString();
+      });
+
+      const revenue = dayOrders.reduce(
+        (sum, o) => sum + Number(o.sellingPrice || 0),
+        0
+      );
+      const profit = dayOrders.reduce(
+        (sum, o) => sum + Number(o.profit || 0),
+        0
+      );
+
+      return { name: dayName, revenue, profit };
+    });
+
+    setGraphData(chartData);
+  };
+
+  // --- CALCULATE METRICS ---
+  const metrics = useMemo(() => {
+    let totalStudents = new Set(orders.map((o) => o.studentEmail)).size;
+    let totalRevenue = 0;
+    let totalCost = 0;
+
+    orders.forEach((order) => {
+      totalRevenue += Number(order.sellingPrice || 0);
+      totalCost += Number(order.adminPrice || 0);
+    });
+
+    return {
+      students: totalStudents,
+      revenue: totalRevenue,
+      profit: totalRevenue - totalCost,
+    };
+  }, [orders]);
+
+  // --- HANDLERS ---
+  const handleEnrollSubmit = async () => {
+    if (
+      !enrollData.studentName ||
+      !enrollData.studentEmail ||
+      !enrollData.selectedProductId ||
+      !enrollData.sellingPrice
+    ) {
+      alert("Please fill all fields properly.");
+      return;
+    }
+
+    // Find selected product (Course or E-Book)
+    const productList = enrollData.productType === "Course" ? courses : ebooks;
+    const selectedProduct = productList.find(
+      (p) => p.id === enrollData.selectedProductId
+    );
+
+    if (!selectedProduct) return;
+
+    setIsProcessing(true);
+    try {
+      const adminPrice = Number(
+        selectedProduct.price || selectedProduct.discountPrice || 0
+      ); // Handle different price field names if any
+      const sellingPrice = Number(enrollData.sellingPrice);
+
+      const orderPayload = {
+        partnerId: partnerId,
+        studentName: enrollData.studentName,
+        studentEmail: enrollData.studentEmail,
+        studentPassword: enrollData.studentPassword,
+        courseId: selectedProduct.id, // Using generic ID field
+        courseTitle: selectedProduct.title, // Title
+        productType: enrollData.productType, // ✨ Store Type (Course/E-Book)
+        adminPrice: adminPrice,
+        sellingPrice: sellingPrice,
+        profit: sellingPrice - adminPrice,
+        status: "Success",
+        createdAt: serverTimestamp(),
+        type: "Enrollment",
+      };
+
+      await addDoc(collection(db, "orders"), orderPayload);
+
+      setShowEnrollModal(false);
+      setEnrollData({
+        productType: "Course",
+        studentName: "",
+        studentEmail: "",
+        studentPassword: "",
+        selectedProductId: "",
+        sellingPrice: "",
+      });
+
+      fetchInitialData(); // Refresh data & graph
+      alert("✅ Student Enrolled Successfully!");
+    } catch (error) {
+      console.error("Enrollment failed:", error);
+      alert("Failed to enroll student. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Helper to get selected product details for display
+  const getSelectedProductDetails = () => {
+    const list = enrollData.productType === "Course" ? courses : ebooks;
+    return list.find((p) => p.id === enrollData.selectedProductId);
   };
 
   return (
-    <div className="p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900 selection:bg-indigo-100">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900">
-              Intelligence Console
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">
-              System operational • Data synced just now
-            </p>
+    <div className="space-y-8 pb-10">
+      {/* --- HEADER --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
+            Partner Command Center
+          </h2>
+          <p className="text-sm text-slate-400 font-medium italic">
+            Manage Enrollments & Track Profit
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowEnrollModal(true)}
+            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-xl"
+          >
+            <Plus size={16} /> New Enroll
+          </button>
+        </div>
+      </div>
+
+      {/* --- KPI CARDS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Students */}
+        <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
+            <Users size={80} className="text-blue-600" />
           </div>
+          <div className="size-14 bg-blue-50 text-blue-600 rounded-[20px] mb-6 flex items-center justify-center">
+            <Users size={24} />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            Total Students
+          </p>
+          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">
+            {metrics.students}
+          </h3>
+          <p className="text-[10px] font-bold text-slate-400 mt-2">
+            Active Learners
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-            {timeRange === "Custom" && (
-              <div className="flex items-center gap-2 px-3 animate-in slide-in-from-right-4 duration-300">
-                <input
-                  type="date"
-                  className="text-[10px] font-bold uppercase p-2 bg-slate-50 border-none rounded-lg outline-none"
-                  onChange={(e) =>
-                    setCustomDates({ ...customDates, start: e.target.value })
-                  }
-                />
-                <span className="text-slate-300">to</span>
-                <input
-                  type="date"
-                  className="text-[10px] font-bold uppercase p-2 bg-slate-50 border-none rounded-lg outline-none"
-                  onChange={(e) =>
-                    setCustomDates({ ...customDates, end: e.target.value })
-                  }
-                />
-              </div>
-            )}
+        {/* Total Revenue */}
+        <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
+            <TrendingUp size={80} className="text-indigo-600" />
+          </div>
+          <div className="size-14 bg-indigo-50 text-indigo-600 rounded-[20px] mb-6 flex items-center justify-center">
+            <Briefcase size={24} />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            Total Revenue
+          </p>
+          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">
+            ₹{metrics.revenue.toLocaleString()}
+          </h3>
+          <p className="text-[10px] font-bold text-slate-400 mt-2">
+            Gross Sales Volume
+          </p>
+        </div>
 
-            <div className="relative">
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="appearance-none bg-slate-950 text-white py-2.5 pl-10 pr-10 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-slate-800 transition-all outline-none"
-              >
-                {["Today", "7D", "30D", "Quarter", "Year", "Custom"].map(
-                  (opt) => (
-                    <option key={opt} value={opt}>
-                      {opt === "7D" ? "This Week" : opt}
-                    </option>
-                  )
-                )}
-              </select>
-              <Filter
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={14}
-              />
-              <ChevronDown
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                size={14}
-              />
+        {/* Net Profit */}
+        <div className="bg-slate-900 p-7 rounded-[40px] border border-slate-800 shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
+            <DollarSign size={80} className="text-emerald-400" />
+          </div>
+          <div className="size-14 bg-white/10 text-emerald-400 rounded-[20px] mb-6 flex items-center justify-center backdrop-blur-sm">
+            <DollarSign size={24} />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            Net Profit
+          </p>
+          <h3 className="text-4xl font-black text-white tracking-tighter">
+            ₹{metrics.profit.toLocaleString()}
+          </h3>
+          <p className="text-[10px] font-bold text-emerald-400 mt-2">
+            Your Total Earnings
+          </p>
+        </div>
+      </div>
+
+      {/* --- CHART & TABLE GRID --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Chart Section */}
+        <div className="lg:col-span-2 bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">
+              Performance Pulse
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400">
+                Last 7 Days Activity
+              </span>
             </div>
+          </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={graphData.length > 0 ? graphData : []}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f1f5f9"
+                />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fontWeight: 700 }}
+                  dy={10}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fontWeight: 700 }}
+                  tickFormatter={(val) => `₹${val / 1000}k`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: "16px",
+                    border: "none",
+                    boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)",
+                  }}
+                  itemStyle={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#6366f1"
+                  strokeWidth={3}
+                  fill="url(#colorRev)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  fill="url(#colorProfit)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            label="Total Revenue"
-            value={`₹${activeData.revenue.total}`}
-            icon={<TrendingUp className="text-blue-500" />}
-            footer={
-              <div className="flex gap-6 mt-5 pt-5 border-t border-slate-50">
-                <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase block tracking-tighter">
-                    Product
-                  </span>
-                  <span className="text-xs font-bold">
-                    ₹{activeData.revenue.product}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase block tracking-tighter">
-                    Commission
-                  </span>
-                  <span className="text-xs font-bold">
-                    ₹{activeData.revenue.comm}
-                  </span>
-                </div>
-              </div>
-            }
-          />
-
-          <StatCard
-            label="Courses Sold"
-            value={activeData.courses.total}
-            icon={<GraduationCap className="text-indigo-500" />}
-            footer={
-              <div className="space-y-1 mt-5 pt-5 border-t border-slate-50">
-                {activeData.courses.top.map((c, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center text-[10px] font-bold text-slate-500"
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span className="text-slate-900">{c.units} Units</span>
-                  </div>
-                ))}
-              </div>
-            }
-          />
-
-          <StatCard
-            label="E-Books Sold"
-            value={activeData.ebooks.total}
-            icon={<BookOpen className="text-emerald-500" />}
-            footer={
-              <div className="space-y-1 mt-5 pt-5 border-t border-slate-50">
-                {activeData.ebooks.top.map((e, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center text-[10px] font-bold text-slate-500"
-                  >
-                    <span className="truncate">{e.name}</span>
-                    <span className="text-slate-900">{e.units} Units</span>
-                  </div>
-                ))}
-              </div>
-            }
-          />
-
-          <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="p-3 bg-slate-50 rounded-2xl w-fit mb-4 text-slate-900">
-                <Wallet size={20} />
-              </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                Available Payout
-              </p>
-              <h3 className="text-3xl font-black text-slate-900 tracking-tighter">
-                ₹{activeData.payout}
-              </h3>
+        {/* Live Enrollment Feed */}
+        <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm flex flex-col h-full">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+              Recent Enrollments
+            </h3>
+            <div className="size-8 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center animate-pulse">
+              <div className="size-2 bg-emerald-500 rounded-full" />
             </div>
-            <button
-              onClick={handleRequestPayout}
-              disabled={isRequesting}
-              className="mt-6 w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
-            >
-              {isRequesting ? "Requesting..." : "Request Payout"}
-            </button>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 bg-white rounded-[48px] p-10 border border-slate-100 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-12">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                  Revenue Stream
-                </h3>
-                <p className="text-sm text-slate-400 font-medium">
-                  Performance tracking:{" "}
-                  {graphView === "weekly" ? "Sun - Sat" : "Jan - Dec"}
-                </p>
-              </div>
-              <div className="flex p-1 bg-slate-100 rounded-xl">
-                {["weekly", "monthly"].map((view) => (
-                  <button
-                    key={view}
-                    onClick={() => setGraphView(view)}
-                    className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
-                      graphView === view
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500"
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar max-h-[300px]">
+            {orders.length > 0 ? (
+              orders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-[24px] border border-slate-100 hover:bg-slate-50 transition-colors"
+                >
+                  <div
+                    className={`size-10 rounded-2xl flex items-center justify-center font-black shadow-sm border border-slate-100 ${
+                      order.productType === "E-Book"
+                        ? "bg-orange-50 text-orange-600"
+                        : "bg-white text-slate-900"
                     }`}
                   >
-                    {view}
-                  </button>
-                ))}
+                    {order.productType === "E-Book" ? (
+                      <FileText size={16} />
+                    ) : order.studentName ? (
+                      order.studentName[0]
+                    ) : (
+                      "U"
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-slate-900 truncate">
+                      {order.studentName}
+                    </p>
+                    <p className="text-[10px] font-bold text-slate-400 truncate flex items-center gap-1">
+                      {order.productType === "E-Book" && (
+                        <span className="text-[8px] bg-orange-100 text-orange-600 px-1 rounded">
+                          E-BOOK
+                        </span>
+                      )}
+                      {order.courseTitle}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-black text-emerald-600">
+                      +₹{order.profit}
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400">
+                      Profit
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-slate-300">
+                <Users size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-[10px] font-bold uppercase">
+                  No enrollments yet
+                </p>
               </div>
-            </div>
-            <div className="h-[380px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={
-                    graphView === "weekly"
-                      ? activeData.graph
-                      : activeData.monthlyGraph
-                  }
-                >
-                  <defs>
-                    <linearGradient id="colorComm" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#F1F5F9"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 11, fill: "#94A3B8", fontWeight: 700 }}
-                    dy={10}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="comm"
-                    stroke="#6366f1"
-                    strokeWidth={4}
-                    fill="url(#colorComm)"
-                    animationDuration={1500}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fill="transparent"
-                    strokeDasharray="6 6"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          <div className="lg:col-span-4 bg-white rounded-[48px] p-10 border border-slate-100 shadow-sm">
-            <h3 className="text-xl font-black text-slate-900 mb-10">
-              Asset Pulse
-            </h3>
-            <div className="space-y-8">
-              <PerformanceBar
-                label="React Pro Mastery"
-                val={activeData.assetPulseValues["React Pro Mastery"]}
-                color="#6366f1"
-              />
-              <PerformanceBar
-                label="UI/UX Design Bootcamp"
-                val={activeData.assetPulseValues["UI/UX Design Bootcamp"]}
-                color="#10b981"
-              />
-              <PerformanceBar
-                label="JavaScript Survival Guide"
-                val={activeData.assetPulseValues["JavaScript Survival Guide"]}
-                color="#f59e0b"
-              />
-              <PerformanceBar
-                label="Next.js 14 Guide"
-                val={activeData.assetPulseValues["Next.js 14 Guide"]}
-                color="#ec4899"
-              />
-
-              <div className="mt-12 p-8 bg-indigo-900 rounded-[32px] text-white relative overflow-hidden">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">
-                  Growth Insight
+      {/* --- ENROLLMENT MODAL --- */}
+      <AnimatePresence>
+        {showEnrollModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEnrollModal(false)}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="bg-slate-900 p-8 text-white relative shrink-0">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                  <GraduationCap size={100} />
+                </div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter">
+                  New Enrollment
+                </h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  Create Access & Assign Product
                 </p>
-                <p className="text-sm font-bold leading-relaxed mb-4">
-                  React Pro Mastery is trending. Launch a coupon to maximize
-                  profit.
-                </p>
-                <button className="text-[10px] font-black uppercase underline">
-                  Deploy Campaign
+                <button
+                  onClick={() => setShowEnrollModal(false)}
+                  className="absolute top-6 right-6 p-2 bg-white/10 rounded-full hover:bg-white/20 transition-all text-white"
+                >
+                  <X size={20} />
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-[48px] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-10 border-b border-slate-50 flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-black text-slate-900">
-                Live Acquisition Stream
-              </h3>
-              <p className="text-sm text-slate-400 font-medium">
-                Real-time student enrollment feed
-              </p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-2xl text-slate-400">
-              <Clock size={20} />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/30">
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Student Identity
-                  </th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-                    Enrollment Asset
-                  </th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Sale Value
-                  </th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                    Net Commission
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {partnerOrders.slice(0, 4).map((o) => (
-                  <tr
-                    key={o.id}
-                    onClick={() => navigate("/partner-dashboard/students")}
-                    className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                  >
-                    <td className="px-10 py-7">
-                      <div className="flex items-center gap-4">
-                        <div className="size-11 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                          <User size={20} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">
-                            {o.studentName}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-medium italic">
-                            {o.studentEmail}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-7 text-center">
-                      <span className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase border border-indigo-100">
-                        {o.assetName}
+              {/* Modal Form */}
+              <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+                {/* 1. Student Details */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                    Student Credentials
+                  </p>
+                  <div className="grid grid-cols-1 gap-4">
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
+                      value={enrollData.studentName}
+                      onChange={(e) =>
+                        setEnrollData({
+                          ...enrollData,
+                          studentName: e.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address"
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
+                      value={enrollData.studentEmail}
+                      onChange={(e) =>
+                        setEnrollData({
+                          ...enrollData,
+                          studentEmail: e.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      type="password"
+                      placeholder="Create Password"
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
+                      value={enrollData.studentPassword}
+                      onChange={(e) =>
+                        setEnrollData({
+                          ...enrollData,
+                          studentPassword: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Product Selection (Course/E-Book) */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Allocation Type
+                    </p>
+                    {/* Toggle Button */}
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                      <button
+                        onClick={() =>
+                          setEnrollData({
+                            ...enrollData,
+                            productType: "Course",
+                            selectedProductId: "",
+                          })
+                        }
+                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                          enrollData.productType === "Course"
+                            ? "bg-white shadow-sm text-slate-900"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        Course
+                      </button>
+                      <button
+                        onClick={() =>
+                          setEnrollData({
+                            ...enrollData,
+                            productType: "E-Book",
+                            selectedProductId: "",
+                          })
+                        }
+                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                          enrollData.productType === "E-Book"
+                            ? "bg-white shadow-sm text-slate-900"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        E-Book
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all appearance-none cursor-pointer"
+                      value={enrollData.selectedProductId}
+                      onChange={(e) =>
+                        setEnrollData({
+                          ...enrollData,
+                          selectedProductId: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select {enrollData.productType}</option>
+                      {(enrollData.productType === "Course"
+                        ? courses
+                        : ebooks
+                      ).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title} (Admin Rate: ₹{item.price})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                  </div>
+
+                  {enrollData.selectedProductId && (
+                    <div className="flex justify-between items-center px-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        Admin Base Price:
                       </span>
-                    </td>
-                    <td className="px-10 py-7">
-                      <p className="text-sm font-black text-slate-900">
-                        ₹{o.saleValue}
-                      </p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
-                        Verified Purchase
-                      </p>
-                    </td>
-                    <td className="px-10 py-7 text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="text-emerald-500 font-black flex items-center gap-1">
-                          <ArrowUpRight size={14} /> +₹{o.commission}
-                        </span>
-                        <span className="text-[9px] text-slate-300 font-medium">
-                          {timeAgo(o.createdAt)}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <span className="text-sm font-black text-slate-900">
+                        ₹{getSelectedProductDetails()?.price}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Financials */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                    Transaction Details
+                  </p>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">
+                      Selling Price (To Student)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        className="w-full bg-indigo-50/50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-indigo-200 transition-all text-indigo-900"
+                        value={enrollData.sellingPrice}
+                        onChange={(e) =>
+                          setEnrollData({
+                            ...enrollData,
+                            sellingPrice: e.target.value,
+                          })
+                        }
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 font-bold">
+                        ₹
+                      </span>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 italic flex items-center gap-1">
+                      <div className="size-1 rounded-full bg-orange-400" /> Only
+                      for your revenue tracking, do not share with anyone.
+                    </p>
+                  </div>
+
+                  {enrollData.selectedProductId && enrollData.sellingPrice && (
+                    <div className="bg-emerald-50 p-4 rounded-2xl flex justify-between items-center border border-emerald-100">
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                        Est. Profit
+                      </span>
+                      <span className="text-xl font-black text-emerald-600">
+                        ₹
+                        {Number(enrollData.sellingPrice) -
+                          Number(getSelectedProductDetails()?.price)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleEnrollSubmit}
+                  disabled={isProcessing}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isProcessing
+                    ? "Processing..."
+                    : `Pay ₹${
+                        enrollData.selectedProductId
+                          ? getSelectedProductDetails()?.price
+                          : "0"
+                      } & Enroll`}
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
-};
-
-const StatCard = ({ label, value, icon, footer }) => (
-  <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm group">
-    <div className="flex justify-between items-start mb-5">
-      <div className="p-4 bg-slate-50 rounded-[24px] text-slate-900 group-hover:rotate-12 transition-transform duration-500">
-        {icon}
-      </div>
-      <div className="p-2 bg-slate-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
-        <ArrowRight size={14} className="text-slate-400" />
-      </div>
-    </div>
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-      {label}
-    </p>
-    <h3 className="text-3xl font-black text-slate-900 tracking-tighter">
-      {value}
-    </h3>
-    {footer}
-  </div>
-);
-
-const PerformanceBar = ({ label, val, color }) => (
-  <div className="space-y-2">
-    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-      <span className="italic">{label}</span>
-      <span>{val}%</span>
-    </div>
-    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: `${val}%` }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-        className="h-full rounded-full shadow-sm"
-        style={{ backgroundColor: color }}
-      />
-    </div>
-  </div>
-);
-
-const CustomTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length >= 2) {
-    return (
-      <div className="bg-slate-900 text-white p-6 rounded-[24px] shadow-2xl border border-white/10 backdrop-blur-md">
-        <p className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">
-          {payload[0].payload.name}
-        </p>
-        <div className="space-y-2">
-          <div className="flex justify-between gap-10">
-            <span className="text-xs font-bold text-slate-400">
-              Net Commission
-            </span>
-            <span className="text-xs font-black text-emerald-400">
-              ₹{payload[0].value}
-            </span>
-          </div>
-          <div className="flex justify-between gap-10">
-            <span className="text-xs font-bold text-slate-400">
-              Units Sold
-            </span>
-            <span className="text-xs font-black text-indigo-400">
-              {payload[1].value} Units
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return null;
 };
 
 export default PartnerDashboard;

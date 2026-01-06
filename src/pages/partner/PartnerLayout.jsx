@@ -3,41 +3,57 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
-  Bell,
-  Zap,
   LogOut,
-  ChevronRight,
-  Search,
   LayoutDashboard,
   CreditCard,
   Ticket,
   Users,
   Settings,
-  ShieldCheck,
   Globe,
   Command,
   AlertCircle,
-  TrendingUp, // Added for Sales icon
-  Copy, // Added for Copy button
-  Check, // Added for Copy feedback
+  TrendingUp,
+  Copy,
+  Check,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAgency } from "../../context/AgencyContext";
 import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase/config"; // ✨ Added DB import
+import { doc, onSnapshot } from "firebase/firestore"; // ✨ Added Firestore imports
 
 const PartnerLayout = () => {
-  const { agency, isPartner } = useAgency();
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [copied, setCopied] = useState(false); // State for copy feedback
+  const [copied, setCopied] = useState(false);
+  const [partnerAgency, setPartnerAgency] = useState(null); // ✨ Local state for real data
+  const [loadingAgency, setLoadingAgency] = useState(true);
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Modern Navigation Config
+  // ✨ Fetch Real Partner Data directly from DB
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const unsub = onSnapshot(doc(db, "agencies", currentUser.uid), (doc) => {
+      if (doc.exists()) {
+        setPartnerAgency(doc.data());
+      } else {
+        setPartnerAgency(null);
+      }
+      setLoadingAgency(false);
+    });
+
+    return () => unsub();
+  }, [currentUser]);
+
+  // Navigation Config
   const navItems = [
     {
-      label: "Pulse",
+      label: "Dashboard",
       path: "/partner",
       icon: <LayoutDashboard size={20} />,
     },
@@ -47,7 +63,7 @@ const PartnerLayout = () => {
       icon: <CreditCard size={20} />,
     },
     {
-      label: "Sales", // ✨ Added Sales Tab
+      label: "Sales",
       path: "/partner/sales",
       icon: <TrendingUp size={20} />,
     },
@@ -86,9 +102,10 @@ const PartnerLayout = () => {
     }
   };
 
-  // ✨ Copy to Clipboard Logic
+  // Copy Logic
   const handleCopyDomain = () => {
-    const domain = `${agency?.subdomain}.alifestableacademy.com`;
+    if (!partnerAgency?.subdomain) return;
+    const domain = `${partnerAgency?.subdomain}.alifestableacademy.com`;
     navigator.clipboard.writeText(domain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -96,7 +113,7 @@ const PartnerLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-[#F4F7FE] font-sans selection:bg-indigo-500/10">
-      {/* 1. DESKTOP SIDEBAR - Premium White Theme */}
+      {/* 1. DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-slate-200 sticky top-0 h-screen z-50">
         {/* Logo Section */}
         <div className="p-8 flex items-center gap-3">
@@ -133,7 +150,6 @@ const PartnerLayout = () => {
                     className="absolute left-0 w-1.5 h-6 bg-emerald-400 rounded-r-full"
                   />
                 )}
-
                 <span
                   className={`${
                     isActive ? "text-emerald-400" : "group-hover:text-slate-900"
@@ -141,53 +157,74 @@ const PartnerLayout = () => {
                 >
                   {item.icon}
                 </span>
-
                 <span className="text-sm font-black uppercase tracking-tight">
                   {item.label}
                 </span>
-
-                {isActive && (
-                  <div className="ml-auto flex items-center gap-2">
-                    <div className="size-2 bg-emerald-400 rounded-full shadow-[0_0_12px_#10b981] animate-pulse"></div>
-                  </div>
-                )}
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom Agency Context */}
+        {/* Bottom Agency Context (Domain Logic) */}
         <div className="p-6 mt-auto border-t border-slate-50">
-          <div className="bg-[#F4F7FE] rounded-3xl p-5 mb-4 border border-slate-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="size-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                  <Globe size={14} className="text-indigo-600" />
+          <div
+            className={`rounded-3xl p-5 mb-4 border transition-all ${
+              !partnerAgency?.subdomain
+                ? "bg-orange-50 border-orange-100"
+                : "bg-[#F4F7FE] border-slate-100"
+            }`}
+          >
+            {/* Logic: If Subdomain Exists -> Show Domain */}
+            {!loadingAgency && partnerAgency?.subdomain ? (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="size-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
+                      <Globe size={14} className="text-indigo-600" />
+                    </div>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      Active Domain
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCopyDomain}
+                    className="p-1.5 hover:bg-white rounded-md transition-colors text-slate-400 hover:text-indigo-600"
+                    title="Copy Domain"
+                  >
+                    {copied ? (
+                      <Check size={14} className="text-emerald-500" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
                 </div>
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                  Active Domain
+                <p className="text-xs font-black text-slate-900 truncate mb-1">
+                  {partnerAgency?.name || "My Academy"}
                 </p>
+                <p className="text-[9px] font-bold text-slate-500 truncate">
+                  {partnerAgency?.subdomain}.alifestableacademy.com
+                </p>
+              </>
+            ) : (
+              /* Logic: If No Subdomain -> Show Setup Prompt */
+              <div className="text-center space-y-3">
+                <div className="flex items-center justify-center gap-2 text-orange-600">
+                  <AlertCircle size={18} />
+                  <span className="text-xs font-black uppercase">
+                    Setup Required
+                  </span>
+                </div>
+                <p className="text-[10px] font-bold text-orange-400 leading-snug">
+                  Please configure your academy settings to go live.
+                </p>
+                <button
+                  onClick={() => navigate("/partner/settings")}
+                  className="w-full py-2 bg-orange-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
+                >
+                  Setup Now <ChevronRight size={12} />
+                </button>
               </div>
-              {/* ✨ Copy Button */}
-              <button
-                onClick={handleCopyDomain}
-                className="p-1.5 hover:bg-white rounded-md transition-colors text-slate-400 hover:text-indigo-600"
-                title="Copy Domain"
-              >
-                {copied ? (
-                  <Check size={14} className="text-emerald-500" />
-                ) : (
-                  <Copy size={14} />
-                )}
-              </button>
-            </div>
-            {/* ✨ Real Institute Name from Agency Settings */}
-            <p className="text-xs font-black text-slate-900 truncate mb-1">
-              {agency?.agencyName || "My Academy"}
-            </p>
-            <p className="text-[9px] font-bold text-slate-500 truncate">
-              {agency?.subdomain}.alifestableacademy.com
-            </p>
+            )}
           </div>
 
           <button
@@ -201,7 +238,7 @@ const PartnerLayout = () => {
 
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header - Glassmorphism */}
+        {/* Header */}
         <header className="h-20 lg:h-24 bg-[#F4F7FE]/80 backdrop-blur-xl sticky top-0 z-40 px-6 lg:px-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -215,36 +252,30 @@ const PartnerLayout = () => {
                 Management / <span className="text-slate-900">Console</span>
               </p>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                Intelligence Hub
+                Main Dashboard
               </h2>
             </div>
           </div>
 
           {/* Top Actions */}
-          <div className="flex items-center gap-3 bg-white p-2 rounded-[24px] shadow-sm border border-slate-100">
-            <div className="hidden md:flex items-center gap-3 bg-[#F4F7FE] px-5 py-2.5 rounded-2xl border border-slate-100 group focus-within:w-72 transition-all duration-500">
-              <Search size={16} className="text-slate-400" />
-              <input
-                type="text"
-                placeholder="Deep search intelligence..."
-                className="bg-transparent border-none outline-none text-[11px] font-bold text-slate-700 w-40"
-              />
+          <div className="flex items-center gap-6">
+            {/* The Nice Line */}
+            <div className="hidden md:flex items-center gap-2 text-slate-400 bg-white/50 px-4 py-2 rounded-2xl border border-slate-100/50">
+              <Sparkles size={14} className="text-indigo-400" />
+              <span className="text-xs font-bold italic tracking-wide">
+                "Architecting the Future of Education"
+              </span>
             </div>
 
-            <div className="h-8 w-px bg-slate-100 hidden md:block mx-1"></div>
+            <div className="h-8 w-px bg-slate-200 hidden md:block mx-1"></div>
 
-            <button className="relative p-3 text-slate-400 hover:text-slate-900 transition-all">
-              <Bell size={20} />
-              <span className="absolute top-2.5 right-2.5 size-2 bg-indigo-50 rounded-full border-2 border-white"></span>
-            </button>
-
-            {/* ✨ Clickable Avatar to Profile */}
+            {/* Avatar */}
             <button
               onClick={() => navigate("/partner/profile")}
               className="flex items-center gap-3 pl-2 pr-1 group"
             >
-              <div className="size-10 rounded-xl bg-slate-950 flex items-center justify-center text-white font-black text-xs border-4 border-slate-100 shadow-xl shadow-slate-200 group-hover:border-indigo-100 transition-all">
-                {agency?.agencyName?.[0] || "P"}
+              <div className="size-10 rounded-xl bg-slate-950 flex items-center justify-center text-white font-black text-xs border-4 border-slate-100 shadow-xl shadow-slate-200 group-hover:border-indigo-100 transition-all uppercase">
+                {partnerAgency?.name?.[0] || "P"}
               </div>
             </button>
           </div>
@@ -296,7 +327,10 @@ const PartnerLayout = () => {
                 {navItems.map((item) => (
                   <button
                     key={item.path}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => {
+                      navigate(item.path);
+                      setIsMobileMenuOpen(false);
+                    }}
                     className={`w-full text-left px-6 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
                       location.pathname === item.path
                         ? "bg-slate-950 text-white"
@@ -312,6 +346,7 @@ const PartnerLayout = () => {
         )}
       </AnimatePresence>
 
+      {/* Logout Modal */}
       <AnimatePresence>
         {showLogoutConfirm && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">

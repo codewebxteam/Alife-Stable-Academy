@@ -3,508 +3,405 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
   Search,
-  Mail,
-  Phone,
+  Filter,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
   Calendar,
   GraduationCap,
   BookOpen,
-  Eye,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Activity,
-  Hash,
-  ShieldCheck,
-  Download,
-  CheckCircle2,
-  Award,
-  AlertCircle,
-  PlayCircle,
-  Filter,
-  ChevronDown,
+  UserCheck,
 } from "lucide-react";
-
-import { listenToOrders } from "../../firebase/orders.service";
-import { listenToPartners } from "../../firebase/partners.service";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
+// ✨ Importing StudentProfile from components folder
+import StudentProfile from "../../components/partner/StudentProfile";
 
 const StudentIntelligence = () => {
-  const [partners, setPartners] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const { currentUser } = useAuth();
+  const partnerId = currentUser?.uid;
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [globalTime, setGlobalTime] = useState("7D");
+  // --- STATE ---
+  const [timeRange, setTimeRange] = useState("All Time");
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
-  const [auditFilter, setAuditFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [rawOrders, setRawOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // ✨ Pagination set to 10
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
+  // --- FETCH DATA ---
   useEffect(() => {
-    const unsub = listenToPartners(setPartners);
-    return () => unsub && unsub();
-  }, []);
+    const fetchData = async () => {
+      if (!partnerId) return;
+      setLoading(true);
+      try {
+        const q = query(
+          collection(db, "orders"),
+          where("partnerId", "==", partnerId),
+          orderBy("createdAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate
+            ? doc.data().createdAt.toDate()
+            : new Date(),
+        }));
+        setRawOrders(data);
+      } catch (error) {
+        console.error("Error fetching student data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const activePartner = useMemo(() => {
-    return partners.find((p) => p.status === "Active") || partners[0] || null;
-  }, [partners]);
+    fetchData();
+  }, [partnerId]);
 
-  useEffect(() => {
-    if (!activePartner?.id) return;
-    const unsub = listenToOrders(activePartner.id, setOrders);
-    return () => unsub && unsub();
-  }, [activePartner]);
-
+  // --- PROCESSED STUDENT DATA WITH ROBUST FILTERS ---
   const students = useMemo(() => {
-    const map = {};
+    const studentMap = {};
 
-    orders.forEach((o) => {
-      if (!o.studentEmail) return;
+    rawOrders.forEach((order) => {
+      const email = order.studentEmail;
+      if (!email) return;
 
-      if (!map[o.studentEmail]) {
-        map[o.studentEmail] = {
-          id: o.studentEmail,
-          name: o.studentName || "Unknown",
-          email: o.studentEmail,
-          phone: "",
-          joinDate: o.createdAt?.toDate
-            ? o.createdAt.toDate().toDateString()
-            : "",
-          learningState: "Completed",
-          certStatus: "N/A",
-          progress: 100,
-          assets: [],
+      if (!studentMap[email]) {
+        studentMap[email] = {
+          id: `STU-${email}`,
+          name: order.studentName || "Unknown Student",
+          email: email,
+          phone: order.studentPhone || "Not Provided",
+          joinDate: order.createdAt,
+          source: "Partner",
+          partnerName: "You",
+          courses: [],
+          transactions: [],
+          totalSpent: 0,
         };
       }
 
-      map[o.studentEmail].assets.push({
-        name: o.productName || o.assetName || "Unknown",
-        type: o.productType === "course" || o.type === "course" ? "Course" : "E-Book",
-        price: o.price || o.saleValue || 0,
-        date: o.createdAt?.toDate
-          ? o.createdAt.toDate().toDateString()
-          : "",
+      // Update Join Date to the earliest one
+      if (order.createdAt < studentMap[email].joinDate) {
+        studentMap[email].joinDate = order.createdAt;
+      }
+
+      // Add Course/Product
+      studentMap[email].courses.push({
+        name: order.courseTitle || order.productTitle || "Unknown Asset",
+        type: order.productType || "Course",
       });
+
+      // Add Transaction
+      studentMap[email].transactions.push({
+        id: order.id,
+        asset: order.courseTitle || "Asset",
+        date: order.createdAt.toLocaleDateString("en-IN"),
+        amount: order.sellingPrice,
+      });
+
+      studentMap[email].totalSpent += Number(order.sellingPrice || 0);
     });
 
-    return Object.values(map).sort((a, b) =>
-      (b.id || "").localeCompare(a.id || "")
-    );
-  }, [orders]);
+    let studentList = Object.values(studentMap);
+    const now = new Date();
 
-  const kpis = useMemo(() => {
-    let completed = 0;
-    let inProgress = 0;
-    let notStarted = 0;
-    let pendingCert = 0;
+    // 1. Time Filter (Fixed Logic)
+    studentList = studentList.filter((s) => {
+      const d = new Date(s.joinDate);
 
-    students.forEach((s) => {
-      if (s.learningState === "Completed") completed += 1;
-      if (s.learningState === "In-Progress") inProgress += 1;
-      if (s.learningState === "Not Started") notStarted += 1;
-      if (s.certStatus === "Pending") pendingCert += 1;
+      if (timeRange === "Today") {
+        return d.toDateString() === now.toDateString();
+      }
+      if (timeRange === "7D") {
+        const weekAgo = new Date();
+        weekAgo.setDate(now.getDate() - 7);
+        weekAgo.setHours(0, 0, 0, 0); // Include full days
+        return d >= weekAgo;
+      }
+      if (timeRange === "Month") {
+        return (
+          d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear()
+        );
+      }
+      if (timeRange === "Year") {
+        return d.getFullYear() === now.getFullYear();
+      }
+      if (timeRange === "Custom") {
+        if (!customDates.start || !customDates.end) return true;
+        const start = new Date(customDates.start);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(customDates.end);
+        end.setHours(23, 59, 59, 999);
+        return d >= start && d <= end;
+      }
+      return true;
     });
 
-    return { completed, inProgress, notStarted, pendingCert };
-  }, [students]);
+    // 2. Search Filter
+    if (searchQuery) {
+      const lowerQ = searchQuery.toLowerCase();
+      studentList = studentList.filter(
+        (s) =>
+          s.name.toLowerCase().includes(lowerQ) ||
+          s.email.toLowerCase().includes(lowerQ)
+      );
+    }
 
-  const filteredStudents = useMemo(() => {
-    return students
-      .filter((s) => {
-        const matchesSearch =
-          (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.id || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return studentList.sort((a, b) => b.joinDate - a.joinDate);
+  }, [rawOrders, timeRange, customDates, searchQuery]);
 
-        const matchesAudit =
-          auditFilter === "All" ||
-          (auditFilter === "Completed" &&
-            s.learningState === "Completed") ||
-          (auditFilter === "InProgress" &&
-            s.learningState === "In-Progress") ||
-          (auditFilter === "NotStarted" &&
-            s.learningState === "Not Started") ||
-          (auditFilter === "PendingCert" &&
-            s.certStatus === "Pending") ||
-          (auditFilter === "IssuedCert" &&
-            s.certStatus === "Issued");
-
-        return matchesSearch && matchesAudit;
-      })
-      .sort((a, b) => (b.id || "").localeCompare(a.id || ""));
-  }, [students, searchQuery, auditFilter]);
-
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
-
-  const currentData = filteredStudents.slice(
+  // --- PAGINATION SLICE ---
+  const currentStudents = students.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  const totalPages = Math.ceil(students.length / itemsPerPage);
+
+  // --- MACRO METRICS ---
+  const metrics = useMemo(() => {
+    return {
+      total: students.length,
+      courseLearners: students.filter((s) =>
+        s.courses.some((c) => c.type === "Course")
+      ).length,
+      ebookReaders: students.filter((s) =>
+        s.courses.some((c) => c.type === "E-Book")
+      ).length,
+    };
+  }, [students]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
-              Student Intelligence
-            </h1>
-            <p className="text-sm text-slate-400 font-medium italic">
-              Lifecycle Auditing & Enrollment Data Center
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            <AnimatePresence>
-              {globalTime === "Custom" && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: "auto", opacity: 1 }}
-                  className="flex items-center gap-2 px-2 border-r border-slate-100 mr-2 overflow-hidden"
-                >
-                  <input
-                    type="date"
-                    className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none border-none"
-                    onChange={(e) =>
-                      setCustomDates({
-                        ...customDates,
-                        start: e.target.value,
-                      })
-                    }
-                  />
-                  <span className="text-slate-300 text-[10px] font-black uppercase tracking-tighter">
-                    To
-                  </span>
-                  <input
-                    type="date"
-                    className="text-[10px] font-bold p-1.5 bg-slate-50 rounded-lg outline-none border-none"
-                    onChange={(e) =>
-                      setCustomDates({
-                        ...customDates,
-                        end: e.target.value,
-                      })
-                    }
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="relative">
-              <select
-                value={globalTime}
-                onChange={(e) => setGlobalTime(e.target.value)}
-                className="appearance-none bg-slate-900 text-white py-2.5 pl-10 pr-10 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer"
-              >
-                {["Today", "7D", "30D", "Year", "Custom"].map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-              <Filter
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={14}
-              />
-              <ChevronDown
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                size={14}
-              />
-            </div>
-          </div>
+    <div className="space-y-8 pb-10">
+      {/* --- HEADER --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
+            Student Registry
+          </h2>
+          <p className="text-sm text-slate-400 font-medium italic">
+            Manage your enrolled learners
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard
-            title="Course Completed"
-            val={String(kpis.completed)}
-            icon={<CheckCircle2 />}
-            color="emerald"
-            onClick={() => setAuditFilter("Completed")}
-            active={auditFilter === "Completed"}
-          />
-          <KPICard
-            title="Pending Certificates"
-            val={String(kpis.pendingCert)}
-            icon={<Award />}
-            color="orange"
-            onClick={() => setAuditFilter("PendingCert")}
-            active={auditFilter === "PendingCert"}
-          />
-          <KPICard
-            title="Active Learning"
-            val={String(kpis.inProgress)}
-            icon={<PlayCircle />}
-            color="blue"
-            onClick={() => setAuditFilter("InProgress")}
-            active={auditFilter === "InProgress"}
-          />
-          <KPICard
-            title="Yet to Start"
-            val={String(kpis.notStarted)}
-            icon={<AlertCircle />}
-            color="indigo"
-            onClick={() => setAuditFilter("NotStarted")}
-            active={auditFilter === "NotStarted"}
-          />
-        </div>
-
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-4">
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
-                Audit Ledger
-              </h3>
-              <select
-                value={auditFilter}
-                onChange={(e) => setAuditFilter(e.target.value)}
-                className="bg-slate-50 border-none text-[10px] font-black uppercase px-4 py-2 rounded-xl outline-none text-slate-500"
-              >
-                <option value="All">All Students</option>
-                <option value="Completed">Completed</option>
-                <option value="InProgress">In Progress</option>
-                <option value="NotStarted">Not Started</option>
-                <option value="PendingCert">Pending Certificates</option>
-                <option value="IssuedCert">Issued Certificates</option>
-              </select>
-            </div>
-
-            <div className="flex-1 max-w-sm flex items-center gap-3 bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100">
-              <Search size={16} className="text-slate-400" />
+        <div className="flex flex-wrap items-center gap-3">
+          {timeRange === "Custom" && (
+            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-slate-100 shadow-sm">
               <input
-                type="text"
-                placeholder="Search Identity..."
-                className="bg-transparent border-none outline-none text-xs font-bold w-full"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                type="date"
+                className="text-[10px] font-bold outline-none bg-slate-50 p-1.5 rounded-lg"
+                onChange={(e) =>
+                  setCustomDates({ ...customDates, start: e.target.value })
+                }
+              />
+              <span className="text-[9px] font-black text-slate-300">TO</span>
+              <input
+                type="date"
+                className="text-[10px] font-bold outline-none bg-slate-50 p-1.5 rounded-lg"
+                onChange={(e) =>
+                  setCustomDates({ ...customDates, end: e.target.value })
+                }
               />
             </div>
-          </div>
-
-          <div className="overflow-x-auto min-h-[450px]">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <th className="px-10 py-6">Identity / ID</th>
-                  <th className="px-10 py-6 text-center">Purchases (C / E)</th>
-                  <th className="px-10 py-6 text-center">Learning Progress</th>
-                  <th className="px-10 py-6 text-center">Certificate</th>
-                  <th className="px-10 py-6 text-right">Inspect</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {currentData.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                    onClick={() => setSelectedStudent(student)}
-                  >
-                    <td className="px-10 py-7">
-                      <div className="flex items-center gap-4">
-                        <div className="size-11 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-xs uppercase">
-                          {(student.name || "?")[0]}
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-slate-900 tracking-tight">
-                            {student.name || "Unknown"}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">
-                            {student.id || "N/A"}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-7">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black tracking-tighter">
-                          <GraduationCap size={12} />{" "}
-                          {
-                            student.assets.filter((a) => a.type === "Course")
-                              .length
-                          }
-                        </span>
-                        <span className="flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black tracking-tighter">
-                          <BookOpen size={12} />{" "}
-                          {
-                            student.assets.filter((a) => a.type === "E-Book")
-                              .length
-                          }
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-10 py-7">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                          {student.learningState} ({student.progress}%)
-                        </span>
-                        <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${student.progress}%` }}
-                            className="h-full bg-indigo-500"
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-7 text-center">
-                      <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border bg-slate-50 text-slate-400 border-slate-100">
-                        {student.certStatus}
-                      </span>
-                    </td>
-                    <td className="px-10 py-7 text-right">
-                      <Eye
-                        size={18}
-                        className="inline text-slate-300 group-hover:text-slate-950 transition-colors"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="p-8 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Page {currentPage} Out of {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentPage((p) => Math.max(1, p - 1));
-                }}
-                disabled={currentPage === 1}
-                className="p-3 bg-white border border-slate-200 rounded-xl disabled:opacity-20"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentPage((p) => Math.min(totalPages, p + 1));
-                }}
-                disabled={currentPage === totalPages}
-                className="p-3 bg-white border border-slate-200 rounded-xl disabled:opacity-20"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
+          )}
+          <div className="relative">
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="appearance-none bg-slate-900 text-white pl-5 pr-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-lg hover:bg-slate-800 transition-all"
+            >
+              {["All Time", "Today", "7D", "Month", "Year", "Custom"].map(
+                (t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                )
+              )}
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
           </div>
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedStudent && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedStudent(null)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-2xl rounded-[48px] p-8 sm:p-12 shadow-2xl relative z-10 overflow-y-auto max-h-[90vh] no-scrollbar"
-            >
-              <div className="flex justify-between items-start mb-10">
-                <div className="flex items-center gap-6">
-                  <div className="size-20 rounded-[32px] bg-slate-950 text-white flex items-center justify-center text-3xl font-black">
-                    {(selectedStudent.name || "?")[0]}
-                  </div>
-                  <div>
-                    <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">
-                      {selectedStudent.name || "Unknown"}
-                    </h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">
-                      Audit ID: {selectedStudent.id || "N/A"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedStudent(null)}
-                  className="p-3 bg-slate-50 rounded-2xl text-slate-400"
-                >
-                  <X size={24} />
-                </button>
-              </div>
+      {/* --- KPI CARDS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard
+          label="Total Students"
+          val={metrics.total}
+          icon={<Users />}
+          color="indigo"
+        />
+        <StatCard
+          label="Course Learners"
+          val={metrics.courseLearners}
+          icon={<GraduationCap />}
+          color="blue"
+        />
+        <StatCard
+          label="E-Book Readers"
+          val={metrics.ebookReaders}
+          icon={<BookOpen />}
+          color="orange"
+        />
+      </div>
 
-              <div className="mb-10">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 border-b pb-4">
-                  Enrolled Assets Intelligence
-                </p>
-                <div className="space-y-4">
-                  {selectedStudent.assets.map((asset, i) => (
-                    <div
-                      key={i}
-                      className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex justify-between items-center"
-                    >
+      {/* --- STUDENT TABLE --- */}
+      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+        <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-4">
+            <div className="size-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center">
+              <UserCheck size={20} />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">
+              Learner Directory
+            </h3>
+          </div>
+
+          <div className="w-full sm:w-64 flex items-center gap-3 bg-slate-50 px-5 py-3 rounded-xl border border-slate-100 focus-within:border-indigo-200 transition-all">
+            <Search size={16} className="text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              className="bg-transparent text-xs font-bold outline-none w-full placeholder:text-slate-400"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                <th className="px-8 py-6">Student Identity</th>
+                <th className="px-8 py-6">First Seen</th>
+                <th className="px-8 py-6 text-center">Library Access</th>
+                <th className="px-8 py-6 text-right">Profile</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className="p-10 text-center text-slate-400 text-xs font-bold uppercase animate-pulse"
+                  >
+                    Syncing Student Data...
+                  </td>
+                </tr>
+              ) : currentStudents.length > 0 ? (
+                currentStudents.map((student) => (
+                  <tr
+                    key={student.id}
+                    className="hover:bg-slate-50/50 transition-colors group"
+                  >
+                    <td className="px-8 py-5">
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`size-12 rounded-2xl flex items-center justify-center ${
-                            asset.type === "Course"
-                              ? "bg-indigo-100 text-indigo-600"
-                              : "bg-orange-100 text-orange-600"
-                          }`}
-                        >
-                          {asset.type === "Course" ? (
-                            <GraduationCap size={20} />
-                          ) : (
-                            <BookOpen size={20} />
-                          )}
+                        <div className="size-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm uppercase">
+                          {student.name[0]}
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-900">
-                            {asset.name || "Unknown Asset"}
+                          <p className="text-xs font-black text-slate-900">
+                            {student.name}
                           </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                            Purchased: {asset.date || "N/A"}
+                          <p className="text-[10px] font-bold text-slate-400">
+                            {student.email}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-black text-slate-900">
-                          ₹{asset.price || 0}
-                        </p>
-                        <p className="text-[9px] font-black text-emerald-500 uppercase">
-                          Confirmed
-                        </p>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Calendar size={14} />
+                        <span className="text-xs font-bold">
+                          {student.joinDate.toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
                       </div>
+                    </td>
+                    <td className="px-8 py-5 text-center">
+                      <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200">
+                        {student.courses.length} Items Enrolled
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button
+                        onClick={() => setSelectedStudent(student)}
+                        className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="p-12 text-center">
+                    <div className="flex flex-col items-center justify-center opacity-50">
+                      <Users size={32} className="text-slate-300 mb-2" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase">
+                        No students found
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <DetailBox label="Contact Feed" icon={<Mail size={14} />}>
-                  <p className="text-xs font-black text-slate-900 break-all">
-                    {selectedStudent.email || "N/A"}
-                  </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
-                    {selectedStudent.phone || "N/A"}
-                  </p>
-                </DetailBox>
-                <DetailBox
-                  label="Lifecycle State"
-                  icon={<ShieldCheck size={14} />}
-                >
-                  <p className="text-sm font-black text-emerald-500 uppercase tracking-tight">
-                    {selectedStudent.learningState || "N/A"} (
-                    {selectedStudent.progress || 0}%)
-                  </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">
-                    Certificate: {selectedStudent.certStatus || "N/A"}
-                  </p>
-                </DetailBox>
-              </div>
-
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-6 border-t border-slate-50 flex justify-between items-center bg-white">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex gap-2">
               <button
-                onClick={() => setSelectedStudent(null)}
-                className="w-full py-6 bg-slate-950 text-white rounded-[32px] text-[11px] font-black uppercase tracking-[0.3em] active:scale-95 shadow-xl transition-all"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2.5 bg-white border border-slate-200 rounded-xl disabled:opacity-30 hover:bg-slate-50 transition-all"
               >
-                Close Intelligence Audit
+                <ChevronLeft size={16} />
               </button>
-            </motion.div>
+              <button
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="p-2.5 bg-white border border-slate-200 rounded-xl disabled:opacity-30 hover:bg-slate-50 transition-all"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --- STUDENT PROFILE MODAL --- */}
+      <AnimatePresence>
+        {selectedStudent && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+            <StudentProfile
+              student={selectedStudent}
+              onClose={() => setSelectedStudent(null)}
+            />
           </div>
         )}
       </AnimatePresence>
@@ -512,47 +409,26 @@ const StudentIntelligence = () => {
   );
 };
 
-const KPICard = ({ title, val, icon, color, onClick, active }) => {
-  const styles = {
-    emerald: "bg-emerald-50 text-emerald-600 border-emerald-200",
-    orange: "bg-orange-50 text-orange-600 border-orange-200",
-    blue: "bg-blue-50 text-blue-600 border-blue-200",
-    indigo: "bg-indigo-50 text-indigo-600 border-indigo-200",
+// --- HELPER COMPONENT ---
+const StatCard = ({ label, val, icon, color }) => {
+  const themes = {
+    indigo: "bg-indigo-50 text-indigo-600",
+    blue: "bg-blue-50 text-blue-600",
+    orange: "bg-orange-50 text-orange-600",
   };
   return (
-    <button
-      onClick={onClick}
-      className={`text-left bg-white p-7 rounded-[36px] border shadow-sm transition-all ${
-        active ? "ring-2 ring-slate-950 scale-95" : "border-slate-100"
-      }`}
-    >
-      <div
-        className={`size-12 rounded-2xl flex items-center justify-center mb-6 ${styles[color]}`}
-      >
-        {icon}
+    <div className="bg-white p-8 rounded-[36px] border border-slate-100 shadow-sm hover:translate-y-[-4px] transition-all duration-500">
+      <div className={`p-4 rounded-2xl w-fit mb-4 ${themes[color]}`}>
+        {React.cloneElement(icon, { size: 22 })}
       </div>
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-        {title}
-      </p>
-      <h3 className="text-2xl font-black text-slate-900 tracking-tighter">
-        {val}
-      </h3>
-    </button>
-  );
-};
-
-const DetailBox = ({ label, icon, children }) => (
-  <div className="bg-slate-50 p-7 rounded-[32px] border border-slate-100">
-    <div className="flex items-center gap-2 mb-4">
-      <div className="size-6 bg-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm">
-        {icon}
-      </div>
-      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
         {label}
       </p>
+      <h3 className="text-3xl font-black text-slate-900 tracking-tighter">
+        {val}
+      </h3>
     </div>
-    {children}
-  </div>
-);
+  );
+};
 
 export default StudentIntelligence;

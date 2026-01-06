@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { fetchAgencyBySubdomain } from "../firebase/agencyService";
 
 const AgencyContext = createContext();
@@ -16,46 +22,66 @@ export const AgencyProvider = ({ children }) => {
   const [isMainSite, setIsMainSite] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const detectAgency = async () => {
+  // --- REFRESH / DETECT AGENCY FUNCTION ---
+  // यह फंक्शन URL चेक करेगा और बताएगा कि यह मेन साइट है या पार्टनर की साइट
+  const refreshAgency = useCallback(async () => {
+    setLoading(true);
+
+    try {
       const hostname = window.location.hostname;
-      // Agar localhost hai to check karo subdomain hai ya nahi (e.g. zinstitute.localhost)
-      const parts = hostname.split(".");
+      const MAIN_DOMAIN = "alifestableacademy.com"; // आपका मुख्य डोमेन
+      let subdomain = null;
 
-      // Logic: Agar parts > 2 hain, matlab subdomain exist karta hai
-      // Example: zinstitute.alifestableacademy.com (3 parts)
-      const isSubdomain =
-        parts.length > (hostname.includes("localhost") ? 1 : 2);
-
-      if (isSubdomain) {
-        const subdomain = parts[0].toLowerCase();
-
-        // Skip 'www' or main domain names
-        if (subdomain !== "www" && subdomain !== "alifestableacademy") {
-          try {
-            // Check Firebase for this subdomain settings
-            const agencyData = await fetchAgencyBySubdomain(subdomain);
-
-            if (agencyData) {
-              setAgency({
-                ...agencyData,
-                pricingMultiplier: agencyData.pricingMultiplier || 1.2,
-              });
-              setIsMainSite(false);
-            }
-          } catch (error) {
-            console.error("Agency Fetch Error:", error);
-          }
+      // 1. Localhost Handling (Testing ke liye)
+      if (hostname.includes("localhost")) {
+        const parts = hostname.split(".");
+        if (parts.length > 1 && parts[0] !== "www") {
+          subdomain = parts[0].toLowerCase();
         }
       }
-      setLoading(false);
-    };
+      // 2. Production Domain Handling
+      else if (hostname.endsWith(MAIN_DOMAIN)) {
+        // e.g. partner.alifestableacademy.com -> parts = ['partner', 'alifestableacademy', 'com']
+        const parts = hostname.split(".");
+        // अगर 2 से ज्यादा पार्ट्स हैं (जैसे sub.domain.com), तो पहला वाला सबडोमेन है
+        if (parts.length > 2 && parts[0] !== "www") {
+          subdomain = parts[0].toLowerCase();
+        }
+      }
 
-    detectAgency();
+      // 3. Fetch Data if Subdomain Exists
+      if (subdomain) {
+        console.log("🔍 Detecting Agency for:", subdomain);
+        const agencyData = await fetchAgencyBySubdomain(subdomain);
+
+        if (agencyData) {
+          setAgency({
+            ...agencyData,
+            pricingMultiplier: agencyData.pricingMultiplier || 1.2,
+          });
+          setIsMainSite(false);
+        } else {
+          console.warn("⚠️ Agency not found, loading main site.");
+          setIsMainSite(true);
+        }
+      } else {
+        setIsMainSite(true);
+      }
+    } catch (error) {
+      console.error("❌ Agency Context Error:", error);
+      setIsMainSite(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  // Initial Load par check karega
+  useEffect(() => {
+    refreshAgency();
+  }, [refreshAgency]);
+
   // [PRO FEATURE] Global Dynamic CSS Injector
-  // Ye partner ke colors ko poori app ke CSS variables mein inject kar dega
+  // पार्टनर के कलर्स पूरी वेबसाइट पर अपने आप लग जाएंगे
   useEffect(() => {
     if (!loading) {
       document.documentElement.style.setProperty(
@@ -67,7 +93,7 @@ export const AgencyProvider = ({ children }) => {
         agency.accentColor
       );
 
-      // Update Tab Title
+      // Tab Title Update
       document.title = isMainSite
         ? "Alife Stable Academy | Learn Smarter"
         : `${agency.agencyName} | Powered by Alife Stable`;
@@ -81,6 +107,7 @@ export const AgencyProvider = ({ children }) => {
         isMainSite,
         isPartner: !isMainSite,
         loading,
+        refreshAgency, // ✨ यहाँ फिक्स किया गया है (Ab ye available hai)
       }}
     >
       {children}
