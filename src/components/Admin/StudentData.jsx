@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -19,67 +19,148 @@ import {
   Zap,
   FileSpreadsheet, // ✨ Excel icon
 } from "lucide-react";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "../../firebase/config";
 import StudentProfile from "./StudentProfile";
 
-// --- MOCK DATA ENGINE ---
-const STUDENT_DATABASE = Array.from({ length: 55 }).map((_, i) => ({
-  id: `STU-${2000 + i}`,
-  name: `Student ${i + 1}`,
-  email: `student${i + 1}@example.com`,
-  phone: `+91 90000 ${10000 + i}`,
-  location: i % 3 === 0 ? "Mumbai, India" : "Delhi, India",
-  // ✨ Dynamic Dates for Filtering Demo
-  joinDate:
-    i % 3 === 0
-      ? new Date().toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "15 Jan 2024",
-  source: i % 3 === 0 ? "Direct" : "Partner",
-  partnerName: i % 3 === 0 ? null : `Nexus Academy ${i % 5}`,
-  status: i % 15 === 0 ? "Inactive" : "Active",
-  courses: [
-    {
-      name: "React Pro Mastery",
-      progress: i % 2 === 0 ? 100 : 45,
-      certificateIssued: i % 2 === 0,
-    },
-    { name: "UI/UX Design", progress: 10, certificateIssued: false },
-  ],
-  certificates: i % 2 === 0 ? ["React Cert"] : [],
-  avgScore: 78 + (i % 20),
-  transactions: [
-    {
-      id: "ORD-998",
-      asset: "React Pro Mastery",
-      date: "15 Jan 2024",
-      amount: "2499",
-    },
-    {
-      id: "ORD-997",
-      asset: "UI/UX Design",
-      date: "10 Jan 2024",
-      amount: "1999",
-    },
-  ],
-}));
+
 
 const StudentData = () => {
   // State
-  const [students, setStudents] = useState(STUDENT_DATABASE);
+  const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Filters
-  const [timeFilter, setTimeFilter] = useState("All Time"); // ✨ Default All Time
+  const [timeFilter, setTimeFilter] = useState("All Time");
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
   const [searchQuery, setSearchQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("All"); // All, Direct, Partner
+  const [sourceFilter, setSourceFilter] = useState("All");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      setLoading(true);
+      try {
+        /* ---- 1. USERS (Students) ---- */
+        const usersSnap = await getDocs(
+          query(collection(db, "users"), where("role", "==", "student"))
+        );
+        const users = usersSnap.docs.map((d) => ({
+          uid: d.id,
+          ...d.data(),
+        }));
+
+        /* ---- 2. ENROLLED COURSES ---- */
+        const enrolledSnap = await getDocs(collection(db, "enrolledCourses"));
+        const enrolledMap = {};
+
+        enrolledSnap.docs.forEach((doc) => {
+          // doc.id IS the studentId (uid)
+          const data = doc.data();
+          enrolledMap[doc.id] = data.courses || [];
+        });
+
+        /* ---- 3. ORDERS (Transactions) ---- */
+        const ordersSnap = await getDocs(collection(db, "orders"));
+        const ordersMap = {}; // Map email -> orders[]
+        const partnerMap = {}; // Map email -> partnerName (if any)
+
+        ordersSnap.docs.forEach((doc) => {
+          const order = doc.data();
+          const email = order.studentEmail?.toLowerCase();
+
+          if (!email) return;
+
+          if (!ordersMap[email]) {
+            ordersMap[email] = [];
+          }
+
+          const orderDate = order.createdAt?.toDate
+            ? order.createdAt.toDate()
+            : order.createdAt
+              ? new Date(order.createdAt)
+              : new Date();
+
+          ordersMap[email].push({
+            id: doc.id,
+            asset: order.assetName || "Course",
+            date: orderDate.toLocaleDateString(),
+            amount: order.saleValue,
+            partnerId: order.partnerId,
+          });
+
+          // Determine Partner Source
+          // If any order has a partnerId that is actual text (not empty), we consider them Partner sourced.
+          // Note: "direct" might be a string used for direct sales, but typically partnerId implies a partner.
+          // We'll treat any truthy partnerId as Partner source for now.
+          if (order.partnerId && order.partnerId.toLowerCase() !== "direct") {
+            partnerMap[email] = `Partner (${order.partnerId})`;
+          }
+        });
+
+        /* ---- FINAL MERGE ---- */
+        const finalStudents = users.map((u) => {
+          const userCourses = enrolledMap[u.uid] || [];
+          const userEmail = u.email?.toLowerCase();
+          const userOrders = ordersMap[userEmail] || [];
+
+          // Source determination: 
+          // If they have a partner record in orders, they are Partner sourced.
+          // Otherwise Direct.
+          const isPartner = !!partnerMap[userEmail];
+
+          return {
+            id: u.uid,
+            name: u.name || "Unknown Student",
+            email: u.email || "",
+            phone: u.phone || "N/A", // Ensure phone is available in users collection or handle missing
+            location: u.location || "N/A",
+            avatar: u.photoURL || "",
+
+            // Join Date from User Creation or first Order
+            joinDate: u.createdAt
+              ? new Date(u.createdAt.toDate ? u.createdAt.toDate() : u.createdAt)
+              : new Date(),
+
+            source: isPartner ? "Partner" : "Direct",
+            partnerName: isPartner ? partnerMap[userEmail] : null,
+            status: "Active", // Logic for active/inactive could be refined
+
+            courses: userCourses.map((c) => ({
+              courseId: c.courseId,
+              courseName: c.title,
+              progress: c.progress || 0,
+              certificateIssued: c.progress === 100,
+            })),
+
+            certificates: userCourses.filter((c) => c.progress === 100).map(c => c.title),
+            transactions: userOrders,
+
+            // A helper for sorting/filtering
+            avgScore: 0, // Placeholder as score isn't clear
+          };
+        });
+
+        setStudents(finalStudents);
+      } catch (error) {
+        console.error("Error fetching student data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
+
 
   // --- 1. TIME FILTER LOGIC (Global Scope) ---
   const timeFilteredStudents = useMemo(() => {
@@ -155,6 +236,14 @@ const StudentData = () => {
     direct: timeFilteredStudents.filter((s) => s.source === "Direct").length,
     partner: timeFilteredStudents.filter((s) => s.source === "Partner").length,
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold">
+        Loading students...
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
@@ -306,7 +395,7 @@ const StudentData = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto min-h-[400px]">
+          <div className="overflow-x-auto min-h-100">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -422,9 +511,19 @@ const StudentData = () => {
       {/* --- STUDENT PROFILE MODAL --- */}
       <AnimatePresence>
         {selectedStudent && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
             <StudentProfile
-              student={selectedStudent}
+              student={{
+                ...selectedStudent,
+                joinDate:
+                  selectedStudent.joinDate instanceof Date
+                    ? selectedStudent.joinDate.toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                    : selectedStudent.joinDate,
+              }}
               onClose={() => setSelectedStudent(null)}
             />
           </div>
@@ -443,7 +542,7 @@ const KPICard = ({ label, val, sub, icon, color }) => {
     orange: "text-orange-600 bg-orange-50",
   };
   return (
-    <div className="bg-white p-7 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all">
+    <div className="bg-white p-7 rounded-4xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
       <div
         className={`size-12 rounded-2xl flex items-center justify-center mb-4 ${styles[color]}`}
       >
