@@ -37,11 +37,10 @@ const StudentProfile = ({ student, onClose }) => {
                   {student.name}
                 </h2>
                 <span
-                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
-                    student.source === "Direct"
-                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-                      : "bg-orange-500/20 text-orange-300 border-orange-500/30"
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${student.source === "Direct"
+                    ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                    : "bg-orange-500/20 text-orange-300 border-orange-500/30"
+                    }`}
                 >
                   {student.source === "Direct"
                     ? "Self Acquired"
@@ -97,11 +96,10 @@ const StudentProfile = ({ student, onClose }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === tab.id
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-400 hover:text-slate-600"
+                }`}
             >
               {tab.icon} {tab.label}
             </button>
@@ -126,6 +124,27 @@ const StudentProfile = ({ student, onClose }) => {
                 icon={<BookOpen size={18} />}
                 color="blue"
               />
+<<<<<<< HEAD
+              <StatBox
+                label="Certificates"
+                val={student.certificates.length}
+                icon={<Award size={18} />}
+                color="emerald"
+              />
+              {/* <StatBox
+                label="Avg. Score"
+                val={`${student.avgScore}%`}
+                icon={<Zap size={18} />}
+                color="orange"
+              /> */}
+              <StatBox
+                label="Learning Hours"
+                val="45h 20m"
+                icon={<Clock size={18} />}
+                color="indigo"
+              />
+=======
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
             </div>
 
             {/* Course List (Just Names) */}
@@ -141,10 +160,47 @@ const StudentProfile = ({ student, onClose }) => {
                   <div className="size-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                     <GraduationCap size={24} />
                   </div>
+<<<<<<< HEAD
+                  <div className="flex-1 w-full">
+                    <div className="flex justify-between items-center mb-2">
+                      <h5 className="text-sm font-black text-slate-900">
+                        {course.name}
+                      </h5>
+                      <span
+                        className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${course.progress === 100
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-slate-100 text-slate-500"
+                          }`}
+                      >
+                        {course.progress === 100 ? "Completed" : "In Progress"}
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${course.progress}%` }}
+                        className={`h-full rounded-full ${course.progress === 100
+                          ? "bg-emerald-500"
+                          : "bg-indigo-500"
+                          }`}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400">
+                      <span>{course.progress}% Completed</span>
+                      {course.certificateIssued ? (
+                        <span className="text-emerald-500 flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Certificate Issued
+                        </span>
+                      ) : (
+                        <span>Certificate Locked</span>
+                      )}
+                    </div>
+=======
                   <div className="flex-1">
                     <h5 className="text-sm font-black text-slate-900">
                       {course.name}
                     </h5>
+>>>>>>> 06127be6f0643dd65859ba9ce5e0b3cd45e9629a
                   </div>
                 </div>
               ))}
@@ -274,9 +330,8 @@ const StatBox = ({ label, val, color, icon }) => {
 
 const InfoCard = ({ label, val, icon, highlight }) => (
   <div
-    className={`p-6 rounded-[24px] border flex items-center gap-4 ${
-      highlight ? "bg-indigo-50 border-indigo-100" : "bg-white border-slate-100"
-    }`}
+    className={`p-6 rounded-[24px] border flex items-center gap-4 ${highlight ? "bg-indigo-50 border-indigo-100" : "bg-white border-slate-100"
+      }`}
   >
     <div className="size-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
       {icon}
@@ -286,9 +341,8 @@ const InfoCard = ({ label, val, icon, highlight }) => (
         {label}
       </p>
       <p
-        className={`text-sm font-black ${
-          highlight ? "text-indigo-700" : "text-slate-900"
-        }`}
+        className={`text-sm font-black ${highlight ? "text-indigo-700" : "text-slate-900"
+          }`}
       >
         {val}
       </p>
