@@ -77,7 +77,7 @@ const IntelligenceHub = () => {
   // --- MAIN STATE ---
   const [timeRange, setTimeRange] = useState("7D");
   const [velocityToggle, setVelocityToggle] = useState("Weekly");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
 
   // --- COUPON INTELLIGENCE STATE ---
@@ -118,8 +118,19 @@ const IntelligenceHub = () => {
 
   // --- EFFECTS ---
 
-  // 1. Fetch Static/Service Data
+  // 1. Fetch Static/Service Data with instant initial values
   useEffect(() => {
+    // Set default values immediately
+    setRevenueData({ totalRevenue: 0, directRevenue: 0, partnerRevenue: 0 });
+    setCourseData({ total: 0, self: 0, partner: 0 });
+    setStudentData({ total: 0, self: 0, partner: 0 });
+    setVelocityData(velocityToggle === "Weekly" ? FALLBACK_WEEKLY : FALLBACK_MONTHLY);
+    setCoursePieData([]);
+    setEbookPieData([]);
+    setInactivePartners([]);
+    setHotAsset({ name: "N/A", units: 0 });
+    
+    // Then fetch real data
     fetchAllData();
   }, [timeRange, velocityToggle, customDates]);
 
@@ -173,50 +184,21 @@ const IntelligenceHub = () => {
   // --- HANDLERS ---
 
   const fetchAllData = async () => {
-    // If Custom is selected but dates are empty, don't fetch yet or fetch default
-    if (timeRange === "Custom" && (!customDates.start || !customDates.end))
-      return;
+    if (timeRange === "Custom" && (!customDates.start || !customDates.end)) return;
 
-    setLoading(true);
     try {
-      const [
-        revenue,
-        courses,
-        students,
-        velocity,
-        coursePie,
-        ebookPie,
-        inactive,
-        asset,
-      ] = await Promise.all([
-        intelligenceService.getRevenueData(timeRange), // You might need to pass customDates here if service supports it
-        intelligenceService.getCourseAcquisitions(),
-        intelligenceService.getStudentCount(),
-        intelligenceService.getRevenueVelocity(velocityToggle),
-        intelligenceService.getCourseSalesDistribution(),
-        intelligenceService.getEbookSalesDistribution(),
-        intelligenceService.getInactivePartners(),
-        intelligenceService.getHotAssetSpotlight(),
-      ]);
-
-      setRevenueData(revenue);
-      setCourseData(courses);
-      setStudentData(students);
-      setVelocityData(
-        velocity.length > 0
-          ? velocity
-          : velocityToggle === "Weekly"
-          ? FALLBACK_WEEKLY
-          : FALLBACK_MONTHLY
-      );
-      setCoursePieData(coursePie);
-      setEbookPieData(ebookPie);
-      setInactivePartners(inactive);
-      setHotAsset(asset);
+      intelligenceService.getRevenueData(timeRange).then(setRevenueData).catch(() => {});
+      intelligenceService.getCourseAcquisitions().then(setCourseData).catch(() => {});
+      intelligenceService.getStudentCount().then(setStudentData).catch(() => {});
+      intelligenceService.getRevenueVelocity(velocityToggle).then(velocity => {
+        if (velocity.length > 0) setVelocityData(velocity);
+      }).catch(() => {});
+      intelligenceService.getCourseSalesDistribution().then(setCoursePieData).catch(() => {});
+      intelligenceService.getEbookSalesDistribution().then(setEbookPieData).catch(() => {});
+      intelligenceService.getInactivePartners().then(setInactivePartners).catch(() => {});
+      intelligenceService.getHotAssetSpotlight().then(setHotAsset).catch(() => {});
     } catch (error) {
       console.error("Error fetching intelligence data:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -299,16 +281,6 @@ const IntelligenceHub = () => {
 
   return (
     <div className="space-y-8 pb-10 relative">
-      {loading && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="size-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-sm font-black text-slate-600 uppercase tracking-widest">
-              Loading Intelligence...
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* --- OMNI-FILTER (FIXED) --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -762,9 +734,9 @@ const IntelligenceHub = () => {
 
           <div className="flex-1 space-y-4">
             {inactivePartners.length > 0 ? (
-              inactivePartners.slice(0, 2).map((p) => (
+              inactivePartners.slice(0, 2).map((p, index) => (
                 <div
-                  key={p}
+                  key={`partner-${index}`}
                   className="flex justify-between items-center p-4 bg-red-50/50 border border-red-100 rounded-[20px]"
                 >
                   <span className="text-[10px] font-black text-slate-800">
