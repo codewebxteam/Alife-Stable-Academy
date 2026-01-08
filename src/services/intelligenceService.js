@@ -6,12 +6,53 @@ import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc } fro
  * Fetches analytics data from Firebase Firestore
  */
 
+// Helper function to get date range based on timeRange
+const getDateRange = (timeRange, customDates = null) => {
+  const now = new Date();
+  let startDate = new Date();
+  
+  switch (timeRange) {
+    case "Today":
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case "7D":
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case "30D":
+      startDate.setDate(now.getDate() - 30);
+      break;
+    case "Quarter":
+      startDate.setMonth(now.getMonth() - 3);
+      break;
+    case "Year":
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+    case "Custom":
+      if (customDates?.start && customDates?.end) {
+        startDate = new Date(customDates.start);
+        const endDate = new Date(customDates.end);
+        endDate.setHours(23, 59, 59, 999);
+        return { startDate, endDate };
+      }
+      startDate.setDate(now.getDate() - 7);
+      break;
+    default:
+      startDate.setDate(now.getDate() - 7);
+  }
+  
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  return { startDate, endDate };
+};
+
 export const intelligenceService = {
   // Fetch revenue data
-  async getRevenueData(timeRange = "7D") {
+  async getRevenueData(timeRange = "7D", customDates = null) {
     try {
       const paymentsRef = collection(db, "payments");
       const snapshot = await getDocs(paymentsRef);
+      
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       
       let totalRevenue = 0;
       let directRevenue = 0;
@@ -19,7 +60,9 @@ export const intelligenceService = {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.status === "completed") {
+        const paymentDate = data.createdAt?.toDate();
+        
+        if (data.status === "completed" && paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
           const amount = parseFloat(data.amount) || 0;
           totalRevenue += amount;
           
@@ -39,10 +82,12 @@ export const intelligenceService = {
   },
 
   // Fetch course acquisitions
-  async getCourseAcquisitions() {
+  async getCourseAcquisitions(timeRange = "7D", customDates = null) {
     try {
       const enrollmentsRef = collection(db, "enrollments");
       const snapshot = await getDocs(enrollmentsRef);
+      
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       
       let total = 0;
       let self = 0;
@@ -50,11 +95,15 @@ export const intelligenceService = {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        total++;
-        if (data.source === "direct" || data.source === "self") {
-          self++;
-        } else {
-          partner++;
+        const enrollDate = data.createdAt?.toDate() || data.enrolledAt?.toDate();
+        
+        if (enrollDate && enrollDate >= startDate && enrollDate <= endDate) {
+          total++;
+          if (data.source === "direct" || data.source === "self") {
+            self++;
+          } else {
+            partner++;
+          }
         }
       });
 
@@ -66,10 +115,12 @@ export const intelligenceService = {
   },
 
   // Fetch student count (from enrollments - real enrolled students)
-  async getStudentCount() {
+  async getStudentCount(timeRange = "7D", customDates = null) {
     try {
       const enrollmentsRef = collection(db, "enrollments");
       const snapshot = await getDocs(enrollmentsRef);
+      
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       
       const uniqueStudents = new Set();
       const directStudents = new Set();
@@ -77,9 +128,10 @@ export const intelligenceService = {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
+        const enrollDate = data.createdAt?.toDate() || data.enrolledAt?.toDate();
         const studentId = data.studentId;
         
-        if (studentId) {
+        if (studentId && enrollDate && enrollDate >= startDate && enrollDate <= endDate) {
           uniqueStudents.add(studentId);
           
           if (data.source === "direct" || data.source === "self") {
@@ -132,20 +184,23 @@ export const intelligenceService = {
   },
 
   // Fetch revenue velocity data (weekly/monthly)
-  async getRevenueVelocity(mode = "Weekly") {
+  async getRevenueVelocity(mode = "Weekly", timeRange = "7D", customDates = null) {
     try {
       const paymentsRef = collection(db, "payments");
       const snapshot = await getDocs(paymentsRef);
       
-      const now = new Date();
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       const result = [];
       
       if (mode === "Weekly") {
-        // Last 7 days
+        // Calculate number of days in the range
+        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        const daysToShow = Math.min(daysDiff, 7);
         const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        for (let i = 6; i >= 0; i--) {
-          const targetDate = new Date(now);
-          targetDate.setDate(now.getDate() - i);
+        
+        for (let i = daysToShow - 1; i >= 0; i--) {
+          const targetDate = new Date(endDate);
+          targetDate.setDate(endDate.getDate() - i);
           targetDate.setHours(0, 0, 0, 0);
           
           const nextDate = new Date(targetDate);
@@ -176,11 +231,15 @@ export const intelligenceService = {
           });
         }
       } else {
-        // Last 6 months
+        // Calculate number of months in the range
+        const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                          (endDate.getMonth() - startDate.getMonth());
+        const monthsToShow = Math.min(monthsDiff + 1, 6);
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        for (let i = 5; i >= 0; i--) {
-          const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const nextDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+        
+        for (let i = monthsToShow - 1; i >= 0; i--) {
+          const targetDate = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
+          const nextDate = new Date(endDate.getFullYear(), endDate.getMonth() - i + 1, 1);
           
           let direct = 0;
           let partner = 0;
@@ -189,7 +248,8 @@ export const intelligenceService = {
             const data = doc.data();
             if (data.status === "completed" && data.createdAt) {
               const paymentDate = data.createdAt.toDate();
-              if (paymentDate >= targetDate && paymentDate < nextDate) {
+              if (paymentDate >= targetDate && paymentDate < nextDate && 
+                  paymentDate >= startDate && paymentDate <= endDate) {
                 const amount = parseFloat(data.amount) || 0;
                 if (data.source === "direct") {
                   direct += amount;
@@ -216,17 +276,22 @@ export const intelligenceService = {
   },
 
   // Fetch course sales distribution
-  async getCourseSalesDistribution() {
+  async getCourseSalesDistribution(timeRange = "7D", customDates = null) {
     try {
       const enrollmentsRef = collection(db, "enrollments");
       const snapshot = await getDocs(enrollmentsRef);
       
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       const courseMap = {};
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        const courseName = data.courseName || "Unknown";
-        courseMap[courseName] = (courseMap[courseName] || 0) + 1;
+        const enrollDate = data.createdAt?.toDate() || data.enrolledAt?.toDate();
+        
+        if (enrollDate && enrollDate >= startDate && enrollDate <= endDate) {
+          const courseName = data.courseName || "Unknown";
+          courseMap[courseName] = (courseMap[courseName] || 0) + 1;
+        }
       });
       
       const colors = ["#6366f1", "#8b5cf6", "#10b981", "#f59e0b"];
@@ -242,17 +307,22 @@ export const intelligenceService = {
   },
 
   // Fetch ebook sales distribution
-  async getEbookSalesDistribution() {
+  async getEbookSalesDistribution(timeRange = "7D", customDates = null) {
     try {
       const ebooksRef = collection(db, "ebook_sales");
       const snapshot = await getDocs(ebooksRef);
       
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       const ebookMap = {};
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        const ebookName = data.ebookName || "Unknown";
-        ebookMap[ebookName] = (ebookMap[ebookName] || 0) + 1;
+        const saleDate = data.createdAt?.toDate() || data.purchasedAt?.toDate();
+        
+        if (saleDate && saleDate >= startDate && saleDate <= endDate) {
+          const ebookName = data.ebookName || "Unknown";
+          ebookMap[ebookName] = (ebookMap[ebookName] || 0) + 1;
+        }
       });
       
       const colors = ["#f43f5e", "#3b82f6", "#10b981"];
@@ -380,17 +450,22 @@ export const intelligenceService = {
   },
 
   // Fetch hot asset spotlight
-  async getHotAssetSpotlight() {
+  async getHotAssetSpotlight(timeRange = "7D", customDates = null) {
     try {
       const enrollmentsRef = collection(db, "enrollments");
       const snapshot = await getDocs(enrollmentsRef);
       
+      const { startDate, endDate } = getDateRange(timeRange, customDates);
       const courseMap = {};
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        const courseName = data.courseName || "Unknown";
-        courseMap[courseName] = (courseMap[courseName] || 0) + 1;
+        const enrollDate = data.createdAt?.toDate() || data.enrolledAt?.toDate();
+        
+        if (enrollDate && enrollDate >= startDate && enrollDate <= endDate) {
+          const courseName = data.courseName || "Unknown";
+          courseMap[courseName] = (courseMap[courseName] || 0) + 1;
+        }
       });
       
       const topCourse = Object.entries(courseMap).sort((a, b) => b[1] - a[1])[0];

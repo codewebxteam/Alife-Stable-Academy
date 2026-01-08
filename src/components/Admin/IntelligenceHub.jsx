@@ -187,16 +187,16 @@ const IntelligenceHub = () => {
     if (timeRange === "Custom" && (!customDates.start || !customDates.end)) return;
 
     try {
-      intelligenceService.getRevenueData(timeRange).then(setRevenueData).catch(() => {});
-      intelligenceService.getCourseAcquisitions().then(setCourseData).catch(() => {});
-      intelligenceService.getStudentCount().then(setStudentData).catch(() => {});
-      intelligenceService.getRevenueVelocity(velocityToggle).then(velocity => {
+      intelligenceService.getRevenueData(timeRange, customDates).then(setRevenueData).catch(() => {});
+      intelligenceService.getCourseAcquisitions(timeRange, customDates).then(setCourseData).catch(() => {});
+      intelligenceService.getStudentCount(timeRange, customDates).then(setStudentData).catch(() => {});
+      intelligenceService.getRevenueVelocity(velocityToggle, timeRange, customDates).then(velocity => {
         if (velocity.length > 0) setVelocityData(velocity);
       }).catch(() => {});
-      intelligenceService.getCourseSalesDistribution().then(setCoursePieData).catch(() => {});
-      intelligenceService.getEbookSalesDistribution().then(setEbookPieData).catch(() => {});
+      intelligenceService.getCourseSalesDistribution(timeRange, customDates).then(setCoursePieData).catch(() => {});
+      intelligenceService.getEbookSalesDistribution(timeRange, customDates).then(setEbookPieData).catch(() => {});
       intelligenceService.getInactivePartners().then(setInactivePartners).catch(() => {});
-      intelligenceService.getHotAssetSpotlight().then(setHotAsset).catch(() => {});
+      intelligenceService.getHotAssetSpotlight(timeRange, customDates).then(setHotAsset).catch(() => {});
     } catch (error) {
       console.error("Error fetching intelligence data:", error);
     }
