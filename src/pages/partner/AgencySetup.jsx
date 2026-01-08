@@ -1,640 +1,822 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
-import { useAgency } from "../../context/AgencyContext"; // Real-time UI update ke liye
-import {
-  checkSubdomainAvailability,
-  saveAgencySetup,
-} from "../../firebase/agencyService";
+import { useAgency } from "../../context/AgencyContext";
 import { db } from "../../firebase/config";
-import { doc, getDoc } from "firebase/firestore";
 import {
-  Globe,
-  Palette,
-  Share2,
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import {
   Rocket,
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  ArrowLeft,
   Loader2,
-  Settings2,
-  ExternalLink,
   Save,
+  Building2,
+  MessageCircle,
+  GraduationCap,
+  BookOpen,
+  DollarSign,
+  Smartphone,
+  Layout,
 } from "lucide-react";
+
+// Simple debounce function
+const simpleDebounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 
 const AgencySetup = () => {
   const { currentUser } = useAuth();
-  const { agency: globalAgency, isPartner } = useAgency(); // Context se current settings lena
+  const { refreshAgency } = useAgency(); // Ensure Context has this function
 
+  // --- STEPS CONFIG ---
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [isSubdomainAvailable, setIsSubdomainAvailable] = useState(null);
-  const [hasExistingAgency, setHasExistingAgency] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
 
+  // --- DATA STATES ---
+  const [courses, setCourses] = useState([]);
+  const [ebooks, setEbooks] = useState([]);
+
+  // --- FORM STATE ---
   const [formData, setFormData] = useState({
-    agencyName: "",
+    instituteName: "",
     subdomain: "",
-    themeColor: "#0f172a",
-    accentColor: "#5edff4",
-    logoUrl: "",
-    pricingMultiplier: 1.2,
-    socialLinks: {
-      instagram: "",
-      whatsapp: "",
-      linkedin: "",
-    },
+    whatsappNumber: "",
+    email: "",
+    upiId: "",
+    customPrices: {}, // { itemId: sellingPrice }
   });
 
-  // 1. Load Existing Data on Mount
+  const [oldSubdomain, setOldSubdomain] = useState(null); // To handle subdomain changes
+  const [subdomainStatus, setSubdomainStatus] = useState("idle"); // idle, checking, available, unavailable
+
+  // --- FETCH INITIAL DATA ---
   useEffect(() => {
-    const loadAgencyData = async () => {
-      if (!currentUser) return;
+    const init = async () => {
+      if (!currentUser?.uid) return;
+      setDataLoading(true);
       try {
-        const docRef = doc(db, "partners", currentUser.uid);
+        // 1. Fetch Inventory
+        const [cSnap, eSnap] = await Promise.all([
+          getDocs(collection(db, "courseVideos")),
+          getDocs(collection(db, "ebooks")),
+        ]);
+
+        setCourses(
+          cSnap.docs.map((d) => ({ id: d.id, type: "course", ...d.data() }))
+        );
+        setEbooks(
+          eSnap.docs.map((d) => ({ id: d.id, type: "ebook", ...d.data() }))
+        );
+
+        // 2. Check Existing Agency in 'agencies' collection
+        const docRef = doc(db, "agencies", currentUser.uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setFormData(data);
-          setHasExistingAgency(true);
-          setStep(5); // Direct Dashboard/Settings View
+          setFormData({
+            instituteName: data.name || "",
+            subdomain: data.subdomain || "",
+            whatsappNumber: data.whatsapp || "",
+            email: data.email || currentUser.email || "",
+            upiId: data.upi || "",
+            customPrices: data.customPrices || {},
+          });
+          setOldSubdomain(data.subdomain); // Save old subdomain to track changes
+          setIsEditMode(true);
+        } else {
+          // New Setup
+          setFormData((prev) => ({ ...prev, email: currentUser.email || "" }));
         }
       } catch (err) {
-        console.error("Error loading agency:", err);
+        console.error("Init Error:", err);
       } finally {
-        setInitialLoading(false);
+        setDataLoading(false);
       }
     };
-    loadAgencyData();
+    init();
   }, [currentUser]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes(".")) {
-      const [parent, child] = name.split(".");
-      setFormData((prev) => ({
-        ...prev,
-        [parent]: { ...prev[parent], [child]: value },
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+  // --- SUBDOMAIN CHECKER ---
+  const checkAvailability = useCallback(
+    simpleDebounce(async (sub) => {
+      if (!sub || sub.length < 3) {
+        setSubdomainStatus("idle");
+        return;
+      }
+
+      // If editing and subdomain hasn't changed, it's valid
+      if (isEditMode && sub === oldSubdomain) {
+        setSubdomainStatus("available");
+        return;
+      }
+
+      setSubdomainStatus("checking");
+
+      try {
+        // Check in 'subdomains' collection
+        const subRef = doc(db, "subdomains", sub);
+        const subSnap = await getDoc(subRef);
+
+        if (subSnap.exists()) {
+          setSubdomainStatus("unavailable");
+        } else {
+          setSubdomainStatus("available");
+        }
+      } catch (error) {
+        console.error("Check failed", error);
+        setSubdomainStatus("idle");
+      }
+    }, 500),
+    [isEditMode, oldSubdomain]
+  );
+
+  const handleSubdomainChange = (e) => {
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setFormData({ ...formData, subdomain: val });
+    checkAvailability(val);
   };
 
-  const validateSubdomain = async () => {
-    // Agar subdomain wahi hai jo pehle se saved hai, to valid hai
-    if (hasExistingAgency && formData.subdomain === globalAgency.subdomain) {
-      setStep(2);
-      return;
-    }
-
-    if (formData.subdomain.length < 3) {
-      setError("Subdomain must be at least 3 characters");
-      return;
-    }
-    setLoading(true);
-    const available = await checkSubdomainAvailability(formData.subdomain);
-    setIsSubdomainAvailable(available);
-    setLoading(false);
-    if (available) setStep(2);
-    else setError("This subdomain is already taken. Try another.");
+  // --- PRICE HANDLER ---
+  const handlePriceChange = (itemId, val) => {
+    setFormData((prev) => ({
+      ...prev,
+      customPrices: {
+        ...prev.customPrices,
+        [itemId]: val,
+      },
+    }));
   };
 
+  // --- SUBMIT (DIRECT FIREBASE SAVE) ---
   const handleFinalSubmit = async () => {
+    if (!currentUser?.uid) return;
     setLoading(true);
-    setError("");
     try {
-      await saveAgencySetup(currentUser.uid, formData);
-      setHasExistingAgency(true);
-      setStep(4); // Success Step
+      const agencyRef = doc(db, "agencies", currentUser.uid);
 
-      // Update local storage or trigger context refresh if needed
-      setTimeout(() => setStep(5), 2000); // Redirect to settings view after success
-    } catch (err) {
-      setError("Failed to save settings. Please try again.");
+      const payload = {
+        name: formData.instituteName,
+        subdomain: formData.subdomain,
+        whatsapp: formData.whatsappNumber,
+        email: formData.email,
+        upi: formData.upiId,
+        customPrices: formData.customPrices,
+        updatedAt: new Date(),
+        ownerId: currentUser.uid,
+        status: "Active",
+      };
+
+      // 1. Save to Agencies Collection
+      await setDoc(agencyRef, payload, { merge: true });
+
+      // 2. Save Subdomain Mapping (Only if changed or new)
+      if (formData.subdomain !== oldSubdomain) {
+        // Create new mapping
+        await setDoc(doc(db, "subdomains", formData.subdomain), {
+          ownerId: currentUser.uid,
+          agencyName: formData.instituteName,
+        });
+
+        // Optional: Delete old subdomain logic can be added here if needed
+      }
+
+      // 3. Refresh Context
+      if (refreshAgency && typeof refreshAgency === "function") {
+        await refreshAgency();
+      }
+
+      alert(
+        isEditMode
+          ? "Academy Settings Updated!"
+          : "Academy Launched Successfully! 🚀"
+      );
+      setIsEditMode(true);
+      setOldSubdomain(formData.subdomain);
+    } catch (error) {
+      console.error("Save Error:", error);
+      alert("Failed to save settings. Check console.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (initialLoading) {
+  if (dataLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="size-12 text-indigo-600 animate-spin" />
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">
+            Loading Academy Console...
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pt-24 pb-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Progress Header (Only show during first setup) */}
-        {step < 5 && (
-          <div className="flex justify-between mb-12">
-            {[1, 2, 3].map((num) => (
-              <div key={num} className="flex flex-col items-center flex-1">
-                <div
-                  className={`size-10 rounded-full flex items-center justify-center font-bold transition-all ${
-                    step >= num
-                      ? "bg-slate-900 text-[#5edff4]"
-                      : "bg-slate-200 text-slate-500"
-                  }`}
-                >
-                  {step > num ? <CheckCircle2 size={20} /> : num}
-                </div>
-                <span
-                  className={`text-xs mt-2 font-bold uppercase tracking-wider ${
-                    step >= num ? "text-slate-900" : "text-slate-400"
-                  }`}
-                >
-                  {num === 1 ? "Identity" : num === 2 ? "Branding" : "Connect"}
-                </span>
-              </div>
-            ))}
+    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-10 font-sans text-slate-900 flex justify-center">
+      <div className="w-full max-w-5xl">
+        {/* HEADER */}
+        <div className="text-center mb-8 lg:mb-10 space-y-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm mb-2">
+            <span
+              className={`size-2 rounded-full ${
+                isEditMode ? "bg-emerald-500" : "bg-indigo-500"
+              } animate-pulse`}
+            />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              {isEditMode ? "Live Mode" : "Setup Mode"}
+            </span>
           </div>
-        )}
+          <h1 className="text-2xl lg:text-4xl font-black uppercase tracking-tighter text-slate-900">
+            {isEditMode ? "Academy Settings" : "Setup Your Academy"}
+          </h1>
+          <p className="text-slate-400 font-medium text-xs lg:text-sm px-4">
+            {isEditMode
+              ? "Update your commercial & operational configurations."
+              : "Configure your digital institute in 4 simple steps."}
+          </p>
+        </div>
 
-        <motion.div
-          layout
-          className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden"
-        >
-          <AnimatePresence mode="wait">
-            {/* Step 1: Subdomain & Identity */}
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="p-8 sm:p-12"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
-                    <Globe size={32} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900">
-                      Establish Your Domain
-                    </h2>
-                    <p className="text-slate-500">
-                      Choose how people will find your academy
-                    </p>
-                  </div>
+        {/* MAIN CARD */}
+        <div className="bg-white rounded-[32px] lg:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden flex flex-col lg:flex-row min-h-[500px] lg:min-h-[600px]">
+          {/* LEFT: STEPS SIDEBAR (Mobile Friendly) */}
+          <div className="w-full lg:w-[280px] bg-slate-950 p-6 lg:p-8 text-white flex flex-col justify-between shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 left-0 size-64 bg-indigo-500/20 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
+
+            <div className="relative z-10 space-y-6 lg:space-y-8">
+              <div className="flex justify-between items-center lg:block">
+                <div>
+                  <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-1">
+                    Config Wizard
+                  </h3>
+                  <p className="text-[10px] lg:text-xs text-slate-400 font-bold">
+                    Step {step} of 4
+                  </p>
                 </div>
+                {/* Mobile Step Indicator */}
+                <div className="lg:hidden text-xs font-black bg-white/10 px-2 py-1 rounded-lg">
+                  {step}/4
+                </div>
+              </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Institute Name
-                    </label>
-                    <input
-                      type="text"
-                      name="agencyName"
-                      value={formData.agencyName}
-                      onChange={handleInputChange}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 outline-none focus:border-[#5edff4] transition-all font-bold"
-                      placeholder="e.g. Z Institute of Technology"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Subdomain URL
-                    </label>
-                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden px-6 focus-within:border-[#5edff4] transition-all">
-                      <input
-                        type="text"
-                        name="subdomain"
-                        value={formData.subdomain}
-                        onChange={handleInputChange}
-                        className="flex-1 bg-transparent py-4 outline-none font-bold lowercase"
-                        placeholder="zinstitute"
-                      />
-                      <span className="text-slate-400 font-bold">
-                        .alifestableacademy.com
-                      </span>
-                    </div>
-                  </div>
-                  {error && (
-                    <div className="flex items-center gap-2 text-red-500 text-sm font-bold">
-                      <AlertCircle size={16} /> {error}
-                    </div>
-                  )}
+              {/* Steps List (Hidden on very small screens if needed, or styled horizontally) */}
+              <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 scrollbar-hide">
+                {[
+                  { id: 1, label: "Identity", icon: <Layout size={16} /> },
+                  { id: 2, label: "Pricing", icon: <DollarSign size={16} /> },
+                  {
+                    id: 3,
+                    label: "Connect",
+                    icon: <MessageCircle size={16} />,
+                  },
+                  { id: 4, label: "Launch", icon: <Rocket size={16} /> },
+                ].map((s) => (
                   <button
-                    onClick={validateSubdomain}
-                    disabled={
-                      loading || !formData.subdomain || !formData.agencyName
-                    }
-                    className="w-full py-4 bg-slate-900 text-[#5edff4] rounded-2xl font-black text-lg flex items-center justify-center gap-2 hover:shadow-xl hover:shadow-[#5edff4]/10 transition-all"
+                    key={s.id}
+                    onClick={() => {
+                      if (isEditMode) setStep(s.id);
+                    }} // Allow click only in edit mode
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all min-w-[120px] lg:min-w-0 ${
+                      step === s.id
+                        ? "bg-white/10 text-white shadow-lg border border-white/5"
+                        : step > s.id
+                        ? "text-emerald-400"
+                        : "text-slate-500"
+                    } ${
+                      isEditMode
+                        ? "cursor-pointer hover:bg-white/5"
+                        : "cursor-default"
+                    }`}
                   >
-                    {loading ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      "Verify & Continue"
-                    )}{" "}
-                    <ArrowRight size={20} />
+                    <div
+                      className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        step > s.id ? "bg-emerald-500/10" : "bg-black/20"
+                      }`}
+                    >
+                      {step > s.id ? <CheckCircle2 size={14} /> : s.icon}
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                      {s.label}
+                    </span>
                   </button>
-                </div>
-              </motion.div>
-            )}
+                ))}
+              </div>
+            </div>
+          </div>
 
-            {/* Step 2: Branding */}
-            {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="p-8 sm:p-12"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-purple-50 rounded-2xl text-purple-600">
-                    <Palette size={32} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900">
-                      Design & Branding
-                    </h2>
-                    <p className="text-slate-500">
-                      Make the academy truly yours
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">
-                        Primary Theme Color
-                      </label>
-                      <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <input
-                          type="color"
-                          name="themeColor"
-                          value={formData.themeColor}
-                          onChange={handleInputChange}
-                          className="size-12 rounded-lg border-none cursor-pointer bg-transparent"
-                        />
-                        <span className="font-mono font-bold text-slate-600">
-                          {formData.themeColor.toUpperCase()}
-                        </span>
+          {/* RIGHT: FORM CONTENT */}
+          <div className="flex-1 flex flex-col bg-white min-w-0">
+            <div className="flex-1 p-6 lg:p-10 overflow-y-auto custom-scrollbar">
+              <AnimatePresence mode="wait">
+                {/* STEP 1: IDENTITY */}
+                {step === 1 && (
+                  <motion.div
+                    key="step1"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-8 max-w-lg mx-auto"
+                  >
+                    <div className="text-center mb-8">
+                      <div className="size-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Building2 size={28} />
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">
-                        Profit Markup (%)
-                      </label>
-                      <input
-                        type="number"
-                        value={((formData.pricingMultiplier - 1) * 100).toFixed(
-                          0
-                        )}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            pricingMultiplier:
-                              parseFloat(e.target.value) / 100 + 1,
-                          })
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 outline-none focus:border-[#5edff4] transition-all font-bold"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        Example: ₹500 course will sell for ₹
-                        {(500 * formData.pricingMultiplier).toFixed(0)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900 rounded-3xl p-6 text-white relative overflow-hidden group">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-[#5edff4] mb-4">
-                      Live Preview
-                    </p>
-                    <div className="h-8 w-24 bg-white/20 rounded-lg mb-4 animate-pulse" />
-                    <div className="space-y-2">
-                      <div className="h-4 w-full bg-white/10 rounded" />
-                      <div className="h-4 w-2/3 bg-white/10 rounded" />
-                    </div>
-                    <button
-                      className="mt-6 w-full py-2 rounded-lg font-bold text-xs"
-                      style={{ backgroundColor: formData.themeColor }}
-                    >
-                      Example Button
-                    </button>
-                    <div className="absolute top-0 right-0 size-32 bg-[#5edff4]/10 blur-3xl rounded-full" />
-                  </div>
-                </div>
-
-                <div className="flex gap-4 mt-8">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={() => setStep(3)}
-                    className="flex-1 py-4 bg-slate-900 text-[#5edff4] rounded-2xl font-black"
-                  >
-                    Next Step
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 3: Social & Finalize */}
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="p-8 sm:p-12"
-              >
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-cyan-50 rounded-2xl text-cyan-600">
-                    <Share2 size={32} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900">
-                      Finalize & Connect
-                    </h2>
-                    <p className="text-slate-500">Add your social presence</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    name="socialLinks.instagram"
-                    value={formData.socialLinks.instagram}
-                    onChange={handleInputChange}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 outline-none focus:border-[#5edff4] font-bold"
-                    placeholder="Instagram Profile URL"
-                  />
-                  <input
-                    type="text"
-                    name="socialLinks.whatsapp"
-                    value={formData.socialLinks.whatsapp}
-                    onChange={handleInputChange}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 outline-none focus:border-[#5edff4] font-bold"
-                    placeholder="WhatsApp Number"
-                  />
-
-                  <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mt-6 text-xs">
-                    <p className="text-blue-800 font-bold flex items-center gap-2 mb-2">
-                      <AlertCircle size={14} /> Note on Payments
-                    </p>
-                    <p className="text-blue-600 leading-relaxed">
-                      Payments are processed via Alife Stable. Commissions are
-                      settled weekly.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-4 mt-8">
-                    <button
-                      onClick={() => setStep(2)}
-                      className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={handleFinalSubmit}
-                      disabled={loading}
-                      className="flex-1 py-4 bg-slate-900 text-[#5edff4] rounded-2xl font-black shadow-xl shadow-[#5edff4]/20 flex items-center justify-center gap-2"
-                    >
-                      {loading ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <>
-                          <Rocket size={20} /> Launch Academy
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 4: Success Message */}
-            {step === 4 && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-12 text-center"
-              >
-                <div className="size-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-500">
-                  <CheckCircle2 size={48} />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-2">
-                  Academy Updated!
-                </h2>
-                <p className="text-slate-500 mb-8 font-medium">
-                  Changes are now live on your domain.
-                </p>
-              </motion.div>
-            )}
-
-            {/* Step 5: Full Settings Dashboard (Partner can edit anytime) */}
-            {step === 5 && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="p-8 sm:p-12"
-              >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 pb-6 border-b border-slate-100">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-slate-900 rounded-2xl text-[#5edff4]">
-                      <Settings2 size={32} />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-black text-slate-900">
-                        Academy Settings
+                      <h2 className="text-2xl font-black text-slate-900 uppercase">
+                        Brand Identity
                       </h2>
-                      <p className="text-slate-500 font-medium text-sm">
-                        Manage your brand and domain
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Name your digital institute
                       </p>
                     </div>
-                  </div>
-                  <a
-                    href={`http://${formData.subdomain}.localhost:5173`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-100 transition-colors"
-                  >
-                    Visit Academy <ExternalLink size={16} />
-                  </a>
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                  {/* Left Column: Form Fields */}
-                  <div className="space-y-8">
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-                        General Information
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          Institute Name
+                        </label>
                         <input
                           type="text"
-                          name="agencyName"
-                          value={formData.agencyName}
-                          onChange={handleInputChange}
-                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-6 outline-none focus:border-[#5edff4] font-bold"
-                          placeholder="Academy Name"
+                          placeholder="Ex. Nexus Academy"
+                          className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white p-4 rounded-2xl font-bold text-slate-900 outline-none transition-all"
+                          value={formData.instituteName}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              instituteName: e.target.value,
+                            })
+                          }
                         />
+                      </div>
 
-                        <div className="flex items-center bg-slate-50 border border-slate-100 rounded-2xl overflow-hidden px-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          Subdomain
+                        </label>
+                        <div className="relative group">
                           <input
                             type="text"
-                            name="subdomain"
+                            placeholder="my-academy"
+                            className={`w-full bg-slate-50 border-2 p-4 pr-32 rounded-2xl font-black text-slate-900 outline-none transition-all lowercase ${
+                              subdomainStatus === "available"
+                                ? "border-emerald-100 focus:border-emerald-200"
+                                : subdomainStatus === "unavailable"
+                                ? "border-red-100 focus:border-red-200"
+                                : "border-transparent focus:border-indigo-100"
+                            }`}
                             value={formData.subdomain}
-                            onChange={handleInputChange}
-                            className="flex-1 bg-transparent py-4 outline-none font-bold"
-                            placeholder="subdomain"
+                            onChange={handleSubdomainChange}
                           />
-                          <span className="text-slate-400 text-sm font-bold">
-                            .alifestableacademy.com
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none hidden sm:block">
+                            .academy.com
+                          </span>
+                        </div>
+
+                        {/* Status Indicator */}
+                        <div className="flex items-center gap-2 ml-1 h-5">
+                          {subdomainStatus === "checking" && (
+                            <>
+                              <Loader2
+                                size={12}
+                                className="animate-spin text-slate-400"
+                              />
+                              <span className="text-[10px] font-bold text-slate-400">
+                                Checking availability...
+                              </span>
+                            </>
+                          )}
+                          {subdomainStatus === "available" && (
+                            <>
+                              <CheckCircle2
+                                size={12}
+                                className="text-emerald-500"
+                              />
+                              <span className="text-[10px] font-bold text-emerald-500">
+                                Available! This URL is yours.
+                              </span>
+                            </>
+                          )}
+                          {subdomainStatus === "unavailable" && (
+                            <>
+                              <AlertCircle size={12} className="text-red-500" />
+                              <span className="text-[10px] font-bold text-red-500">
+                                Oops! Already taken. Try another.
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 2: PRICING (COMMERCIALS) */}
+                {step === 2 && (
+                  <motion.div
+                    key="step2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-6"
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-100 pb-4">
+                      <div>
+                        <h2 className="text-xl font-black text-slate-900 uppercase">
+                          Pricing Strategy
+                        </h2>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          Set your margins. You keep the profit.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-lg">
+                          <div className="size-2 rounded-full bg-slate-300" />{" "}
+                          <span className="text-[9px] font-bold uppercase text-slate-500">
+                            Cost
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-lg">
+                          <div className="size-2 rounded-full bg-emerald-500" />{" "}
+                          <span className="text-[9px] font-bold uppercase text-emerald-600">
+                            Profit
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-                        Branding & Pricing
-                      </h3>
-                      <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <input
-                          type="color"
-                          name="themeColor"
-                          value={formData.themeColor}
-                          onChange={handleInputChange}
-                          className="size-12 rounded-lg cursor-pointer bg-transparent border-none"
+                    <div className="space-y-8">
+                      {/* Courses Section */}
+                      <section>
+                        <div className="flex items-center gap-2 mb-4">
+                          <GraduationCap
+                            size={18}
+                            className="text-indigo-600"
+                          />
+                          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                            Video Courses
+                          </h3>
+                        </div>
+                        <div className="grid gap-4">
+                          {courses.map((course) => {
+                            const adminPrice = Number(
+                              course.price || course.discountPrice || 0
+                            );
+                            const sellingPrice =
+                              formData.customPrices[course.id] || adminPrice; // Default to admin price
+                            const profit = Math.max(
+                              0,
+                              sellingPrice - adminPrice
+                            );
+
+                            return (
+                              <div
+                                key={course.id}
+                                className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row items-center gap-4"
+                              >
+                                <div className="flex-1 w-full text-center sm:text-left">
+                                  <p className="text-xs font-black text-slate-900 line-clamp-1">
+                                    {course.title}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                    Admin Cost: ₹{adminPrice}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-center gap-4 w-full sm:w-auto">
+                                  <div className="flex flex-col items-end">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase mb-1">
+                                      Your Price
+                                    </label>
+                                    <div className="relative w-24 sm:w-28">
+                                      <input
+                                        type="number"
+                                        className="w-full pl-5 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none focus:border-indigo-300 transition-all text-right"
+                                        value={sellingPrice}
+                                        onChange={(e) =>
+                                          handlePriceChange(
+                                            course.id,
+                                            e.target.value
+                                          )
+                                        }
+                                      />
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                                        ₹
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end w-16 sm:w-20">
+                                    <label className="text-[9px] font-black text-emerald-600 uppercase mb-1">
+                                      Profit
+                                    </label>
+                                    <span className="text-sm font-black text-emerald-600">
+                                      +₹{profit}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+
+                      {/* E-Books Section */}
+                      <section>
+                        <div className="flex items-center gap-2 mb-4">
+                          <BookOpen size={18} className="text-orange-600" />
+                          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                            E-Books
+                          </h3>
+                        </div>
+                        <div className="grid gap-4">
+                          {ebooks.map((ebook) => {
+                            const adminPrice = Number(
+                              ebook.price || ebook.discountPrice || 0
+                            );
+                            const sellingPrice =
+                              formData.customPrices[ebook.id] || adminPrice;
+                            const profit = Math.max(
+                              0,
+                              sellingPrice - adminPrice
+                            );
+
+                            return (
+                              <div
+                                key={ebook.id}
+                                className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row items-center gap-4"
+                              >
+                                <div className="flex-1 w-full text-center sm:text-left">
+                                  <p className="text-xs font-black text-slate-900 line-clamp-1">
+                                    {ebook.title}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                    Admin Cost: ₹{adminPrice}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-center gap-4 w-full sm:w-auto">
+                                  <div className="flex flex-col items-end">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase mb-1">
+                                      Your Price
+                                    </label>
+                                    <div className="relative w-24 sm:w-28">
+                                      <input
+                                        type="number"
+                                        className="w-full pl-5 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none focus:border-indigo-300 transition-all text-right"
+                                        value={sellingPrice}
+                                        onChange={(e) =>
+                                          handlePriceChange(
+                                            ebook.id,
+                                            e.target.value
+                                          )
+                                        }
+                                      />
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                                        ₹
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end w-16 sm:w-20">
+                                    <label className="text-[9px] font-black text-emerald-600 uppercase mb-1">
+                                      Profit
+                                    </label>
+                                    <span className="text-sm font-black text-emerald-600">
+                                      +₹{profit}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 3: CONNECT */}
+                {step === 3 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-8 max-w-lg mx-auto"
+                  >
+                    <div className="text-center mb-8">
+                      <div className="size-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <MessageCircle size={28} />
+                      </div>
+                      <h2 className="text-2xl font-black text-slate-900 uppercase">
+                        Automation
+                      </h2>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Connect your sales channel
+                      </p>
+                    </div>
+
+                    <div className="bg-emerald-50/50 p-6 rounded-[24px] border border-emerald-100 mb-6">
+                      <div className="flex items-start gap-3">
+                        <Smartphone
+                          size={20}
+                          className="text-emerald-600 mt-1"
                         />
-                        <div className="flex-1">
-                          <p className="text-xs font-bold text-slate-500">
-                            Theme Color
-                          </p>
-                          <p className="font-mono font-bold text-slate-900">
-                            {formData.themeColor.toUpperCase()}
+                        <div>
+                          <h4 className="text-sm font-black text-slate-900 uppercase mb-1">
+                            How it works?
+                          </h4>
+                          <p className="text-[11px] font-medium text-slate-600 leading-relaxed">
+                            When a student clicks "Buy Now" on your site, they
+                            will be redirected to your WhatsApp with a
+                            pre-filled message.
                           </p>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          WhatsApp Number
+                        </label>
                         <input
-                          type="number"
-                          step="1"
-                          value={(
-                            (formData.pricingMultiplier - 1) *
-                            100
-                          ).toFixed(0)}
+                          type="tel"
+                          placeholder="Ex. 919876543210"
+                          className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white p-4 rounded-2xl font-bold text-slate-900 outline-none transition-all"
+                          value={formData.whatsappNumber}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              pricingMultiplier:
-                                parseFloat(e.target.value) / 100 + 1,
+                              whatsappNumber: e.target.value,
                             })
                           }
-                          className="w-24 bg-white border border-slate-200 rounded-xl py-2 px-3 outline-none font-bold text-center"
                         />
-                        <span className="text-xs font-bold text-slate-400">
-                          % Markup
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          Support Email
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="help@nexus.com"
+                          className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white p-4 rounded-2xl font-bold text-slate-900 outline-none transition-all"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          UPI ID (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="yourname@upi"
+                          className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white p-4 rounded-2xl font-bold text-slate-900 outline-none transition-all"
+                          value={formData.upiId}
+                          onChange={(e) =>
+                            setFormData({ ...formData, upiId: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 4: LAUNCH */}
+                {step === 4 && (
+                  <motion.div
+                    key="step4"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center max-w-lg mx-auto py-10"
+                  >
+                    <div className="size-32 bg-slate-900 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-slate-300">
+                      <Rocket size={48} className="animate-bounce" />
+                    </div>
+
+                    <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">
+                      {isEditMode ? "Save Changes?" : "Ready for Liftoff!"}
+                    </h2>
+
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed mb-10">
+                      {isEditMode
+                        ? "Your academy settings will be updated immediately across the platform."
+                        : `You are about to launch "${formData.instituteName}". Your custom domain and pricing structure are set.`}
+                    </p>
+
+                    <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 mb-8 text-left space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          Academy Name
+                        </span>
+                        <span className="text-sm font-black text-slate-900">
+                          {formData.instituteName}
                         </span>
                       </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-                        Social Links
-                      </h3>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100 pr-4">
-                          <div className="p-3 bg-pink-50 text-pink-500 rounded-xl">
-                            <Share2 size={18} />
-                          </div>
-                          <input
-                            type="text"
-                            name="socialLinks.instagram"
-                            value={formData.socialLinks.instagram}
-                            onChange={handleInputChange}
-                            className="flex-1 bg-transparent py-2 outline-none font-medium text-sm"
-                            placeholder="Instagram URL"
-                          />
-                        </div>
-                        <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100 pr-4">
-                          <div className="p-3 bg-green-50 text-green-500 rounded-xl">
-                            <Share2 size={18} />
-                          </div>
-                          <input
-                            type="text"
-                            name="socialLinks.whatsapp"
-                            value={formData.socialLinks.whatsapp}
-                            onChange={handleInputChange}
-                            className="flex-1 bg-transparent py-2 outline-none font-medium text-sm"
-                            placeholder="WhatsApp Number"
-                          />
-                        </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          Subdomain
+                        </span>
+                        <span className="text-sm font-black text-indigo-600">
+                          {formData.subdomain}.academy.com
+                        </span>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Visual Preview */}
-                  <div className="space-y-6">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-                      Visual Preview
-                    </h3>
-                    <div className="aspect-video bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl">
-                      <div className="flex justify-between items-center mb-10">
-                        <div
-                          className="h-6 w-20 rounded-md"
-                          style={{ backgroundColor: formData.themeColor }}
-                        />
-                        <div className="flex gap-2">
-                          <div className="size-2 rounded-full bg-white/20" />
-                          <div className="size-2 rounded-full bg-white/20" />
-                        </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          WhatsApp
+                        </span>
+                        <span className="text-sm font-black text-slate-900">
+                          {formData.whatsappNumber}
+                        </span>
                       </div>
-                      <h4 className="text-xl font-black mb-2">
-                        {formData.agencyName || "Your Academy"}
-                      </h4>
-                      <p className="text-white/50 text-xs mb-6 max-w-[200px]">
-                        Unlock your potential with our expert-led courses.
-                      </p>
-                      <button
-                        className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg"
-                        style={{ backgroundColor: formData.themeColor }}
-                      >
-                        Explore Courses
-                      </button>
-                      <div
-                        className="absolute -bottom-10 -right-10 size-40 blur-[80px] rounded-full opacity-50"
-                        style={{ backgroundColor: formData.themeColor }}
-                      />
                     </div>
 
                     <button
                       onClick={handleFinalSubmit}
                       disabled={loading}
-                      className="w-full py-5 bg-slate-900 text-[#5edff4] rounded-[24px] font-black text-lg flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200"
+                      className="w-full py-5 bg-slate-900 text-white rounded-[24px] font-black text-sm uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {loading ? (
-                        <Loader2 className="animate-spin" />
+                        <>
+                          <Loader2 size={18} className="animate-spin" />{" "}
+                          Publishing...
+                        </>
                       ) : (
                         <>
-                          <Save size={24} /> Save All Changes
+                          <Save size={18} />{" "}
+                          {isEditMode ? "Update Academy" : "Launch Academy"}
                         </>
                       )}
                     </button>
-                    {error && (
-                      <p className="text-red-500 text-center font-bold text-sm">
-                        {error}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* NAV FOOTER */}
+            <div className="p-6 lg:p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+              <button
+                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                disabled={step === 1 || loading}
+                className="px-6 py-3 text-slate-400 font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:text-slate-900 disabled:opacity-0 transition-all"
+              >
+                <ArrowLeft size={16} /> Back
+              </button>
+
+              {step < 4 && (
+                <button
+                  onClick={() => {
+                    // Basic Validation per step
+                    if (
+                      step === 1 &&
+                      (!formData.instituteName ||
+                        !formData.subdomain ||
+                        (subdomainStatus !== "available" && !isEditMode))
+                    ) {
+                      alert(
+                        "Please provide a valid Name and an available Subdomain."
+                      );
+                      return;
+                    }
+                    if (
+                      step === 3 &&
+                      (!formData.whatsappNumber || !formData.email)
+                    ) {
+                      alert("WhatsApp and Email are required.");
+                      return;
+                    }
+                    setStep((s) => s + 1);
+                  }}
+                  className="px-8 py-3 bg-slate-900 text-white rounded-[18px] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-indigo-600 transition-all shadow-lg"
+                >
+                  Next Step <ArrowRight size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

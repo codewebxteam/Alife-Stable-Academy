@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote,
@@ -17,42 +17,15 @@ import {
   XCircle,
   BookOpen,
   CheckCircle2,
-  TrendingUp, // Added for AOV icon
+  TrendingUp,
 } from "lucide-react";
-
-// --- MOCK TRANSACTION DATA (Commission Logic Removed) ---
-const TRANSACTIONS_DB = Array.from({ length: 85 })
-  .map((_, i) => {
-    const isEbook = i % 4 === 0; // Every 4th item is an E-Book
-    const amount = isEbook ? 499 : i % 3 === 0 ? 4999 : 2499;
-    const isPartnerSale = i % 2 === 0;
-
-    return {
-      id: `TXN-${8000 + i}`,
-      student: `Student ${i + 1}`,
-      asset: isEbook
-        ? "React Interview Guide (E-Book)"
-        : i % 3 === 0
-        ? "Full Stack Mastery"
-        : "React Pro Bundle",
-      type: isEbook ? "E-Book" : "Course",
-      date: i % 5 === 0 ? new Date().toISOString().split("T")[0] : "2024-02-15",
-      amount: amount,
-      source: isPartnerSale ? "Partner" : "Self",
-      partnerId: isPartnerSale ? `PRT-${1000 + (i % 5)}` : null,
-      partnerName: isPartnerSale ? `Nexus Academy ${i % 5}` : null,
-      // Removed: commission & payoutStatus
-      status: "Success",
-      gateway: i % 2 === 0 ? "Razorpay" : "PhonePe",
-      invoiceId: `INV-${202400 + i}`,
-    };
-  })
-  .sort((a, b) => b.id.localeCompare(a.id));
+import { listenToAllOrders } from "../../firebase/orders.service";
 
 const SalesManager = () => {
   // State
-  const [transactions, setTransactions] = useState(TRANSACTIONS_DB);
+  const [transactions, setTransactions] = useState([]);
   const [selectedTxn, setSelectedTxn] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Filters
   const [timeFilter, setTimeFilter] = useState("All Time");
@@ -64,6 +37,35 @@ const SalesManager = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  useEffect(() => {
+    const unsubscribe = listenToAllOrders((orders) => {
+      const formattedOrders = orders.map((order) => {
+        const isPartnerSale = order.partnerId && order.partnerId !== "direct";
+        const dateObj = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+
+        return {
+          id: order.id,
+          student: order.studentName || "Unknown Student",
+          asset: order.productName || "Unknown Asset",
+          type: order.productType === "ebook" ? "E-Book" : "Course",
+          date: dateObj.toISOString().split("T")[0],
+          fullDate: dateObj,
+          amount: Number(order.price) || 0,
+          source: isPartnerSale ? "Partner" : "Self",
+          partnerId: isPartnerSale ? order.partnerId : null,
+          partnerName: isPartnerSale ? order.partnerName : null,
+          status: order.status || "Success",
+          gateway: "Razorpay",
+          invoiceId: `INV-${order.id.slice(0, 8).toUpperCase()}`,
+        };
+      });
+      setTransactions(formattedOrders);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // --- FILTER LOGIC ---
   const filteredData = useMemo(() => {
     let data = transactions;
@@ -72,15 +74,27 @@ const SalesManager = () => {
     if (timeFilter !== "All Time") {
       const now = new Date();
       data = data.filter((t) => {
-        const tDate = new Date(t.date);
-        if (timeFilter === "Today")
+        const tDate = t.fullDate;
+        if (timeFilter === "Today") {
           return tDate.toDateString() === now.toDateString();
-        if (timeFilter === "Month") return tDate.getMonth() === now.getMonth();
+        }
+        if (timeFilter === "Week") {
+          const weekAgo = new Date();
+          weekAgo.setDate(now.getDate() - 7);
+          return tDate >= weekAgo;
+        }
+        if (timeFilter === "Month") {
+          return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+        }
+        if (timeFilter === "Year") {
+          return tDate.getFullYear() === now.getFullYear();
+        }
         if (timeFilter === "Custom" && customDates.start && customDates.end) {
-          return (
-            tDate >= new Date(customDates.start) &&
-            tDate <= new Date(customDates.end)
-          );
+          const start = new Date(customDates.start);
+          const end = new Date(customDates.end);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return tDate >= start && tDate <= end;
         }
         return true;
       });
@@ -102,15 +116,19 @@ const SalesManager = () => {
   }, [transactions, timeFilter, searchQuery, sourceFilter, customDates]);
 
   // Pagination Slicing
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
   const currentItems = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
+  // Ensure current page is valid after filtering
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeFilter, searchQuery, sourceFilter, customDates]);
+
   // --- REAL-TIME METRICS (Updated) ---
   const metrics = useMemo(() => {
-    // Helper to safely count types
     const countTypes = (data) => ({
       courses: data.filter((t) => t.type === "Course").length,
       ebooks: data.filter((t) => t.type === "E-Book").length,
@@ -133,10 +151,20 @@ const SalesManager = () => {
         rev: partnerData.reduce((acc, curr) => acc + curr.amount, 0),
         counts: countTypes(partnerData),
       },
-      // New Metric: Average Order Value (AOV)
       aov: filteredData.length > 0 ? totalRev / filteredData.length : 0,
     };
   }, [filteredData]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#F8FAFC]">
+        <div className="text-center space-y-4">
+          <div className="size-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Syncing Ledger...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">

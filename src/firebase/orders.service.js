@@ -13,11 +13,27 @@ import {
 import { db } from "./config";
 
 export const listenToOrders = (partnerId, callback) => {
-  if (!partnerId || typeof partnerId !== "string") return () => {};
+  if (!partnerId || typeof partnerId !== "string") return () => { };
 
   const q = query(
     collection(db, "orders"),
     where("partnerId", "==", partnerId.trim()),
+    orderBy("createdAt", "desc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    callback(
+      snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+    );
+  });
+};
+
+export const listenToAllOrders = (callback) => {
+  const q = query(
+    collection(db, "orders"),
     orderBy("createdAt", "desc")
   );
 
@@ -73,9 +89,9 @@ export const updateCourseProgress = async (userId, courseId, progress) => {
       where("productType", "==", "course")
     );
     const snapshot = await getDocs(q);
-    
+
     snapshot.forEach(async (doc) => {
-      await updateDoc(doc.ref, { 
+      await updateDoc(doc.ref, {
         videoProgress: Math.min(Math.round(progress), 100),
         certificateIssued: progress >= 100 ? true : false
       });
