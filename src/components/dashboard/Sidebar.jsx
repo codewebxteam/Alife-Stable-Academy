@@ -1,22 +1,21 @@
-import React, { useState,useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   BookOpen,
   PlayCircle,
-  BarChart2,
+  // BarChart2, // Removed unused import
   ShoppingCart,
   LogOut,
   X,
   GraduationCap,
-  Award, // New Icon for Certificates
+  Award,
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/config";
-
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout, currentUser } = useAuth();
@@ -28,35 +27,26 @@ const Sidebar = ({ isOpen, onClose }) => {
     await logout();
     navigate("/");
   };
-  
+
   useEffect(() => {
-  if (!currentUser) return;
+    if (!currentUser) return;
 
-  const ref = doc(db, "dashboard", currentUser.uid);
+    const ref = doc(db, "dashboard", currentUser.uid);
 
-  const unsub = onSnapshot(ref, (snap) => {
-    if (snap.exists()) {
-      setDashboard(snap.data());
-    }
-  });
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setDashboard(snap.data());
+      }
+    });
 
-  return () => unsub();
-}, [currentUser]);
+    return () => unsub();
+  }, [currentUser]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: PlayCircle, label: "My Learning", path: "/dashboard/my-courses" },
     { icon: BookOpen, label: "E-Book Library", path: "/dashboard/ebooks" },
-    { icon: Award, label: "Certificates", path: "/dashboard/certificates" }, // [NEW]
-    ...(dashboard?.stats?.enrolledCourses > 0
-    ? [
-        {
-          icon: BarChart2,
-          label: "Progress Report",
-          path: "/dashboard/progress",
-        },
-      ]
-    : []),
+    { icon: Award, label: "Certificates", path: "/dashboard/certificates" },
     {
       icon: ShoppingCart,
       label: "Explore Courses",

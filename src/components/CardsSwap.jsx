@@ -10,126 +10,173 @@ import React, {
 } from "react";
 import gsap from "gsap";
 import { Check, ArrowRight, Zap, Crown, Star, Bookmark } from "lucide-react";
+import { Link } from "react-router-dom";
+import { collection, getDocs, limit, query } from "firebase/firestore";
+import { db } from "../firebase/config";
 
 // ==========================================
-// SECTION 1: CARD DESIGNS (Academy Themed)
+// SECTION 1: DYNAMIC CARD DESIGNS
 // ==========================================
 
-const FrontendCard = () => (
-  <div className="size-full bg-white rounded-4xl border border-slate-200 shadow-2xl shadow-slate-200/50 p-8 flex flex-col justify-between relative overflow-hidden group">
-    <div className="absolute top-0 right-0 size-32 bg-[#f0fdff] rounded-bl-[4rem] -mr-4 -mt-4 z-0 transition-transform duration-700 group-hover:scale-110" />
-    <div className="relative z-10">
-      <div className="size-12 bg-[#f0fdff] rounded-2xl flex items-center justify-center text-[#0891b2] mb-6">
-        <Zap className="size-6" />
-      </div>
-      <h3 className="text-2xl font-bold text-slate-900">Frontend</h3>
-      <p className="text-slate-500 mt-2 text-sm font-medium">
-        Master React & UI Design.
-      </p>
-    </div>
-    <div className="relative z-10">
-      <div className="flex items-baseline gap-1 mb-6">
-        <span className="text-4xl font-bold text-slate-900">₹2,999</span>
-        <span className="text-slate-400 text-sm">/course</span>
-      </div>
-      <ul className="space-y-3 mb-8">
-        {["HTML, CSS & JS", "React Mastery", "Tailwind CSS"].map((item) => (
-          <li
-            key={item}
-            className="flex items-center gap-3 text-sm text-slate-600 font-medium"
-          >
-            <div className="size-5 rounded-full bg-[#f0fdff] flex items-center justify-center shrink-0">
-              <Check className="size-3 text-[#0891b2]" />
-            </div>
-            {item}
-          </li>
-        ))}
-      </ul>
-      <button className="w-full py-3.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-sm hover:bg-[#f0fdff] hover:border-[#cff9fe] transition-all flex items-center justify-center gap-2 cursor-pointer">
-        View Syllabus <ArrowRight className="size-4" />
-      </button>
-    </div>
-  </div>
-);
+const FrontendCard = ({ data }) => {
+  // Use Real Data if available, else Fallback to Static
+  const info = data
+    ? {
+        title: data.title,
+        desc: data.description,
+        price: data.price,
+        features: ["Instant Access", "Video Lessons", "Secure Content"],
+      }
+    : {
+        title: "Frontend",
+        desc: "Master React & UI Design.",
+        price: 2999,
+        features: ["HTML, CSS & JS", "React Mastery", "Tailwind CSS"],
+      };
 
-const FullStackCard = () => (
-  // Updated Gradient to Linear for Tailwind 4.1
-  <div className="size-full bg-linear-to-br from-[#5edff4] to-[#06b6d4] rounded-4xl shadow-2xl shadow-[#5edff4]/40 p-8 flex flex-col justify-between relative overflow-hidden border border-white/20 group">
-    {/* Badge */}
-    <div
-      className="absolute top-6 right-6 z-50"
-      style={{ transform: "translateZ(60px)" }}
-    >
-      <span className="px-4 py-1.5 bg-white text-[#0891b2] text-xs font-bold rounded-full shadow-xl uppercase tracking-wider flex items-center gap-1">
-        <Crown className="size-3" /> Best Seller
-      </span>
-    </div>
-
-    <div className="absolute -top-20 -right-20 size-60 bg-white/10 rounded-full blur-2xl transition-transform group-hover:scale-110 duration-700" />
-    <div className="absolute bottom-0 left-0 size-40 bg-white/10 rounded-full blur-3xl" />
-
-    <div className="relative z-10">
-      <div className="size-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-6 shadow-inner border border-white/20">
-        <Crown className="size-6" />
+  return (
+    <div className="size-full bg-white rounded-4xl border border-slate-200 shadow-2xl shadow-slate-200/50 p-8 flex flex-col justify-between relative overflow-hidden group">
+      <div className="absolute top-0 right-0 size-32 bg-[#f0fdff] rounded-bl-[4rem] -mr-4 -mt-4 z-0 transition-transform duration-700 group-hover:scale-110" />
+      <div className="relative z-10">
+        <div className="size-12 bg-[#f0fdff] rounded-2xl flex items-center justify-center text-[#0891b2] mb-6">
+          <Zap className="size-6" />
+        </div>
+        <h3 className="text-2xl font-bold text-slate-900 line-clamp-1">
+          {info.title}
+        </h3>
+        <p className="text-slate-500 mt-2 text-sm font-medium line-clamp-2">
+          {info.desc}
+        </p>
       </div>
-      <h3 className="text-2xl font-bold text-white">Full Stack</h3>
-      <p className="text-[#cff9fe] mt-2 text-sm font-medium">
-        MERN Stack Specialization.
-      </p>
-    </div>
-    <div className="relative z-10">
-      <div className="flex items-baseline gap-1 mb-6">
-        <span className="text-4xl font-bold text-white">₹5,999</span>
-        <span className="text-[#cff9fe] text-sm">/bundle</span>
+      <div className="relative z-10">
+        <div className="flex items-baseline gap-1 mb-6">
+          <span className="text-4xl font-bold text-slate-900">
+            {info.price == 0 ? "Free" : `₹${info.price}`}
+          </span>
+          {!data && <span className="text-slate-400 text-sm">/course</span>}
+        </div>
+        <ul className="space-y-3 mb-8">
+          {info.features.map((item) => (
+            <li
+              key={item}
+              className="flex items-center gap-3 text-sm text-slate-600 font-medium"
+            >
+              <div className="size-5 rounded-full bg-[#f0fdff] flex items-center justify-center shrink-0">
+                <Check className="size-3 text-[#0891b2]" />
+              </div>
+              {item}
+            </li>
+          ))}
+        </ul>
+        <Link
+          to={data ? `/courses/${data.id}` : "/courses"}
+          className="w-full py-3.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-sm hover:bg-[#f0fdff] hover:border-[#cff9fe] transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          View Details <ArrowRight className="size-4" />
+        </Link>
       </div>
-      <ul className="space-y-3 mb-8">
-        {[
+    </div>
+  );
+};
+
+const FullStackCard = ({ data }) => {
+  const info = data
+    ? {
+        title: data.title,
+        desc: data.description,
+        price: data.price,
+        features: ["Full Course Access", "Certificate", "Lifetime Updates"],
+      }
+    : {
+        title: "Full Stack",
+        desc: "MERN Stack Specialization.",
+        price: 5999,
+        features: [
           "Frontend + Backend",
           "Node.js & Database",
-          "Placement Assistance",
-          "Live Projects",
-        ].map((item) => (
-          <li
-            key={item}
-            className="flex items-center gap-3 text-sm text-white font-medium"
-          >
-            <div className="size-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <Check className="size-3 text-white" />
-            </div>
-            {item}
-          </li>
-        ))}
-      </ul>
-      <button className="w-full py-3.5 rounded-xl bg-white text-[#0891b2] font-bold text-sm hover:bg-[#f0fdff] hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer">
-        Enroll Now <ArrowRight className="size-4" />
-      </button>
-    </div>
-  </div>
-);
+          "Placement Support",
+        ],
+      };
 
-const DataScienceCard = () => (
-  <div className="size-full bg-slate-900 rounded-4xl border border-slate-800 shadow-2xl shadow-slate-900/50 p-8 flex flex-col justify-between relative overflow-hidden group">
-    {/* Subtle texture overlay */}
-    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-[#5edff4] to-purple-500" />
-
-    <div className="relative z-10">
-      <div className="size-12 bg-slate-800 rounded-2xl flex items-center justify-center text-white mb-6 border border-slate-700 shadow-lg">
-        <Star className="size-6 text-[#5edff4]" />
+  return (
+    <div className="size-full bg-linear-to-br from-[#5edff4] to-[#06b6d4] rounded-4xl shadow-2xl shadow-[#5edff4]/40 p-8 flex flex-col justify-between relative overflow-hidden border border-white/20 group">
+      <div className="relative z-10">
+        <div className="size-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-6 shadow-inner border border-white/20">
+          <Crown className="size-6" />
+        </div>
+        <h3 className="text-2xl font-bold text-white line-clamp-1">
+          {info.title}
+        </h3>
+        <p className="text-[#cff9fe] mt-2 text-sm font-medium line-clamp-2">
+          {info.desc}
+        </p>
       </div>
-      <h3 className="text-2xl font-bold text-white">AI & Data</h3>
-      <p className="text-slate-400 mt-2 text-sm font-medium">
-        Machine Learning Masters.
-      </p>
+      <div className="relative z-10">
+        <div className="flex items-baseline gap-1 mb-6">
+          <span className="text-4xl font-bold text-white">
+            {info.price == 0 ? "Free" : `₹${info.price}`}
+          </span>
+        </div>
+        <ul className="space-y-3 mb-8">
+          {info.features.map((item) => (
+            <li
+              key={item}
+              className="flex items-center gap-3 text-sm text-white font-medium"
+            >
+              <div className="size-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                <Check className="size-3 text-white" />
+              </div>
+              {item}
+            </li>
+          ))}
+        </ul>
+        <Link
+          to={data ? `/courses/${data.id}` : "/courses"}
+          className="w-full py-3.5 rounded-xl bg-white text-[#0891b2] font-bold text-sm hover:bg-[#f0fdff] hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          Enroll Now <ArrowRight className="size-4" />
+        </Link>
+      </div>
     </div>
-    <div className="relative z-10">
-      <div className="flex items-baseline gap-1 mb-6">
-        <span className="text-4xl font-bold text-white">₹7,999</span>
-        <span className="text-slate-500 text-sm">/course</span>
+  );
+};
+
+const DataScienceCard = ({ data }) => {
+  const info = data
+    ? {
+        title: data.title,
+        desc: data.description,
+        price: data.price,
+        features: ["HD Video Lessons", "Project Files", "Mobile Access"],
+      }
+    : {
+        title: "AI & Data",
+        desc: "Machine Learning Masters.",
+        price: 7999,
+        features: ["Python & SQL", "Machine Learning", "Big Data Analytics"],
+      };
+
+  return (
+    <div className="size-full bg-slate-900 rounded-4xl border border-slate-800 shadow-2xl shadow-slate-900/50 p-8 flex flex-col justify-between relative overflow-hidden group">
+      <div className="relative z-10">
+        <div className="size-12 bg-slate-800 rounded-2xl flex items-center justify-center text-white mb-6 border border-slate-700 shadow-lg">
+          <Star className="size-6 text-[#5edff4]" />
+        </div>
+        <h3 className="text-2xl font-bold text-white line-clamp-1">
+          {info.title}
+        </h3>
+        <p className="text-slate-400 mt-2 text-sm font-medium line-clamp-2">
+          {info.desc}
+        </p>
       </div>
-      <ul className="space-y-3 mb-8">
-        {["Python & SQL", "Machine Learning", "Big Data Analytics"].map(
-          (item) => (
+      <div className="relative z-10">
+        <div className="flex items-baseline gap-1 mb-6">
+          <span className="text-4xl font-bold text-white">
+            {info.price == 0 ? "Free" : `₹${info.price}`}
+          </span>
+        </div>
+        <ul className="space-y-3 mb-8">
+          {info.features.map((item) => (
             <li
               key={item}
               className="flex items-center gap-3 text-sm text-slate-300 font-medium"
@@ -139,18 +186,21 @@ const DataScienceCard = () => (
               </div>
               {item}
             </li>
-          )
-        )}
-      </ul>
-      <button className="w-full py-3.5 rounded-xl bg-slate-800 text-white border border-slate-700 font-bold text-sm hover:bg-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2 cursor-pointer">
-        View Details <ArrowRight className="size-4" />
-      </button>
+          ))}
+        </ul>
+        <Link
+          to={data ? `/courses/${data.id}` : "/courses"}
+          className="w-full py-3.5 rounded-xl bg-slate-800 text-white border border-slate-700 font-bold text-sm hover:bg-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          View Details <ArrowRight className="size-4" />
+        </Link>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================
-// SECTION 2: THE ENGINE (Logic)
+// SECTION 2: 3D ENGINE
 // ==========================================
 
 export const Card = forwardRef(({ customClass, ...rest }, ref) => (
@@ -356,11 +406,12 @@ const SwapEngine = ({
 };
 
 // ==========================================
-// SECTION 3: THE CLEAN LAYOUT (Responsive)
+// SECTION 3: RESPONSIVE LAYOUT & DATA FETCHING
 // ==========================================
 
 const CardsSwap = () => {
   const [isMobile, setIsMobile] = useState(false);
+  const [courses, setCourses] = useState([]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -371,7 +422,21 @@ const CardsSwap = () => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Responsive Dimensions (Standard Tailwind 4.1 spacing used via style for 3D engine)
+  // Fetch Courses from DB
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const q = query(collection(db, "courseVideos"), limit(3));
+        const snap = await getDocs(q);
+        const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setCourses(data);
+      } catch (e) {
+        console.error("Error fetching courses for cards:", e);
+      }
+    };
+    fetchCourses();
+  }, []);
+
   const cardWidth = isMobile ? "280px" : "320px";
   const cardHeight = isMobile ? "400px" : "480px";
   const cardDist = isMobile ? 30 : 45;
@@ -391,7 +456,6 @@ const CardsSwap = () => {
 
               <h2 className="text-3xl md:text-5xl font-bold text-slate-900 leading-tight mb-4 md:mb-6">
                 Choose Your <br />
-                {/* Updated Gradient Text */}
                 <span className="text-transparent bg-clip-text bg-linear-to-r from-[#5edff4] to-[#0891b2]">
                   Career Path.
                 </span>
@@ -459,14 +523,19 @@ const CardsSwap = () => {
                 delay={3500}
                 skewAmount={3}
               >
+                {/* LOGIC: 
+                    If Course 1 exists in DB -> Show it in Card 1. Else -> Show Static.
+                    If Course 2 exists in DB -> Show it in Card 2. Else -> Show Static.
+                    If Course 3 exists in DB -> Show it in Card 3. Else -> Show Static.
+                */}
                 <Card>
-                  <FrontendCard />
+                  <FrontendCard data={courses[0]} />
                 </Card>
                 <Card>
-                  <DataScienceCard />
+                  <DataScienceCard data={courses[1]} />
                 </Card>
                 <Card>
-                  <FullStackCard />
+                  <FullStackCard data={courses[2]} />
                 </Card>
               </SwapEngine>
             </div>

@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, ArrowRight, MapPin } from "lucide-react";
+import { CheckCircle2, ArrowRight, MapPin, Rocket } from "lucide-react";
+import { Link } from "react-router-dom"; // [ADDED] Link for navigation
 
-// --- Step Data ---
+// --- Step Data (Static is fine for Roadmap) ---
 const steps = [
   {
     id: 1,
     title: "Apply & Enroll",
     description:
-      "Submit your application, clear the basic assessment, and secure your seat.",
+      "Submit your application, browse our courses, and secure your seat in the batch.",
     image:
       "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1000&auto=format&fit=crop",
     stat: "Step 1",
@@ -46,7 +47,6 @@ const RoadmapSection = () => {
   const [activeStep, setActiveStep] = useState(1);
 
   return (
-    // Updated: bg-gradient-to-b -> bg-linear-to-b
     <section className="w-full relative font-sans bg-linear-to-b from-white via-[#f0fdff] to-[#cff9fe] py-20 px-4 overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay pointer-events-none" />
@@ -57,10 +57,6 @@ const RoadmapSection = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        // Updated: rounded-[3rem] -> rounded-3xl or arbitrary rounded-[3rem] if needed,
-        // using rounded-3xl (24px) for standard, or strictly following your style with clean classes.
-        // Let's stick to standard max rounded-3xl for Tailwind 4, or custom arbitrary if really needed.
-        // Using standard rounded-3xl.
         className="max-w-6xl mx-auto bg-white/60 backdrop-blur-sm rounded-3xl md:rounded-[3rem] p-6 md:p-12 shadow-2xl border border-white/50 relative z-10"
       >
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -153,7 +149,6 @@ const RoadmapSection = () => {
           {/* --- RIGHT SIDE: Image Area --- */}
           <div className="relative h-64 md:h-112 w-full flex items-center justify-center lg:justify-end order-1 lg:order-2">
             {/* Background Blob Animation */}
-            {/* Updated gradient to linear */}
             <motion.div
               animate={{ rotate: [0, 5, -5, 0], scale: [0.95, 1, 0.95] }}
               transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
@@ -166,7 +161,6 @@ const RoadmapSection = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              // Updated: rounded-[2rem] -> rounded-4xl
               className="relative size-full rounded-4xl overflow-hidden shadow-xl border-4 border-white bg-white"
             >
               <AnimatePresence mode="wait">
@@ -231,6 +225,16 @@ const RoadmapSection = () => {
               </div>
             </motion.div>
           </div>
+        </div>
+
+        {/* --- [NEW] Call to Action Button --- */}
+        <div className="mt-12 flex justify-center">
+          <Link to="/courses">
+            <button className="px-8 py-4 rounded-full bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-95 flex items-center gap-3 cursor-pointer">
+              Start Your Journey Now{" "}
+              <Rocket className="size-5 text-[#5edff4]" />
+            </button>
+          </Link>
         </div>
       </motion.div>
     </section>

@@ -53,9 +53,6 @@ import SalesManager from "./components/Admin/SalesManager";
 import PaymentManager from "./components/Admin/PaymentManager";
 import CourseManager from "./components/Admin/CourseManager";
 import EBookManager from "./components/Admin/EBookManager";
-import AdminSettings from "./components/Admin/AdminSettings";
-import BunnyUploader from "./components/Admin/BunnyUploader";
-
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -76,6 +73,11 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/partner" replace />;
   }
 
+  // [NEW] Redirect Admin to Admin Panel if they try to access Student Dashboard
+  if (userData && userData.role === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
   return children;
 };
 
@@ -87,6 +89,25 @@ const PartnerRoute = ({ children }) => {
   if (!currentUser) return <Navigate to="/" replace />;
 
   if (userData && userData.role !== "partner") {
+    // If Admin tries to access partner, send them to Admin Panel
+    if (userData && userData.role === "admin") {
+      return <Navigate to="/admin" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+// --- [NEW] Admin Route Wrapper ---
+const AdminRoute = ({ children }) => {
+  const { currentUser, userData, loading } = useAuth();
+
+  if (loading) return null;
+  if (!currentUser) return <Navigate to="/" replace />;
+
+  // Only allow users with role 'admin'
+  if (userData && userData.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -216,8 +237,15 @@ const AppContent = () => {
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* --- [NEW] ADMIN DASHBOARD ROUTES (SIDEBAR SUPPORT) --- */}
-        <Route path="/admin" element={<AdminLayout />}>
+        {/* --- [UPDATED] ADMIN DASHBOARD ROUTES (PROTECTED) --- */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
           <Route index element={<IntelligenceHub />} />
           <Route path="partners" element={<PartnerIntelligence />} />
           <Route path="students" element={<StudentData />} />
@@ -225,8 +253,6 @@ const AppContent = () => {
           <Route path="payments" element={<PaymentManager />} />
           <Route path="courses" element={<CourseManager />} />
           <Route path="ebooks" element={<EBookManager />} />
-          <Route path="bunny" element={<BunnyUploader />} />
-          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* STUDENT DASHBOARD ROUTES */}

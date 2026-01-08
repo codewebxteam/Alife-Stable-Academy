@@ -6,38 +6,41 @@ import {
   Infinity,
   Trophy,
   Smartphone,
+  FileText,
+  CheckCircle,
 } from "lucide-react";
-import { useAgency } from "../../context/AgencyContext"; // [NEW] Agency context
+import { useAgency } from "../../context/AgencyContext";
+import { useNavigate } from "react-router-dom"; // [NEW] Navigation hook
 
-const PricingCard = ({ course, onEnroll }) => {
+const PricingCard = ({ course, onEnroll, isEnrolled }) => {
   const { agency, isPartner } = useAgency();
+  const navigate = useNavigate(); // [NEW] Navigate hook
 
   // --- [DYNAMIC PRICING LOGIC] ---
-  // Agar partner site hai, toh multiplier apply karo, varna original price
   const calculatePrice = (originalPriceStr) => {
     if (originalPriceStr === "Free") return "Free";
-
-    // String se number nikalna (e.g., "₹499" -> 499)
-    const numericPrice = parseInt(originalPriceStr.replace(/[^0-9]/g, ""));
+    const numericPrice = parseInt(
+      String(originalPriceStr).replace(/[^0-9]/g, "")
+    );
     const finalPrice = isPartner
       ? Math.round(numericPrice * agency.pricingMultiplier)
       : numericPrice;
-
     return `₹${finalPrice.toLocaleString("en-IN")}`;
   };
 
-  // Offer price (selling price) - course.price
   const displayPrice = calculatePrice(course.price);
-  // Listing price (original/cut price) - course.originalPrice
   const displayOriginalPrice = calculatePrice(course.originalPrice);
 
-  // Calculate discount percentage
   const calculateDiscount = () => {
     if (course.price === "Free" || !course.originalPrice) return "100% off";
     const offerPrice = parseInt(String(course.price).replace(/[^0-9]/g, ""));
-    const listingPrice = parseInt(String(course.originalPrice).replace(/[^0-9]/g, ""));
+    const listingPrice = parseInt(
+      String(course.originalPrice).replace(/[^0-9]/g, "")
+    );
     if (listingPrice > offerPrice) {
-      const discount = Math.round(((listingPrice - offerPrice) / listingPrice) * 100);
+      const discount = Math.round(
+        ((listingPrice - offerPrice) / listingPrice) * 100
+      );
       return `${discount}% off`;
     }
     return "Special Offer";
@@ -69,38 +72,67 @@ const PricingCard = ({ course, onEnroll }) => {
         </div>
 
         <div className="p-8">
-          <div className="flex items-center gap-3 mb-6 flex-wrap">
-            <span className="text-4xl font-black text-slate-900">
-              {displayPrice}
-            </span>
-            {displayOriginalPrice && displayOriginalPrice !== displayPrice && (
-              <>
-                <span className="text-lg text-slate-400 line-through">
-                  {displayOriginalPrice}
+          {/* [FIX] Show "Purchased" status if enrolled */}
+          {isEnrolled ? (
+            <div className="mb-6 flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+              <CheckCircle className="size-6 shrink-0" />
+              <div>
+                <span className="font-black text-lg block leading-none mb-1">
+                  You own this course
                 </span>
-                <span className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
-                  {calculateDiscount()}
+                <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">
+                  Ready to watch
                 </span>
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
+              <span className="text-4xl font-black text-slate-900">
+                {displayPrice}
+              </span>
+              {displayOriginalPrice &&
+                displayOriginalPrice !== displayPrice && (
+                  <>
+                    <span className="text-lg text-slate-400 line-through">
+                      {displayOriginalPrice}
+                    </span>
+                    <span className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
+                      {calculateDiscount()}
+                    </span>
+                  </>
+                )}
+            </div>
+          )}
 
-          <button
-            onClick={() =>
-              onEnroll({
-                ...course,
-                finalPrice: displayPrice,
-                commission: isPartner ? "Calculated at Checkout" : 0,
-              })
-            }
-            className="w-full py-4 text-slate-900 font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer"
-            style={{
-              backgroundColor: agency.accentColor || "#5edff4",
-              boxShadow: `0 10px 15px -3px ${agency.accentColor}33`,
-            }}
-          >
-            Buy Now
-          </button>
+          {/* [FIX] Button Change based on Enrollment */}
+          {isEnrolled ? (
+            <button
+              onClick={() => navigate("/dashboard/my-courses")} // Navigate to Dashboard
+              className="w-full py-4 text-white font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2"
+              style={{
+                boxShadow: `0 10px 15px -3px rgba(16, 185, 129, 0.3)`,
+              }}
+            >
+              Go to Dashboard
+            </button>
+          ) : (
+            <button
+              onClick={() =>
+                onEnroll({
+                  ...course,
+                  finalPrice: displayPrice,
+                  commission: isPartner ? "Calculated at Checkout" : 0,
+                })
+              }
+              className="w-full py-4 text-slate-900 font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer"
+              style={{
+                backgroundColor: agency.accentColor || "#5edff4",
+                boxShadow: `0 10px 15px -3px ${agency.accentColor}33`,
+              }}
+            >
+              {course.price === "Free" ? "Enroll for Free" : "Buy Now"}
+            </button>
+          )}
 
           <p className="text-center text-xs text-slate-500 mb-6">
             30-Day Money-Back Guarantee
@@ -112,6 +144,9 @@ const PricingCard = ({ course, onEnroll }) => {
             </h4>
             <FeatureItem icon={Infinity} text="Lifetime access" />
             <FeatureItem icon={Smartphone} text="Access on mobile and TV" />
+            {course.driveLink && (
+              <FeatureItem icon={FileText} text="Downloadable Study Material" />
+            )}
             <FeatureItem icon={Trophy} text="Certificate of completion" />
             <FeatureItem icon={ShieldCheck} text="Expert Q&A Support" />
           </div>

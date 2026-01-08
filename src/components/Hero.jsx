@@ -1,10 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import AuthModal from "../components/AuthModal";
 
 const Hero = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  const handleStartLearning = () => {
+    if (currentUser) {
+      // Agar login hai to Store pe bhejo
+      navigate("/ebooks");
+    } else {
+      // Agar login nahi hai to Modal kholo
+      setIsAuthOpen(true);
+    }
+  };
+
   return (
-    // Updated Spacing: pt-16 (Mobile - Tight), lg:pt-28 (Desktop - Reduced)
     <div className="relative min-h-screen w-full overflow-hidden flex items-center pt-5 pb-12 lg:pt-12 lg:pb-0 bg-linear-to-b from-white via-white via-75% to-[#5edff4]/10">
       {/* --- 1. Background Grid & Glows --- */}
       <div className="absolute inset-0 max-w-7xl mx-auto pointer-events-none border-slate-200/60 z-0">
@@ -41,11 +57,17 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 mt-2 w-full">
-            <button className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-[#5edff4] text-slate-900 font-bold text-sm md:text-lg hover:bg-[#22ccEB] transition-all shadow-xl shadow-[#5edff4]/20 hover:shadow-[#5edff4]/40 hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 cursor-pointer">
+            <button
+              onClick={handleStartLearning}
+              className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-[#5edff4] text-slate-900 font-bold text-sm md:text-lg hover:bg-[#22ccEB] transition-all shadow-xl shadow-[#5edff4]/20 hover:shadow-[#5edff4]/40 hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 cursor-pointer"
+            >
               Start Learning <ArrowRight className="size-4 md:size-5" />
             </button>
-            <button className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-slate-900 text-white font-semibold text-sm md:text-lg hover:bg-slate-800 transition-all shadow-lg hover:-translate-y-0.5 active:scale-95 cursor-pointer">
-              View Syllabus
+            <button
+              onClick={() => navigate("/ebooks")}
+              className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-slate-900 text-white font-semibold text-sm md:text-lg hover:bg-slate-800 transition-all shadow-lg hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            >
+              View Library
             </button>
           </div>
 
@@ -86,61 +108,48 @@ const Hero = () => {
                 e.target.nextSibling.style.display = "flex";
               }}
             />
+            {/* Fallback if image missing */}
             <div className="hidden absolute inset-0 border-2 border-dashed border-[#5edff4] bg-[#5edff4]/5 rounded-3xl items-center justify-center -z-20 p-4">
               <div className="text-center">
                 <p className="text-[#0891b2] text-sm md:text-lg font-bold">
-                  Image Missing
+                  Learn & Grow
                 </p>
               </div>
             </div>
           </motion.div>
 
           <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden lg:overflow-visible">
+            {/* Floating Icons (Simplified for reliability) */}
             <img
               src="/assets/hero/1.svg"
               className="absolute w-12 sm:w-20 lg:w-32 animate-fall-slow opacity-90"
               style={{ left: "5%", top: "-370px" }}
               alt=""
+              onError={(e) => (e.target.style.display = "none")}
             />
             <img
               src="/assets/hero/2.svg"
               className="absolute w-16 sm:w-24 lg:w-40 animate-fall-medium opacity-90"
               style={{ right: "8%", top: "-80px" }}
               alt=""
+              onError={(e) => (e.target.style.display = "none")}
             />
             <img
               src="/assets/hero/3.svg"
               className="absolute w-12 sm:w-20 lg:w-32 animate-fall-fast opacity-80"
               style={{ left: "12%", top: "-120px" }}
               alt=""
-            />
-            <img
-              src="/assets/hero/4.svg"
-              className="absolute w-14 sm:w-24 lg:w-36 animate-fall-slow opacity-90"
-              style={{ right: "15%", top: "-160px" }}
-              alt=""
-            />
-            <img
-              src="/assets/hero/5.svg"
-              className="absolute w-12 sm:w-20 lg:w-32 animate-fall-medium opacity-85"
-              style={{ left: "20%", top: "-200px" }}
-              alt=""
-            />
-            <img
-              src="/assets/hero/6.svg"
-              className="absolute w-10 sm:w-16 lg:w-28 animate-fall-fast opacity-90"
-              style={{ right: "2%", top: "-240px" }}
-              alt=""
-            />
-            <img
-              src="/assets/hero/5.svg"
-              className="absolute w-14 sm:w-20 lg:w-36 animate-fall-slow opacity-80"
-              style={{ left: "50%", top: "-280px" }}
-              alt=""
+              onError={(e) => (e.target.style.display = "none")}
             />
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        defaultMode="signup"
+      />
 
       <style>{`
         @keyframes fall {

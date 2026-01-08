@@ -4,7 +4,6 @@ import {
   Edit3,
   BookOpen,
   Trash2,
-  X,
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
@@ -13,9 +12,9 @@ import {
   ChevronUp,
   ChevronDown,
   Layout,
-  Link as LinkIcon,
   Image as ImageIcon,
-  FileText,
+  X,
+  Check, // Added for the progress bar
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../../firebase/config";
@@ -25,7 +24,32 @@ import {
   getDocs,
   deleteDoc,
   doc,
+  updateDoc,
 } from "firebase/firestore";
+
+// --- [HELPER] Professional Google Drive Image Fixer (UPDATED) ---
+const getValidImageUrl = (url) => {
+  if (!url) return "";
+  try {
+    let id = "";
+    // Case 1: Standard Sharing Link (.../file/d/ID/view...)
+    if (url.includes("/file/d/")) {
+      id = url.split("/file/d/")[1].split("/")[0];
+    }
+    // Case 2: ID based Link (...id=ID...)
+    else if (url.includes("id=")) {
+      id = url.split("id=")[1].split("&")[0];
+    }
+
+    // [FIX] Use Google Drive Thumbnail API for reliable loading
+    if (id) {
+      return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+    }
+  } catch (e) {
+    console.error("Error parsing URL", e);
+  }
+  return url;
+};
 
 const EBookManager = () => {
   const [ebooks, setEbooks] = useState([]);
@@ -34,12 +58,15 @@ const EBookManager = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Removed Title, Author, Category, Chapters etc.
   const initialFormState = {
-    price: 99, // Selling Price
-    discountPrice: 499, // Original Price
-    cover: "", // Cover Image URL
-    driveLink: "", // PDF/EPUB Drive Link
+    title: "",
+    author: "",
+    description: "",
+    pages: "",
+    price: 99,
+    discountPrice: 499,
+    cover: "",
+    driveLink: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -51,11 +78,11 @@ const EBookManager = () => {
   const fetchEBooks = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "ebooks"));
-      const list = querySnapshot.docs.map((doc) => ({
+      const booksList = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setEbooks(list);
+      setEbooks(booksList);
     } catch (error) {
       console.error("Error fetching ebooks:", error);
     }
@@ -68,49 +95,66 @@ const EBookManager = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (ebook) => {
-    setEditingId(ebook.id);
-    setFormData({ ...ebook });
+  const handleEdit = (book) => {
+    setEditingId(book.id);
+    setFormData({
+      title: book.title || "",
+      author: book.author || "",
+      description: book.description || "",
+      pages: book.pages || "",
+      price: book.price || 99,
+      discountPrice: book.originalPrice || 499,
+      cover: book.image || "",
+      driveLink: book.driveLink || "",
+    });
     setCurrentStep(1);
     setShowModal(true);
   };
 
   const handleFinalSubmit = async () => {
-    // Validation: Cover, File Link & Prices are Required
-    if (!formData.cover || !formData.driveLink || !formData.price) {
-      alert("⚠️ Cover Image, Drive Link and Pricing are strictly required!");
+    if (!formData.title || !formData.cover || !formData.price) {
+      alert("⚠️ Book Title, Cover Image, and Price are required!");
       return;
     }
 
     setLoading(true);
     try {
-      // Auto-generating title
-      const autoTitle = `E-Book Asset ${new Date().toLocaleDateString(
-        "en-GB"
-      )}`;
+      // [IMPORTANT] Convert Drive Link to Direct Image before saving
+      const validCoverUrl = getValidImageUrl(formData.cover);
 
-      await addDoc(collection(db, "ebooks"), {
-        title: autoTitle, // Fallback title
-        cover: formData.cover,
+      const bookData = {
+        title: formData.title,
+        author: formData.author || "Unknown Author",
+        description: formData.description,
+        pages: formData.pages || "Unknown",
+        image: validCoverUrl, // Saving the fixed URL
         driveLink: formData.driveLink,
         price: formData.price.toString(),
-        discountPrice: formData.discountPrice.toString(), // Using discountPrice as original
-        category: "General", // Default category
-        status: "Active",
-        createdAt: new Date().toISOString(),
-      });
+        originalPrice: formData.discountPrice.toString(),
+        updatedAt: new Date().toISOString(),
+        rating: 4.5,
+        language: "English",
+      };
 
+      if (editingId) {
+        await updateDoc(doc(db, "ebooks", editingId), bookData);
+      } else {
+        await addDoc(collection(db, "ebooks"), {
+          ...bookData,
+          createdAt: new Date().toISOString(),
+        });
+      }
       setShowModal(false);
       fetchEBooks();
     } catch (error) {
-      console.error("Error adding ebook:", error);
+      console.error("Error saving ebook:", error);
       alert("Failed to save ebook");
     }
     setLoading(false);
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this digital asset?")) return;
+    if (!window.confirm("Delete this E-Book?")) return;
     try {
       await deleteDoc(doc(db, "ebooks", id));
       fetchEBooks();
@@ -120,413 +164,537 @@ const EBookManager = () => {
   };
 
   const steps = [
-    { id: 1, label: "Book Assets", icon: <FileText size={16} /> },
-    { id: 2, label: "Pricing", icon: <DollarSign size={16} /> },
-    { id: 3, label: "Review", icon: <Rocket size={16} /> },
+    { id: 1, label: "Info", icon: <Layout size={16} /> },
+    { id: 2, label: "Assets", icon: <ImageIcon size={16} /> },
+    { id: 3, label: "Pricing", icon: <DollarSign size={16} /> },
+    { id: 4, label: "Review", icon: <Rocket size={16} /> },
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 h-full min-h-[500px]">
-      {/* SIDEBAR DASHBOARD */}
-      <div className="w-full lg:w-[400px]">
-        <div className="bg-slate-950 p-8 lg:p-10 rounded-[40px] text-white flex flex-col justify-between shadow-2xl sticky top-28 overflow-hidden">
+    <div className="h-[calc(100vh-80px)] flex flex-col lg:flex-row gap-6">
+      {/* MOBILE HEADER */}
+      <div className="lg:hidden flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="size-10 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-200">
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-900 leading-none">
+              Library
+            </h2>
+            <p className="text-xs text-slate-400 font-bold">
+              {ebooks.length} Books
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleLaunchNew}
+          className="size-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+        >
+          <Plus size={20} />
+        </button>
+      </div>
+
+      {/* DESKTOP SIDEBAR */}
+      <div className="hidden lg:flex w-[350px] flex-col">
+        <div className="bg-slate-950 p-8 rounded-[40px] text-white flex flex-col justify-between shadow-2xl relative overflow-hidden h-[500px] sticky top-0">
           <div className="absolute top-0 right-0 size-64 bg-orange-500/20 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
           <div className="relative z-10">
             <div className="size-16 bg-orange-500 rounded-2xl flex items-center justify-center mb-8 shadow-xl shadow-orange-500/20">
               <BookOpen size={32} className="text-white" />
             </div>
-            <h2 className="text-3xl lg:text-4xl font-black tracking-tighter mb-4 leading-none uppercase">
-              Digital <br /> <span className="text-orange-400">Library</span>
+            <h2 className="text-4xl font-black tracking-tighter mb-4 leading-none uppercase">
+              E-Book <br /> <span className="text-orange-400">Manager</span>
             </h2>
             <p className="text-slate-400 text-sm font-medium leading-relaxed italic">
-              "Distribute knowledge instantly. Secure & Direct."
+              "Publish digital resources and guides."
             </p>
           </div>
           <button
             onClick={handleLaunchNew}
-            className="mt-12 flex items-center justify-center gap-3 w-full py-5 bg-white text-slate-950 rounded-[24px] font-black uppercase text-[11px] tracking-widest hover:bg-orange-400 hover:text-white transition-all duration-500 shadow-xl"
+            className="mt-auto flex items-center justify-center gap-3 w-full py-5 bg-white text-slate-950 rounded-[24px] font-black uppercase text-[11px] tracking-widest hover:bg-orange-400 hover:text-white transition-all duration-500 shadow-xl"
           >
-            <Plus size={18} /> Upload New E-Book
+            <Plus size={18} /> Add New E-Book
           </button>
         </div>
       </div>
 
-      {/* EBOOK LIST */}
-      <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar max-h-[75vh]">
-        <div className="flex items-center justify-between mb-4">
+      {/* BOOK LIST AREA */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 lg:pb-0">
+        <div className="hidden lg:flex items-center justify-between mb-6">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-            Shelf Inventory ({ebooks.length})
+            Digital Library ({ebooks.length})
           </h3>
           <Layout size={16} className="text-slate-300" />
         </div>
-        <AnimatePresence mode="popLayout">
-          {ebooks.map((ebook) => (
-            <motion.div
-              layout
-              key={ebook.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white p-5 lg:p-6 rounded-[32px] border border-slate-100 flex items-center justify-between group hover:shadow-2xl hover:border-orange-100 transition-all duration-500"
-            >
-              <div className="flex items-center gap-4 lg:gap-5">
-                <div className="size-16 lg:size-20 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center text-slate-400 group-hover:ring-4 ring-orange-50 transition-all duration-500 relative shrink-0">
-                  {ebook.cover ? (
-                    <img
-                      src={ebook.cover}
-                      alt="Cover"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <FileText size={24} />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-black text-slate-900 uppercase tracking-tight mb-1">
-                    {ebook.title || "Untitled Asset"}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                      ₹{ebook.price}
-                    </span>
-                    {ebook.driveLink && (
-                      <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg flex items-center gap-1">
-                        <CheckCircle2 size={10} /> Digital Ready
-                      </span>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+          <AnimatePresence mode="popLayout">
+            {ebooks.map((book) => (
+              <motion.div
+                layout
+                key={book.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white p-4 rounded-[24px] border border-slate-100 flex flex-col gap-4 group hover:shadow-xl hover:border-orange-100 transition-all duration-300"
+              >
+                <div className="flex gap-4">
+                  <div className="w-20 h-28 sm:w-24 sm:h-32 bg-slate-100 rounded-xl overflow-hidden shrink-0 relative shadow-md">
+                    {/* List Preview with Fix */}
+                    {book.image ? (
+                      <img
+                        src={getValidImageUrl(book.image)}
+                        alt="Cover"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src =
+                            "https://placehold.co/400x600?text=No+Cover";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-slate-300">
+                        <BookOpen size={24} />
+                      </div>
                     )}
                   </div>
+
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <div className="mb-1">
+                      <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        PDF
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-tight line-clamp-2 mb-1">
+                      {book.title || "Untitled Book"}
+                    </h4>
+                    <p className="text-xs text-slate-500 mb-auto">
+                      by {book.author || "Unknown"}
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="text-sm font-black text-emerald-600">
+                        ₹{book.price}
+                      </span>
+                      {book.pages && (
+                        <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                          {book.pages} Pages
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                <button
-                  onClick={() => handleEdit(ebook)}
-                  className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-orange-50 hover:text-orange-600 shadow-sm transition-colors"
-                >
-                  <Edit3 size={18} />
-                </button>
-                <button
-                  onClick={() => handleDelete(ebook.id)}
-                  className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-red-50 hover:text-red-500 shadow-sm transition-colors"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+
+                <div className="flex gap-2 pt-3 border-t border-slate-50">
+                  <button
+                    onClick={() => handleEdit(book)}
+                    className="flex-1 py-2.5 bg-slate-50 text-slate-600 rounded-xl text-xs font-bold hover:bg-orange-50 hover:text-orange-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit3 size={14} /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(book.id)}
+                    className="flex-1 py-2.5 bg-red-50 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {ebooks.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+            <div className="size-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <BookOpen size={24} />
+            </div>
+            <p className="text-sm font-medium">No ebooks found.</p>
+            <button
+              onClick={handleLaunchNew}
+              className="mt-4 text-orange-500 text-sm font-bold hover:underline lg:hidden"
+            >
+              Add your first ebook
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* MODAL */}
+      {/* RESPONSIVE MODAL */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 lg:p-4">
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowModal(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-xl"
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-5xl rounded-[40px] lg:rounded-[54px] shadow-2xl relative z-10 overflow-hidden flex flex-col lg:flex-row h-[90vh] lg:h-[80vh]"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-white w-full max-w-4xl h-[95vh] sm:h-[85vh] sm:rounded-[40px] rounded-t-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden"
             >
-              {/* STEPS SIDEBAR */}
-              <div className="w-full lg:w-[300px] bg-slate-950 p-8 lg:p-10 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
-                <div className="absolute top-0 left-0 size-64 bg-orange-500/20 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
-                <div className="relative z-10">
-                  <h3 className="text-2xl font-black uppercase tracking-tighter mb-10 leading-none">
-                    Asset <br />
-                    <span className="text-orange-400">Manager</span>
+              {/* MODAL HEADER - NEW BEAUTIFUL PROGRESS BAR */}
+              <div className="p-6 border-b border-slate-100 flex flex-col gap-6 bg-white z-20">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black text-slate-900">
+                    {editingId ? "Edit E-Book" : "New E-Book"}
                   </h3>
-                  <div className="space-y-3">
-                    {steps.map((step) => (
-                      <button
-                        key={step.id}
-                        onClick={() => setCurrentStep(step.id)}
-                        className={`w-full flex items-center gap-4 text-left p-4 rounded-2xl transition-all border border-transparent ${
-                          currentStep === step.id
-                            ? "bg-white/10 opacity-100 border-white/5 shadow-lg"
-                            : "opacity-40 hover:opacity-70"
-                        }`}
-                      >
-                        <div
-                          className={`size-8 rounded-lg flex items-center justify-center font-bold ${
-                            currentStep === step.id
-                              ? "text-orange-400"
-                              : "text-slate-400"
-                          }`}
-                        >
-                          {step.icon}
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest">
-                          {step.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* FORM AREA */}
-              <div className="flex-1 flex flex-col bg-white min-w-0 overflow-hidden">
-                <div className="p-6 lg:p-8 border-b border-slate-50 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="size-2 bg-orange-500 rounded-full animate-pulse" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                      {editingId ? "Editing Asset" : "New Digital Asset"}
-                    </p>
-                  </div>
                   <button
                     onClick={() => setShowModal(false)}
-                    className="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-colors"
+                    className="size-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 lg:p-12 custom-scrollbar selection:bg-orange-100">
+                {/* STEPS INDICATOR CONTAINER */}
+                <div className="relative px-2">
+                  {/* Background Grey Line */}
+                  <div className="absolute left-0 top-5 w-full h-1 bg-slate-100 rounded-full -z-10" />
+
+                  {/* Steps Loop */}
+                  <div className="flex justify-between items-start">
+                    {steps.map((step) => {
+                      const isCompleted = currentStep > step.id;
+                      const isActive = currentStep === step.id;
+
+                      return (
+                        <div
+                          key={step.id}
+                          className="flex flex-col items-center gap-2 group cursor-default"
+                        >
+                          {/* Circle */}
+                          <div
+                            className={`size-10 rounded-full flex items-center justify-center transition-all duration-300 border-4 border-white
+                                  ${
+                                    isActive
+                                      ? "bg-orange-500 text-white shadow-lg shadow-orange-200 scale-110"
+                                      : isCompleted
+                                      ? "bg-emerald-500 text-white"
+                                      : "bg-slate-200 text-slate-400"
+                                  }
+                                `}
+                          >
+                            {isCompleted ? (
+                              <Check size={16} strokeWidth={3} />
+                            ) : (
+                              step.icon
+                            )}
+                          </div>
+
+                          {/* Label (Name) */}
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors duration-300 
+                                ${
+                                  isActive
+                                    ? "text-slate-900"
+                                    : isCompleted
+                                    ? "text-emerald-600"
+                                    : "text-slate-300"
+                                }`}
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* MODAL CONTENT */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-10 custom-scrollbar bg-white">
+                <div className="max-w-xl mx-auto pb-20 sm:pb-0">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={currentStep}
-                      initial={{ opacity: 0, x: 20 }}
+                      initial={{ opacity: 0, x: 10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ duration: 0.3 }}
-                      className="max-w-2xl mx-auto space-y-10"
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-6"
                     >
                       {currentStep === 1 && (
-                        <AssetsTab
+                        <InfoTab
                           formData={formData}
                           setFormData={setFormData}
                         />
                       )}
                       {currentStep === 2 && (
+                        <AssetsTab
+                          formData={formData}
+                          setFormData={setFormData}
+                        />
+                      )}
+                      {currentStep === 3 && (
                         <PricingTab
                           formData={formData}
                           setFormData={setFormData}
                         />
                       )}
-                      {currentStep === 3 && <ReviewTab formData={formData} />}
+                      {currentStep === 4 && <ReviewTab formData={formData} />}
                     </motion.div>
                   </AnimatePresence>
                 </div>
+              </div>
 
-                <div className="p-6 lg:p-8 bg-slate-50/50 border-t border-slate-50 flex justify-between items-center">
+              {/* MODAL FOOTER */}
+              <div className="p-4 sm:p-6 border-t border-slate-100 bg-white flex justify-between items-center z-20">
+                <button
+                  onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
+                  disabled={currentStep === 1}
+                  className="px-4 py-2 sm:px-6 sm:py-3 text-slate-400 font-bold uppercase text-xs flex items-center gap-2 disabled:opacity-0 hover:text-slate-900 transition-all"
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+
+                {currentStep < 4 ? (
                   <button
-                    onClick={() => setCurrentStep((s) => s - 1)}
-                    disabled={currentStep === 1}
-                    className="px-6 py-3 text-slate-400 font-black uppercase text-[10px] tracking-widest flex items-center gap-2 disabled:opacity-0 hover:text-slate-950 transition-all"
+                    onClick={() => setCurrentStep((s) => Math.min(4, s + 1))}
+                    className="px-6 py-3 sm:px-8 sm:py-3.5 bg-slate-900 text-white rounded-xl sm:rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
                   >
-                    <ArrowLeft size={16} /> Back
+                    Next <ArrowRight size={16} />
                   </button>
-                  {currentStep < 3 ? (
-                    <button
-                      onClick={() => setCurrentStep((s) => s + 1)}
-                      className="px-10 py-4 bg-slate-950 text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-orange-500 transition-all flex items-center gap-3"
-                    >
-                      Next Step <ArrowRight size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleFinalSubmit}
-                      disabled={loading}
-                      className="px-10 py-4 bg-emerald-500 text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-100 hover:scale-105 transition-all disabled:opacity-50 flex items-center gap-3"
-                    >
-                      {loading ? "Saving..." : "Publish E-Book"}{" "}
-                      <CheckCircle2 size={16} />
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button
+                    onClick={handleFinalSubmit}
+                    disabled={loading}
+                    className="px-6 py-3 sm:px-8 sm:py-3.5 bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-2"
+                  >
+                    {loading ? "Saving..." : "Publish"}{" "}
+                    <CheckCircle2 size={16} />
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #e2e8f0;
-          border-radius: 10px;
-        }
-      `}</style>
     </div>
   );
 };
 
-// --- TAB COMPONENTS ---
+// --- SUB-COMPONENTS ---
 
-const AssetsTab = ({ formData, setFormData }) => {
-  return (
-    <div className="space-y-8">
-      <div className="text-center space-y-2 mb-10">
-        <div className="size-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
-          <FileText size={32} />
-        </div>
-        <h3 className="text-2xl font-black text-slate-900 uppercase">
-          Book Assets
-        </h3>
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-          Link your visual and digital content
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        {/* Cover Image */}
-        <div className="space-y-3">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-            Cover Image URL <span className="text-red-500">*</span>
-          </label>
-          <div className="relative group">
-            <input
-              type="text"
-              placeholder="https://imgur.com/..."
-              className="w-full bg-slate-50 p-6 pl-6 pr-14 rounded-[28px] border-2 border-transparent focus:border-blue-100 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
-              value={formData.cover || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, cover: e.target.value })
-              }
-            />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-              <ImageIcon size={20} />
-            </div>
-          </div>
-          {formData.cover && (
-            <div className="mt-2 ml-2 flex items-center gap-2 text-[10px] text-emerald-600 font-bold animate-in fade-in">
-              <CheckCircle2 size={12} /> Cover Linked
-            </div>
-          )}
-        </div>
-
-        {/* Drive Link */}
-        <div className="space-y-3">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-            Book File (Drive Link) <span className="text-red-500">*</span>
-          </label>
-          <div className="relative group">
-            <input
-              type="text"
-              placeholder="https://drive.google.com/..."
-              className="w-full bg-slate-50 p-6 pl-6 pr-14 rounded-[28px] border-2 border-transparent focus:border-orange-100 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
-              value={formData.driveLink || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, driveLink: e.target.value })
-              }
-            />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-              <LinkIcon size={20} />
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-400 ml-2">
-            Ensure the Drive link is accessible to "Anyone with the link"
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const PricingTab = ({ formData, setFormData }) => (
-  <div className="space-y-8">
-    <div className="text-center space-y-2 mb-8">
-      <h3 className="text-2xl font-black text-slate-900 uppercase">
-        Set Pricing
+const InfoTab = ({ formData, setFormData }) => (
+  <div className="space-y-6">
+    <div className="text-center mb-8">
+      <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+        Book Details
       </h3>
-      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-        Define the value of your content
+      <p className="text-slate-400 text-xs">
+        Basic information about the ebook
       </p>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <PriceControl
-        label="Listing Price (Original)"
-        value={formData.discountPrice}
-        color="slate"
-        onChange={(v) => setFormData({ ...formData, discountPrice: v })}
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+          Book Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          placeholder="e.g. The Ultimate React Guide"
+          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-orange-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+            Author Name
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. John Doe"
+            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-orange-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
+            value={formData.author}
+            onChange={(e) =>
+              setFormData({ ...formData, author: e.target.value })
+            }
+          />
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+            No. of Pages
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 150"
+            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-orange-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
+            value={formData.pages}
+            onChange={(e) =>
+              setFormData({ ...formData, pages: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+          Description
+        </label>
+        <textarea
+          rows="4"
+          placeholder="What is this book about?"
+          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-orange-500 focus:bg-white outline-none font-medium text-slate-700 transition-all text-sm resize-none"
+          value={formData.description}
+          onChange={(e) =>
+            setFormData({ ...formData, description: e.target.value })
+          }
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const AssetsTab = ({ formData, setFormData }) => (
+  <div className="space-y-6">
+    <div className="text-center mb-8">
+      <h3 className="text-xl sm:text-2xl font-black text-slate-900">Assets</h3>
+      <p className="text-slate-400 text-xs">Cover image and download link</p>
+    </div>
+
+    <div>
+      <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+        Cover Image Link (Drive/Imgur) <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        placeholder="https://drive.google.com/..."
+        className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-orange-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
+        value={formData.cover}
+        onChange={(e) => setFormData({ ...formData, cover: e.target.value })}
       />
-      <PriceControl
-        label="Offer Price (Selling)"
-        value={formData.price}
-        color="emerald"
-        onChange={(v) => setFormData({ ...formData, price: v })}
+
+      {/* Live Preview (With Auto Fixer) */}
+      <div className="mt-4 h-48 sm:h-56 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden relative group">
+        {formData.cover ? (
+          <img
+            src={getValidImageUrl(formData.cover)}
+            alt="Preview"
+            className="h-full object-contain shadow-lg"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://placehold.co/600x400?text=Invalid+Link";
+            }}
+          />
+        ) : (
+          <div className="text-center text-slate-400">
+            <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-xs">Preview will appear here</p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div>
+      <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+        Book PDF Link <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        placeholder="https://drive.google.com/..."
+        className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
+        value={formData.driveLink}
+        onChange={(e) =>
+          setFormData({ ...formData, driveLink: e.target.value })
+        }
       />
     </div>
   </div>
 );
 
-const ReviewTab = ({ formData }) => (
-  <div className="text-center py-6 space-y-8">
-    <div className="size-28 bg-emerald-50 text-emerald-500 rounded-[40px] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-50/50 animate-bounce">
-      <Rocket size={48} />
+const PricingTab = ({ formData, setFormData }) => (
+  <div className="space-y-6">
+    <div className="text-center mb-8">
+      <h3 className="text-xl sm:text-2xl font-black text-slate-900">Pricing</h3>
+      <p className="text-slate-400 text-xs">Set your book value</p>
     </div>
-    <div className="space-y-4">
-      <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">
-        Ready to Deploy
-      </h3>
-      <div className="bg-slate-50 p-6 rounded-[32px] max-w-sm mx-auto space-y-3 border border-slate-100">
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-bold text-slate-400 uppercase">
-            Selling Price
-          </span>
-          <span className="text-lg font-black text-emerald-600">
-            ₹{formData.price}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-bold text-slate-400 uppercase">
-            Content
-          </span>
-          <span className="text-xs font-bold text-slate-900">
-            {formData.driveLink ? "Linked" : "Missing"}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-bold text-slate-400 uppercase">
-            Cover
-          </span>
-          <span className="text-xs font-bold text-slate-900">
-            {formData.cover ? "Attached" : "None"}
-          </span>
-        </div>
-      </div>
+
+    <div className="grid grid-cols-1 gap-4">
+      <PriceControl
+        label="Selling Price"
+        value={formData.price}
+        color="emerald"
+        onChange={(v) => setFormData({ ...formData, price: v })}
+      />
+      <PriceControl
+        label="Original Price (Strike-through)"
+        value={formData.discountPrice}
+        color="slate"
+        onChange={(v) => setFormData({ ...formData, discountPrice: v })}
+      />
     </div>
   </div>
 );
 
 const PriceControl = ({ label, value, onChange, color }) => (
   <div
-    className={`p-8 bg-${color}-50/50 rounded-[40px] border border-${color}-100 transition-all hover:bg-${color}-50`}
+    className={`p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-between`}
   >
-    <p
-      className={`text-[10px] font-black text-${color}-600 uppercase tracking-widest mb-4`}
-    >
-      {label}
-    </p>
-    <div className="flex items-center justify-between">
-      <span className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter">
+    <div>
+      <p className="text-xs font-bold text-slate-400 uppercase">{label}</p>
+      <p
+        className={`text-2xl sm:text-3xl font-black text-${
+          color === "emerald" ? "emerald-600" : "slate-900"
+        }`}
+      >
         ₹{value}
-      </span>
-      <div className="flex flex-col gap-1.5">
-        <button
-          onClick={() => onChange(Number(value) + 100)}
-          className="p-2 bg-white rounded-xl shadow-sm hover:bg-orange-600 hover:text-white transition-all"
-        >
-          <ChevronUp size={16} />
-        </button>
-        <button
-          onClick={() => onChange(Math.max(0, Number(value) - 100))}
-          className="p-2 bg-white rounded-xl shadow-sm hover:bg-red-500 hover:text-white transition-all"
-        >
-          <ChevronDown size={16} />
-        </button>
+      </p>
+    </div>
+    <div className="flex flex-col gap-1">
+      <button
+        onClick={() => onChange(Number(value) + 50)}
+        className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg"
+      >
+        <ChevronUp size={16} />
+      </button>
+      <button
+        onClick={() => onChange(Math.max(0, Number(value) - 50))}
+        className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg"
+      >
+        <ChevronDown size={16} />
+      </button>
+    </div>
+  </div>
+);
+
+const ReviewTab = ({ formData }) => (
+  <div className="text-center space-y-6 py-4">
+    <div className="size-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+      <Rocket size={32} />
+    </div>
+    <h3 className="text-2xl font-black text-slate-900">Ready to Publish?</h3>
+
+    <div className="bg-slate-50 p-6 rounded-2xl text-left space-y-3 border border-slate-100 max-w-sm mx-auto flex items-start gap-4">
+      <div className="w-16 h-20 bg-slate-200 rounded-lg overflow-hidden shrink-0">
+        {formData.cover && (
+          <img
+            src={getValidImageUrl(formData.cover)}
+            className="w-full h-full object-cover"
+            alt=""
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://placehold.co/600x400?text=Error";
+            }}
+          />
+        )}
+      </div>
+      <div className="flex-1">
+        <p className="font-bold text-slate-900 line-clamp-2 leading-tight">
+          {formData.title || "Untitled"}
+        </p>
+        <p className="text-xs text-slate-500 mb-2">{formData.pages} Pages</p>
+        <p className="font-black text-emerald-600 text-lg">₹{formData.price}</p>
       </div>
     </div>
   </div>

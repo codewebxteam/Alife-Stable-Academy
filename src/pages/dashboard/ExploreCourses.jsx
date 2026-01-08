@@ -1,18 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingCart, Star } from "lucide-react";
 import { Link } from "react-router-dom";
-import { COURSES_DATA } from "../../data/coursesData";
+import { useCourse } from "../../context/CourseContext";
+import { collection, getDocs } from "firebase/firestore"; // [NEW] Import Firestore
+import { db } from "../../firebase/config"; // [NEW] Import DB
 
 const ExploreCourses = () => {
-  const [filter, setFilter] = useState("All");
-  const categories = ["All", "Development", "Design", "Business", "Marketing"];
+  const { isEnrolled } = useCourse();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [liveCourses, setLiveCourses] = useState([]); // [NEW] State for live courses
+  const [loading, setLoading] = useState(true);
 
-  // Safeguard: Ensure COURSES_DATA is an array before filtering
-  const safeData = Array.isArray(COURSES_DATA) ? COURSES_DATA : [];
+  // --- [NEW] Fetch Courses from Firebase ---
+  useEffect(() => {
+    const fetchLiveCourses = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "courseVideos"));
+        const courses = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setLiveCourses(courses);
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredCourses =
-    filter === "All" ? safeData : safeData.filter((c) => c.category === filter);
+    fetchLiveCourses();
+  }, []);
+
+  // Filter: Show only courses that are NOT enrolled AND match search query
+  const availableCourses = liveCourses.filter((course) => {
+    // Check if the user is already enrolled
+    const notEnrolled = !isEnrolled(course.id);
+
+    // Check search query
+    const matchesSearch = (course.title || "")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    return notEnrolled && matchesSearch;
+  });
 
   return (
     <div className="space-y-8 pb-10">
@@ -31,47 +62,50 @@ const ExploreCourses = () => {
           <input
             type="text"
             placeholder="What do you want to learn?"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-3 rounded-full border border-slate-200 shadow-lg shadow-slate-200/20 outline-none focus:border-[#5edff4] focus:ring-2 focus:ring-[#5edff4]/20 transition-all"
           />
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div className="flex justify-center gap-2 flex-wrap">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-5 py-2 rounded-full text-sm font-bold transition-all cursor-pointer ${
-              filter === cat
-                ? "bg-slate-900 text-white shadow-lg scale-105"
-                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
       {/* Course Grid */}
-      <motion.div layout className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredCourses.length > 0 ? (
-            filteredCourses.map((course) => (
-              <ExploreCard key={course.id} course={course} />
-            ))
-          ) : (
-            <div className="col-span-full text-center py-10 text-slate-500">
-              No courses found in this category.
-            </div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      {loading ? (
+        <div className="text-center py-20 text-slate-400">
+          Loading courses...
+        </div>
+      ) : (
+        <motion.div layout className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AnimatePresence mode="popLayout">
+            {availableCourses.length > 0 ? (
+              availableCourses.map((course) => (
+                <ExploreCard key={course.id} course={course} />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+                <p className="text-slate-500">
+                  {liveCourses.length === 0
+                    ? "No courses available in the library yet."
+                    : "You have enrolled in all available courses!"}
+                </p>
+                {liveCourses.length > 0 && (
+                  <Link
+                    to="/dashboard/my-courses"
+                    className="inline-block mt-4 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-[#5edff4] hover:text-slate-900 transition-all"
+                  >
+                    Go to My Learning
+                  </Link>
+                )}
+              </div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
     </div>
   );
 };
 
-// Specialized Card (FIXED CLOSING TAG)
+// Specialized Card Component
 const ExploreCard = ({ course }) => (
   <motion.div
     layout
@@ -84,37 +118,43 @@ const ExploreCard = ({ course }) => (
     {/* Image */}
     <div className="relative h-48 overflow-hidden">
       <img
-        src={course.image}
+        src={
+          course.image ||
+          course.thumbnail ||
+          `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
+        }
         alt={course.title}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
       />
       <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
         <Star className="size-3 fill-yellow-400 text-yellow-400" />{" "}
-        {course.rating}
+        {course.rating || 4.5}
       </div>
     </div>
 
     <div className="p-6 flex flex-col flex-1">
       <div className="mb-4">
         <span className="text-[10px] font-bold text-[#0891b2] uppercase tracking-wider">
-          {course.category}
+          {course.category || "General"}
         </span>
         <h3 className="text-lg font-bold text-slate-900 leading-tight mt-1 line-clamp-2">
           {course.title}
         </h3>
         <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-          By {course.instructor}
+          By {course.instructor || "Alife Academy"}
         </p>
       </div>
 
       <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
         <div>
           <span className="block text-lg font-bold text-slate-900">
-            {course.price}
+            ₹{course.price}
           </span>
-          <span className="text-xs text-slate-400 line-through">
-            {course.originalPrice}
-          </span>
+          {course.originalPrice && (
+            <span className="text-xs text-slate-400 line-through">
+              ₹{course.originalPrice}
+            </span>
+          )}
         </div>
         <Link
           to={`/courses/${course.id}`}
@@ -124,7 +164,7 @@ const ExploreCard = ({ course }) => (
         </Link>
       </div>
     </div>
-  </motion.div> 
+  </motion.div>
 );
 
 export default ExploreCourses;

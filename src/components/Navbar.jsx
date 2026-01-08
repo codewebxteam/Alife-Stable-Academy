@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Settings,
   ChevronDown,
+  Lock, // [NEW] Added Lock icon for Reset Password
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import AuthModal from "./AuthModal";
@@ -23,7 +24,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- [UPDATED] Destructure userData for Role Detection ---
+  // --- Destructure userData for Role Detection ---
   const { currentUser, userData, logout } = useAuth();
   const { agency, isMainSite } = useAgency();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -35,11 +36,18 @@ const Navbar = () => {
   const brandColor = agency.themeColor || "#0f172a";
   const accentColor = agency.accentColor || "#5edff4";
 
-  // --- [NEW] Logical Dashboard & Profile Paths ---
-  // ✨ Navbar ab strictly naye "/partner" route ko follow karega
+  // --- [UPDATED] Logical Dashboard Paths for Student, Partner & Admin ---
   const isPartner = userData?.role === "partner";
-  const dashboardPath = isPartner ? "/partner" : "/dashboard";
-  const profilePath = isPartner ? "/partner/profile" : "/dashboard/profile";
+  const isAdmin = userData?.role === "admin"; // Check if user is admin
+
+  let dashboardPath = "/dashboard";
+  if (isPartner) dashboardPath = "/partner";
+  if (isAdmin) dashboardPath = "/admin"; // Redirect admin to Admin Panel
+
+  // Profile Path
+  let profilePath = "/dashboard/profile";
+  if (isPartner) profilePath = "/partner/profile";
+  if (isAdmin) profilePath = "/admin/settings"; // Admin profile usually in settings
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,7 +62,6 @@ const Navbar = () => {
       }
     };
 
-    // ✨ NEW: Listener for Footer Partner Link
     const handlePartnerModalTrigger = () => {
       setAuthMode("partner");
       setIsAuthOpen(true);
@@ -92,7 +99,7 @@ const Navbar = () => {
     { name: "E-Books", path: "/ebooks", icon: BookOpen },
     { name: "About Us", path: "/about", icon: Users },
     { name: "Contact Us", path: "/contact", icon: Mail },
-    // ✨ Dashboard link logic added here to ensure it shows up in nav items when logged in
+    // Show Dashboard link if logged in
     ...(currentUser
       ? [{ name: "Dashboard", path: dashboardPath, icon: LayoutDashboard }]
       : []),
@@ -231,6 +238,12 @@ const Navbar = () => {
                         <p className="text-xs text-slate-500 truncate">
                           {currentUser.email}
                         </p>
+                        {/* Show Admin Badge */}
+                        {isAdmin && (
+                          <span className="mt-1 inline-block text-[10px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Admin Access
+                          </span>
+                        )}
                       </div>
                       <div className="p-2 space-y-1">
                         <Link
@@ -240,13 +253,28 @@ const Navbar = () => {
                         >
                           <LayoutDashboard className="size-4" /> Dashboard
                         </Link>
-                        <Link
-                          to={profilePath}
-                          onClick={() => setShowProfileMenu(false)}
-                          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
-                        >
-                          <Settings className="size-4" /> My Profile
-                        </Link>
+
+                        {!isAdmin && (
+                          <Link
+                            to={profilePath}
+                            onClick={() => setShowProfileMenu(false)}
+                            className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+                          >
+                            <Settings className="size-4" /> My Profile
+                          </Link>
+                        )}
+
+                        {/* --- [NEW] Reset Password Option for Admin --- */}
+                        {isAdmin && (
+                          <Link
+                            to="/admin/settings"
+                            onClick={() => setShowProfileMenu(false)}
+                            className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+                          >
+                            <Lock className="size-4 text-indigo-500" /> Reset
+                            Password
+                          </Link>
+                        )}
                       </div>
                       <div className="p-2 border-t border-slate-50">
                         <button

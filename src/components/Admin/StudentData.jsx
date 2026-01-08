@@ -1,73 +1,27 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
   Search,
   Filter,
-  Mail,
   Globe,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  Download,
   Calendar,
   ChevronDown,
   GraduationCap,
-  CheckCircle2,
-  BookOpen,
-  Award,
   Zap,
-  FileSpreadsheet, // ✨ Excel icon
+  FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
-import StudentProfile from "./StudentProfile";
-
-// --- MOCK DATA ENGINE ---
-const STUDENT_DATABASE = Array.from({ length: 55 }).map((_, i) => ({
-  id: `STU-${2000 + i}`,
-  name: `Student ${i + 1}`,
-  email: `student${i + 1}@example.com`,
-  phone: `+91 90000 ${10000 + i}`,
-  location: i % 3 === 0 ? "Mumbai, India" : "Delhi, India",
-  joinDate:
-    i % 3 === 0
-      ? new Date().toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "15 Jan 2024",
-  source: i % 3 === 0 ? "Direct" : "Partner",
-  partnerName: i % 3 === 0 ? null : `Nexus Academy ${i % 5}`,
-  status: i % 15 === 0 ? "Inactive" : "Active",
-  courses: [
-    {
-      name: "React Pro Mastery",
-      progress: i % 2 === 0 ? 100 : 45,
-      certificateIssued: i % 2 === 0,
-    },
-    { name: "UI/UX Design", progress: 10, certificateIssued: false },
-  ],
-  certificates: i % 2 === 0 ? ["React Cert"] : [],
-  avgScore: 78 + (i % 20),
-  transactions: [
-    {
-      id: "ORD-998",
-      asset: "React Pro Mastery",
-      date: "15 Jan 2024",
-      amount: "2499",
-    },
-    {
-      id: "ORD-997",
-      asset: "UI/UX Design",
-      date: "10 Jan 2024",
-      amount: "1999",
-    },
-  ],
-}));
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "../../firebase/config"; // Ensure path is correct based on your folder structure
+import StudentProfile from "../partner/StudentProfile"; // Reusing the profile component
 
 const StudentData = () => {
-  // State
-  const [students, setStudents] = useState(STUDENT_DATABASE);
+  // --- STATE ---
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   // Filters
@@ -80,56 +34,183 @@ const StudentData = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // --- 1. TIME FILTER LOGIC ---
-  const timeFilteredStudents = useMemo(() => {
-    if (timeFilter === "All Time") return students;
+  // --- 1. FETCH REAL DATA FROM BACKEND ---
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // A. Fetch All Users (Students)
+        const usersSnap = await getDocs(collection(db, "users"));
+        const usersMap = {};
 
-    const now = new Date();
-    return students.filter((s) => {
-      const sDate = new Date(s.joinDate);
+        usersSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          // Only process if user is a student (optional check depending on your auth structure)
+          if (!data.role || data.role === "student") {
+            usersMap[data.email] = {
+              id: doc.id,
+              name: data.displayName || data.name || "Unknown",
+              email: data.email,
+              phone: data.phoneNumber || data.phone || "N/A",
+              location: data.location || "N/A",
+              joinDate: data.createdAt?.toDate
+                ? data.createdAt.toDate()
+                : new Date(),
+              source: "Direct", // Default to Direct
+              partnerName: null,
+              status: data.status || "Active",
+              courses: [],
+              transactions: [],
+              certificates: [],
+              totalSpent: 0,
+            };
+          }
+        });
 
-      if (timeFilter === "Today") {
-        return (
-          sDate.getDate() === now.getDate() &&
-          sDate.getMonth() === now.getMonth() &&
-          sDate.getFullYear() === now.getFullYear()
+        // B. Fetch All Orders to Link Courses & Determine Source
+        const ordersSnap = await getDocs(
+          query(collection(db, "orders"), orderBy("createdAt", "desc"))
         );
-      }
-      if (timeFilter === "Week") {
-        const weekAgo = new Date();
-        weekAgo.setDate(now.getDate() - 7);
-        return sDate >= weekAgo;
-      }
-      if (timeFilter === "Month") {
-        return (
-          sDate.getMonth() === now.getMonth() &&
-          sDate.getFullYear() === now.getFullYear()
-        );
-      }
-      if (timeFilter === "Quarter") {
-        const currentQuarter = Math.floor((now.getMonth() + 3) / 3);
-        const sQuarter = Math.floor((sDate.getMonth() + 3) / 3);
-        return (
-          sQuarter === currentQuarter &&
-          sDate.getFullYear() === now.getFullYear()
-        );
-      }
-      if (timeFilter === "Year") {
-        return sDate.getFullYear() === now.getFullYear();
-      }
-      if (timeFilter === "Custom" && customDates.start && customDates.end) {
-        return (
-          sDate >= new Date(customDates.start) &&
-          sDate <= new Date(customDates.end)
-        );
-      }
-      return true;
-    });
-  }, [students, timeFilter, customDates]);
 
-  // --- 2. SOURCE & SEARCH FILTER ---
+        ordersSnap.docs.forEach((doc) => {
+          const order = doc.data();
+          const email = order.studentEmail;
+
+          // If user exists in map, enrich data. If not (maybe guest checkout?), create entry.
+          if (!usersMap[email]) {
+            usersMap[email] = {
+              id: `GUEST-${doc.id.slice(0, 5)}`,
+              name: order.studentName || "Guest Student",
+              email: email,
+              phone: order.studentPhone || "N/A",
+              location: "N/A",
+              joinDate: order.createdAt?.toDate
+                ? order.createdAt.toDate()
+                : new Date(),
+              source: "Direct",
+              partnerName: null,
+              status: "Active",
+              courses: [],
+              transactions: [],
+              certificates: [],
+              totalSpent: 0,
+            };
+          }
+
+          // 1. Add Transaction
+          usersMap[email].transactions.push({
+            id: doc.id,
+            asset: order.courseTitle || order.productTitle || "Asset",
+            date: order.createdAt?.toDate
+              ? order.createdAt.toDate().toLocaleDateString("en-IN")
+              : "N/A",
+            amount: order.sellingPrice || order.amount,
+          });
+
+          // 2. Add Course to Portfolio (Avoid duplicates)
+          const courseName = order.courseTitle || order.productTitle;
+          if (
+            courseName &&
+            !usersMap[email].courses.some((c) => c.name === courseName)
+          ) {
+            usersMap[email].courses.push({
+              name: courseName,
+              type: order.productType || "Course",
+              // We don't have progress in orders, so default to 0 or derive from another collection if available
+              progress: 0,
+              certificateIssued: false,
+            });
+          }
+
+          // 3. Determine Source (If order has partnerId, they are Partner acquired)
+          if (order.partnerId) {
+            usersMap[email].source = "Partner";
+            usersMap[email].partnerName = order.agencyName || "Unknown Partner"; // Ensure agencyName is saved in orders
+          }
+
+          // 4. Calc Total Spent
+          usersMap[email].totalSpent += Number(
+            order.sellingPrice || order.amount || 0
+          );
+        });
+
+        // Convert Map to Array & Sort by Join Date
+        const processedStudents = Object.values(usersMap).sort(
+          (a, b) => b.joinDate - a.joinDate
+        );
+        setStudents(processedStudents);
+      } catch (error) {
+        console.error("Error fetching student data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // --- 2. EXPORT TO CSV ---
+  const handleExport = () => {
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      "Name,Email,Phone,Source,Join Date,Total Spent,Courses Enrolled\n" +
+      filteredData
+        .map(
+          (s) =>
+            `"${s.name}","${s.email}","${s.phone}","${
+              s.source
+            }","${s.joinDate.toLocaleDateString()}","${s.totalSpent}","${
+              s.courses.length
+            }"`
+        )
+        .join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "student_data.csv");
+    document.body.appendChild(link);
+    link.click();
+  };
+
+  // --- 3. FILTER LOGIC ---
   const filteredData = useMemo(() => {
-    return timeFilteredStudents.filter((s) => {
+    let data = students;
+    const now = new Date();
+
+    // Time Filter
+    if (timeFilter !== "All Time") {
+      data = data.filter((s) => {
+        const sDate = new Date(s.joinDate);
+        if (timeFilter === "Today") {
+          return sDate.toDateString() === now.toDateString();
+        }
+        if (timeFilter === "Week") {
+          const weekAgo = new Date();
+          weekAgo.setDate(now.getDate() - 7);
+          return sDate >= weekAgo;
+        }
+        if (timeFilter === "Month") {
+          return (
+            sDate.getMonth() === now.getMonth() &&
+            sDate.getFullYear() === now.getFullYear()
+          );
+        }
+        if (timeFilter === "Year") {
+          return sDate.getFullYear() === now.getFullYear();
+        }
+        if (timeFilter === "Custom" && customDates.start && customDates.end) {
+          return (
+            sDate >= new Date(customDates.start) &&
+            sDate <= new Date(customDates.end)
+          );
+        }
+        return true;
+      });
+    }
+
+    // Search & Source Filter
+    return data.filter((s) => {
       const matchesSearch =
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -139,8 +220,9 @@ const StudentData = () => {
 
       return matchesSearch && matchesSource;
     });
-  }, [timeFilteredStudents, searchQuery, sourceFilter]);
+  }, [students, timeFilter, customDates, searchQuery, sourceFilter]);
 
+  // --- PAGINATION ---
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const currentItems = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -148,12 +230,26 @@ const StudentData = () => {
   );
 
   // --- MACRO METRICS ---
-  const metrics = {
-    total: timeFilteredStudents.length,
-    active: timeFilteredStudents.filter((s) => s.status === "Active").length,
-    direct: timeFilteredStudents.filter((s) => s.source === "Direct").length,
-    partner: timeFilteredStudents.filter((s) => s.source === "Partner").length,
-  };
+  const metrics = useMemo(
+    () => ({
+      total: filteredData.length,
+      active: filteredData.filter((s) => s.status === "Active").length,
+      direct: filteredData.filter((s) => s.source === "Direct").length,
+      partner: filteredData.filter((s) => s.source === "Partner").length,
+    }),
+    [filteredData]
+  );
+
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+        <Loader2 size={40} className="text-indigo-600 animate-spin mb-4" />
+        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+          Loading Student Universe...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
@@ -200,19 +296,13 @@ const StudentData = () => {
                 onChange={(e) => setTimeFilter(e.target.value)}
                 className="appearance-none bg-transparent text-xs font-black uppercase text-slate-700 outline-none pr-8 cursor-pointer"
               >
-                {[
-                  "All Time",
-                  "Today",
-                  "Week",
-                  "Month",
-                  "Quarter",
-                  "Year",
-                  "Custom",
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                {["All Time", "Today", "Week", "Month", "Year", "Custom"].map(
+                  (t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  )
+                )}
               </select>
               <ChevronDown
                 size={14}
@@ -295,6 +385,7 @@ const StudentData = () => {
               </div>
 
               <button
+                onClick={handleExport}
                 className="flex items-center justify-center size-10 bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-105 transition-all"
                 title="Download Excel Report"
               >
@@ -310,97 +401,107 @@ const StudentData = () => {
                   <th className="px-8 py-5">Identity</th>
                   <th className="px-8 py-5">Acquisition Source</th>
                   <th className="px-8 py-5 text-center">Portfolio</th>
-                  {/* ✨ Progress Column Removed as requested */}
                   <th className="px-8 py-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {currentItems.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                    onClick={() => setSelectedStudent(s)}
-                  >
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="size-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs">
-                          {s.name[0]}
+                {currentItems.length > 0 ? (
+                  currentItems.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="group hover:bg-slate-50/50 transition-all cursor-pointer"
+                      onClick={() => setSelectedStudent(s)}
+                    >
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="size-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs uppercase">
+                            {s.name[0]}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-slate-900">
+                              {s.name}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400">
+                              {s.email}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-black text-slate-900">
-                            {s.name}
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">
-                            {s.id}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      {s.source === "Direct" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase">
-                          <Globe size={10} /> Direct
-                        </span>
-                      ) : (
-                        <div className="flex flex-col">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black uppercase w-fit">
-                            <Users size={10} /> Partner
+                      </td>
+                      <td className="px-8 py-6">
+                        {s.source === "Direct" ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase">
+                            <Globe size={10} /> Direct
                           </span>
-                          <span className="text-[9px] font-bold text-slate-400 mt-1 pl-1">
-                            {s.partnerName}
+                        ) : (
+                          <div className="flex flex-col">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black uppercase w-fit">
+                              <Users size={10} /> Partner
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-400 mt-1 pl-1">
+                              {s.partnerName}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                            {s.courses.length} Courses
                           </span>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                          {s.courses.length} Courses
-                        </span>
-                      </div>
-                    </td>
-                    {/* ✨ Progress Cell Removed */}
-                    <td className="px-8 py-6 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedStudent(s);
-                        }}
-                        className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                      >
-                        View Profile
-                      </button>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedStudent(s);
+                          }}
+                          className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                        >
+                          View Profile
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-8 py-10 text-center">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        No students found matching filters.
+                      </p>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Pagination */}
-          <div className="p-6 border-t border-slate-50 flex justify-between items-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Page {currentPage} of {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50"
-              >
-                <ChevronRight size={16} />
-              </button>
+          {totalPages > 1 && (
+            <div className="p-6 border-t border-slate-50 flex justify-between items-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
