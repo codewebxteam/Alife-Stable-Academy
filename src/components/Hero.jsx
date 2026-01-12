@@ -10,14 +10,9 @@ const Hero = () => {
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  const handleStartLearning = () => {
-    if (currentUser) {
-      // Agar login hai to Store pe bhejo
-      navigate("/ebooks");
-    } else {
-      // Agar login nahi hai to Modal kholo
-      setIsAuthOpen(true);
-    }
+  // [UPDATED] Simplified navigation as requested
+  const handleExploreCourses = () => {
+    navigate("/courses");
   };
 
   return (
@@ -40,7 +35,8 @@ const Hero = () => {
           {/* Badge */}
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0fdff] border border-[#cff9fe] text-[#0891b2] text-[10px] md:text-xs font-bold tracking-widest uppercase shadow-sm">
             <span className="size-2 rounded-full bg-[#5edff4] animate-pulse" />
-            Admissions Open 2025
+            {/* [UPDATED] Text Change */}
+            Skills That Pay You Back
           </span>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight text-slate-900 leading-[1.1]">
@@ -57,17 +53,20 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 mt-2 w-full">
+            {/* [UPDATED] Button 1: Explore Courses */}
             <button
-              onClick={handleStartLearning}
+              onClick={handleExploreCourses}
               className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-[#5edff4] text-slate-900 font-bold text-sm md:text-lg hover:bg-[#22ccEB] transition-all shadow-xl shadow-[#5edff4]/20 hover:shadow-[#5edff4]/40 hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 cursor-pointer"
             >
-              Start Learning <ArrowRight className="size-4 md:size-5" />
+              Explore Courses <ArrowRight className="size-4 md:size-5" />
             </button>
+
+            {/* [UPDATED] Button 2: Explore Ebooks */}
             <button
               onClick={() => navigate("/ebooks")}
               className="px-6 py-3 md:px-8 md:py-4 rounded-full bg-slate-900 text-white font-semibold text-sm md:text-lg hover:bg-slate-800 transition-all shadow-lg hover:-translate-y-0.5 active:scale-95 cursor-pointer"
             >
-              View Library
+              Explore Ebooks
             </button>
           </div>
 

@@ -477,13 +477,13 @@ const CardsSwap = () => {
                   {
                     num: 2,
                     title: "Specialization",
-                    desc: "Master specific tools and frameworks.",
+                    desc: "Master specific AI tools and frameworks.", // [UPDATED]
                     color: "bg-slate-100 text-slate-600",
                   },
                   {
                     num: 3,
                     title: "Career Launch",
-                    desc: "Get placed with expert guidance.",
+                    desc: "Turn Skills Into Career with expert guidance.", // [UPDATED]
                     color: "bg-[#5edff4]/10 text-[#0891b2]",
                   },
                 ].map((item) => (
@@ -523,11 +523,6 @@ const CardsSwap = () => {
                 delay={3500}
                 skewAmount={3}
               >
-                {/* LOGIC: 
-                    If Course 1 exists in DB -> Show it in Card 1. Else -> Show Static.
-                    If Course 2 exists in DB -> Show it in Card 2. Else -> Show Static.
-                    If Course 3 exists in DB -> Show it in Card 3. Else -> Show Static.
-                */}
                 <Card>
                   <FrontendCard data={courses[0]} />
                 </Card>

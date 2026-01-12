@@ -1,38 +1,45 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Minus, MessageCircleQuestion } from "lucide-react";
+import { Link } from "react-router-dom";
 
-// --- FAQ Data ---
+// --- FAQ Data (Updated) ---
 const faqs = [
   {
     id: 1,
-    question: "How long are the courses?",
+    question: "Who is this course for?",
     answer:
-      "Our courses range from 4 weeks for crash courses to 6 months for full bootcamps. All programs are self-paced with weekly live mentorship sessions.",
+      "This course is designed for beginners, students, working professionals, and creators who want to build industry-ready skills from scratch.",
   },
   {
     id: 2,
-    question: "Is there a refund policy?",
+    question: "Do I need any prior experience?",
     answer:
-      "Yes, we offer a 7-day money-back guarantee. If you are not satisfied with the trial week, you can claim a full refund, no questions asked.",
+      "No prior experience is required. The course starts from the basics and gradually moves to advanced, practical concepts.",
   },
   {
     id: 3,
-    question: "Do you provide placement assistance?",
+    question: "How will I access the course after enrollment?",
     answer:
-      "Absolutely! Our 'Job Guarantee' and 'Career Track' programs come with dedicated placement support, resume reviews, and direct referrals to our hiring partners.",
+      "You’ll get instant access to all course content after successful payment. Learn anytime, at your own pace.",
   },
   {
     id: 4,
-    question: "Do I need prior coding experience?",
+    question: "Is this course online or offline?",
     answer:
-      "For our beginner tracks, no prior experience is needed. We start from scratch. For advanced specializations, a basic understanding of programming is recommended.",
+      "This is a 100% online course, accessible from anywhere using a mobile, tablet, or computer.",
   },
   {
     id: 5,
-    question: "Can I access the course on mobile?",
+    question: "Will I get a certificate after completing the course?",
     answer:
-      "Yes! Our platform is fully responsive. You can watch lectures and track your progress from any device, anytime.",
+      "Yes, you’ll receive a certificate of completion after finishing the course.",
+  },
+  {
+    id: 6,
+    question: "Will I get support if I face issues?",
+    answer:
+      "Yes. You’ll have access to WhatsApp & Email support and guidance from our team.",
   },
 ];
 
@@ -41,7 +48,6 @@ const FAQSection = () => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   return (
-    // Updated: bg-gradient-to-b -> bg-linear-to-b
     <section className="w-full relative bg-linear-to-b from-[#f0fdff] to-white py-20 px-4 font-sans overflow-hidden">
       {/* Background Decoration */}
       <div className="absolute top-0 left-0 size-full overflow-hidden pointer-events-none">
@@ -79,7 +85,6 @@ const FAQSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
-              // Updated: rounded-[1.5rem] -> rounded-3xl
               className={`group border rounded-3xl overflow-hidden transition-all duration-300
                 ${
                   activeIndex === index
@@ -159,9 +164,11 @@ const FAQSection = () => {
                 Can't find the answer you're looking for? Chat to our friendly
                 team.
               </p>
-              <button className="px-8 py-3.5 rounded-full bg-[#5edff4] text-slate-900 font-bold text-sm hover:bg-white transition-all shadow-lg shadow-[#5edff4]/20 hover:shadow-white/20 active:scale-95 cursor-pointer">
-                Get in Touch
-              </button>
+              <Link to="/contact">
+                <button className="px-8 py-3.5 rounded-full bg-[#5edff4] text-slate-900 font-bold text-sm hover:bg-white transition-all shadow-lg shadow-[#5edff4]/20 hover:shadow-white/20 active:scale-95 cursor-pointer">
+                  Get in Touch
+                </button>
+              </Link>
             </div>
           </div>
         </div>

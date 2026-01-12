@@ -8,11 +8,35 @@ import {
   ArrowRight,
   CheckCircle2,
   Globe,
-  HelpCircle,
-  CreditCard,
-  FileText,
-  Smartphone,
 } from "lucide-react";
+
+// --- FAQ Data (Same as Home Page) ---
+const faqs = [
+  {
+    q: "Who is this course for?",
+    a: "This course is designed for beginners, students, working professionals, and creators who want to build industry-ready skills from scratch.",
+  },
+  {
+    q: "Do I need any prior experience?",
+    a: "No prior experience is required. The course starts from the basics and gradually moves to advanced, practical concepts.",
+  },
+  {
+    q: "How will I access the course after enrollment?",
+    a: "You’ll get instant access to all course content after successful payment. Learn anytime, at your own pace.",
+  },
+  {
+    q: "Is this course online or offline?",
+    a: "This is a 100% online course, accessible from anywhere using a mobile, tablet, or computer.",
+  },
+  {
+    q: "Will I get a certificate after completing the course?",
+    a: "Yes, you’ll receive a certificate of completion after finishing the course.",
+  },
+  {
+    q: "Will I get support if I face issues?",
+    a: "Yes. You’ll have access to WhatsApp & Email support and guidance from our team.",
+  },
+];
 
 const ContactUs = () => {
   const [formState, setFormState] = useState("idle"); // idle, submitting, success
@@ -39,10 +63,7 @@ const ContactUs = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0fdff] border border-[#cff9fe] text-[#0891b2] text-[10px] md:text-xs font-bold tracking-widest uppercase shadow-sm mb-6">
-              <span className="size-2 rounded-full bg-[#5edff4] animate-pulse" />
-              24/7 Support
-            </div>
+            {/* [REMOVED] 24/7 Support Badge */}
 
             <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6">
               Let's Start a <br />
@@ -51,9 +72,9 @@ const ContactUs = () => {
               </span>
             </h1>
 
+            {/* [UPDATED] Sub-headline */}
             <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Have a question about a course? Want to partner with us? Or just
-              want to say hi? We are here to help you grow.
+              Questions or just want to say hi? We’re here to help you grow.
             </p>
           </motion.div>
         </div>
@@ -82,6 +103,7 @@ const ContactUs = () => {
                 </p>
 
                 <div className="space-y-8">
+                  {/* [UPDATED] Contact Details */}
                   <ContactItem
                     icon={Mail}
                     title="Email Us"
@@ -91,13 +113,13 @@ const ContactUs = () => {
                   <ContactItem
                     icon={Phone}
                     title="Call Us"
-                    value="+91 98765 43210"
-                    link="tel:+919876543210"
+                    value="+91 80840 37252"
+                    link="tel:+918084037252"
                   />
                   <ContactItem
                     icon={MapPin}
                     title="Visit HQ"
-                    value="Tech Park, Bangalore, India"
+                    value="Near Metro Station, Nirman Vihar, East Delhi 110092"
                   />
                 </div>
               </div>
@@ -230,7 +252,7 @@ const ContactUs = () => {
         </div>
 
         {/* =========================================
-            3. FREQUENTLY ASKED QUESTIONS (Expanded)
+            3. FREQUENTLY ASKED QUESTIONS (Matched Home Page)
         ========================================= */}
         <div className="bg-white border-t border-slate-200 py-20 md:py-32">
           <div className="max-w-4xl mx-auto px-6">
@@ -244,61 +266,10 @@ const ContactUs = () => {
               </p>
             </div>
 
-            <div className="grid gap-6">
-              <div className="bg-slate-50 p-6 rounded-2xl">
-                <h3 className="text-sm font-bold text-[#0891b2] uppercase tracking-wider mb-4">
-                  📚 Courses & Access
-                </h3>
-                <div className="space-y-3">
-                  <FAQItem
-                    q="Do I get lifetime access to the courses?"
-                    a="Yes! Once you purchase a course, it is yours forever. You can revisit the content, updates, and community discussions anytime."
-                  />
-                  <FAQItem
-                    q="Are the courses suitable for beginners?"
-                    a="Most of our courses are designed to take you from zero to hero. Look for the 'Beginner' tag on the course card."
-                  />
-                  <FAQItem
-                    q="Can I download videos for offline viewing?"
-                    a="Currently, video content is stream-only to protect intellectual property, but our E-books are downloadable within the secure reader."
-                  />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-2xl">
-                <h3 className="text-sm font-bold text-[#0891b2] uppercase tracking-wider mb-4">
-                  💳 Payments & Refunds
-                </h3>
-                <div className="space-y-3">
-                  <FAQItem
-                    q="What payment methods do you accept?"
-                    a="We accept all major Credit/Debit Cards, UPI, Net Banking, and Wallet payments through our secure gateway."
-                    icon={CreditCard}
-                  />
-                  <FAQItem
-                    q="What is your refund policy?"
-                    a="We offer a 7-day money-back guarantee. If you are not satisfied with the content, email us within 7 days for a full refund."
-                  />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-2xl">
-                <h3 className="text-sm font-bold text-[#0891b2] uppercase tracking-wider mb-4">
-                  🎓 Certification & Support
-                </h3>
-                <div className="space-y-3">
-                  <FAQItem
-                    q="Do you provide certificates?"
-                    a="Yes, upon completing 100% of a course and the final project, you will receive a verifiable digital certificate."
-                    icon={FileText}
-                  />
-                  <FAQItem
-                    q="How does technical support work?"
-                    a="Each course has a dedicated Q&A section where instructors and community members answer queries within 24 hours."
-                    icon={HelpCircle}
-                  />
-                </div>
-              </div>
+            <div className="grid gap-4">
+              {faqs.map((faq, index) => (
+                <FAQItem key={index} q={faq.q} a={faq.a} />
+              ))}
             </div>
           </div>
         </div>

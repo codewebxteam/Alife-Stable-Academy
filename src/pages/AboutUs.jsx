@@ -9,6 +9,11 @@ import {
   ArrowRight,
   Heart,
   Target,
+  Briefcase,
+  Layers,
+  Cpu,
+  User,
+  Lightbulb,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -41,11 +46,13 @@ const AboutUs = () => {
                 </span>
               </h1>
 
+              {/* [UPDATED] Intro Text */}
               <p className="text-lg text-slate-600 leading-relaxed mb-8 max-w-xl">
-                Alife Stable Academy wasn't built in a boardroom. It started
-                with a simple idea: **Education should be accessible, practical,
-                and life-changing.** We bridge the gap between theoretical
-                knowledge and industry demands.
+                Alife Stable Academy wasn’t built in a boardroom. It started
+                with a simple vision: education should be accessible, practical,
+                and future-ready. We empower learners with AI-driven tools,
+                hands-on projects, and industry-aligned skills to bridge the gap
+                between knowledge and real-world careers.
               </p>
 
               <div className="flex flex-wrap gap-4">
@@ -57,8 +64,9 @@ const AboutUs = () => {
                     <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">
                       Mission
                     </p>
+                    {/* [UPDATED] Mission Statement */}
                     <p className="font-bold text-slate-900">
-                      Empower 1M+ Developers
+                      Empower 1M+ Creators
                     </p>
                   </div>
                 </div>
@@ -79,7 +87,7 @@ const AboutUs = () => {
               </div>
             </motion.div>
 
-            {/* Right: Image Collage (Abstract Representation) */}
+            {/* Right: Image Collage */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
@@ -110,14 +118,12 @@ const AboutUs = () => {
                     alt="Meeting"
                     className="w-full h-64 object-cover rounded-2xl shadow-xl"
                   />
-                  <div className="w-full h-48 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center text-center p-4">
-                    <span className="text-5xl font-bold text-[#5edff4] mb-2">
-                      15+
-                    </span>
-                    <span className="text-white text-sm font-medium">
-                      Years of Excellence
-                    </span>
-                  </div>
+                  {/* [UPDATED] Removed "15+ Years" block as requested */}
+                  <img
+                    src="https://images.unsplash.com/photo-1606761568499-6d2451b23c66?q=80&w=400&auto=format&fit=crop"
+                    alt="Creative Workspace"
+                    className="w-full h-48 object-cover rounded-2xl shadow-xl"
+                  />
                 </div>
               </div>
             </motion.div>
@@ -125,20 +131,21 @@ const AboutUs = () => {
         </div>
 
         {/* =========================================
-            2. STATS SECTION (Bento Style)
+            2. CORE VALUES SECTION (Replaces Stats)
         ========================================= */}
         <div className="bg-slate-900 py-20 text-white relative overflow-hidden">
           {/* Background Grid */}
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
           <div className="max-w-7xl mx-auto px-6 relative z-10">
+            {/* [UPDATED] Replaced numbers with Core Value Identifiers */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 text-center">
               {[
-                { label: "Active Students", value: "12,000+", icon: Users },
-                { label: "Courses Published", value: "350+", icon: Globe },
-                { label: "Instructor Partners", value: "150+", icon: Zap },
-                { label: "Global Awards", value: "24", icon: Award },
-              ].map((stat, i) => (
+                { label: "Industry-Aligned", icon: Briefcase },
+                { label: "Project-Based", icon: Layers },
+                { label: "Future-Ready Skills", icon: Cpu },
+                { label: "Creator-First", icon: User },
+              ].map((item, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
@@ -147,15 +154,13 @@ const AboutUs = () => {
                   transition={{ delay: i * 0.1 }}
                   className="flex flex-col items-center group"
                 >
-                  <div className="size-12 mb-4 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-[#5edff4] group-hover:text-slate-900 transition-colors duration-300">
-                    <stat.icon className="size-6" />
+                  <div className="size-14 mb-5 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-[#5edff4] group-hover:text-slate-900 transition-colors duration-300 border border-slate-700">
+                    <item.icon className="size-7" />
                   </div>
-                  <h3 className="text-3xl md:text-4xl font-bold mb-2">
-                    {stat.value}
+                  {/* Used h3 for the main label to make it prominent like the stats were */}
+                  <h3 className="text-xl md:text-2xl font-bold mb-2 leading-tight">
+                    {item.label}
                   </h3>
-                  <p className="text-slate-400 text-sm uppercase tracking-widest">
-                    {stat.label}
-                  </p>
                 </motion.div>
               ))}
             </div>
@@ -180,17 +185,20 @@ const AboutUs = () => {
             {[
               {
                 title: "Curated Content",
-                desc: "We manually verify every course. No outdated tutorials. Only industry-standard, high-quality lessons.",
+                // [UPDATED]
+                desc: "We manually verify every course. No outdated tutorials. Only industry-standard, high-quality AI-Powered lessons.",
                 color: "bg-blue-50 text-blue-600",
               },
               {
                 title: "Community Driven",
-                desc: "Join a Discord server of 10k+ developers. Get code reviews, pair programming partners, and job referrals.",
+                // [UPDATED]
+                desc: "We foster a supportive learning community where creators grow, collaborate, and learn together.",
                 color: "bg-[#f0fdff] text-[#0891b2]",
               },
               {
                 title: "Affordable Pricing",
-                desc: "Premium education shouldn't break the bank. We partner directly with creators to offer the best regional pricing.",
+                // [UPDATED]
+                desc: "High-quality education should be accessible. We work directly with creators to offer fair, region-appropriate pricing without compromising on quality.",
                 color: "bg-purple-50 text-purple-600",
               },
             ].map((card, i) => (
@@ -217,56 +225,50 @@ const AboutUs = () => {
         </div>
 
         {/* =========================================
-            4. FOUNDER'S NOTE SECTION
+            4. LEARNING PHILOSOPHY (Replaces Founder's Note)
         ========================================= */}
         <div className="bg-[#f0fdff] py-20 md:py-32 border-y border-[#cff9fe]">
           <div className="max-w-5xl mx-auto px-6">
             <div className="flex flex-col md:flex-row items-center gap-12">
-              {/* Avatar */}
+              {/* Image: Abstract / Learning Focus */}
               <div className="relative shrink-0">
                 <div className="size-48 md:size-64 rounded-full overflow-hidden border-4 border-white shadow-2xl">
+                  {/* [UPDATED] Replaced founder image with abstract learning image */}
                   <img
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop"
-                    alt="Founder"
+                    src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?q=80&w=400&auto=format&fit=crop"
+                    alt="Philosophy"
                     className="size-full object-cover"
                   />
                 </div>
-                <div className="absolute bottom-4 right-4 bg-white p-2 rounded-lg shadow-lg">
-                  <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png"
-                    className="size-6"
-                    alt="LinkedIn"
-                  />
+                <div className="absolute bottom-4 right-4 bg-white p-3 rounded-xl shadow-lg">
+                  <Lightbulb className="size-6 text-[#5edff4]" />
                 </div>
               </div>
 
               {/* Text */}
               <div className="text-center md:text-left">
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                  A Note from the Founder
+                {/* [UPDATED] New Heading */}
+                <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mb-6">
+                  Our Learning Philosophy
                 </h3>
-                <p className="text-[#0891b2] font-bold mb-6">
-                  Alex Sterling, CEO
-                </p>
+
                 <div className="relative">
-                  <span className="absolute -top-4 -left-4 text-6xl text-[#5edff4] opacity-50 font-serif">
+                  {/* Kept the quote style for aesthetic but used it for the philosophy text */}
+                  <span className="absolute -top-4 -left-4 text-6xl text-[#5edff4] opacity-50 font-serif hidden md:block">
                     "
                   </span>
-                  <p className="text-lg md:text-xl text-slate-700 leading-relaxed italic relative z-10">
-                    When I started coding 15 years ago, resources were scattered
-                    and expensive. I built Alife Stable Academy to be the
-                    platform I wish I had. A place where quality meets
-                    affordability, and where "Self-Taught" doesn't mean "Alone".
-                    Welcome to the family.
+                  {/* [UPDATED] New Text Content */}
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10">
+                    At Alife Stable Academy, we believe learning should be
+                    practical, accessible, and future-ready. Our philosophy is
+                    built around hands-on, project-based education that reflects
+                    real industry workflows. By combining structured learning
+                    paths, modern tools, and AI-driven approaches, we help
+                    learners move beyond theory and build skills that are
+                    relevant, applicable, and career-focused. Every course is
+                    designed to support creators at every stage—guiding them
+                    from foundational concepts to industry-ready confidence.
                   </p>
-                </div>
-
-                <div className="mt-8">
-                  <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Signature_sample.svg"
-                    alt="Signature"
-                    className="h-12 opacity-60 mx-auto md:mx-0"
-                  />
                 </div>
               </div>
             </div>
@@ -289,9 +291,10 @@ const AboutUs = () => {
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 relative z-10">
               Ready to start your journey?
             </h2>
+            {/* [UPDATED] CTA Subtext */}
             <p className="text-slate-400 max-w-2xl mx-auto mb-10 text-lg relative z-10">
-              Join 12,000+ students transforming their careers today. Get
-              unlimited access to our premium library.
+              Transform your career today. Get unlimited access to our premium
+              library.
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 relative z-10">

@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, ArrowRight, MapPin, Rocket } from "lucide-react";
-import { Link } from "react-router-dom"; // [ADDED] Link for navigation
+import { Link } from "react-router-dom";
 
-// --- Step Data (Static is fine for Roadmap) ---
+// --- Step Data ---
 const steps = [
   {
     id: 1,
-    title: "Apply & Enroll",
-    description:
-      "Submit your application, browse our courses, and secure your seat in the batch.",
+    title: "Login & Enroll", // [UPDATED]
+    description: "Login, browse our course, and secure your seat now.", // [UPDATED]
     image:
       "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1000&auto=format&fit=crop",
     stat: "Step 1",
@@ -18,27 +17,27 @@ const steps = [
     id: 2,
     title: "Learn & Build",
     description:
-      "Attend live classes, solve coding challenges, and build real-world projects.",
+      "Attend live classes, solve challenges, and build real-world projects.", // [UPDATED] Removed "coding"
     image:
-      "https://images.unsplash.com/photo-1587620962725-abab7fe55159?q=80&w=1000&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44c?q=80&w=1000&auto=format&fit=crop", // [UPDATED] Changed to Video Editing/Creative image
     stat: "Step 2",
   },
   {
     id: 3,
     title: "Capstone Project",
     description:
-      "Develop a full-stack application to showcase in your portfolio.",
+      "Learn by building real-world capstone projects that showcase your skills.", // [UPDATED]
     image:
       "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
     stat: "Step 3",
   },
   {
     id: 4,
-    title: "Get Hired",
+    title: "Start Your Career", // [UPDATED]
     description:
-      "Mock interviews, resume building, and direct referrals to top tech companies.",
+      "Start your career as a professional Creator.", // [UPDATED]
     image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1533750516457-a7f992034fec?q=80&w=1000&auto=format&fit=crop", // [UPDATED] Changed to Creator/Camera image
     stat: "Goal",
   },
 ];
@@ -80,8 +79,10 @@ const RoadmapSection = () => {
                 Your Roadmap to <span className="text-[#0891b2]">Success</span>.
               </h2>
               <p className="mt-4 text-base md:text-lg text-slate-600 leading-relaxed">
-                A structured path designed to take you from beginner to
-                industry-ready professional.
+                {/* [UPDATED] New description text */}
+                A carefully designed learning ecosystem covering AI filmmaking,
+                2D, 3D, and video editing—built to transform beginners into
+                industry-ready creative professionals.
               </p>
             </motion.div>
 
@@ -227,7 +228,7 @@ const RoadmapSection = () => {
           </div>
         </div>
 
-        {/* --- [NEW] Call to Action Button --- */}
+        {/* --- Call to Action Button --- */}
         <div className="mt-12 flex justify-center">
           <Link to="/courses">
             <button className="px-8 py-4 rounded-full bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-95 flex items-center gap-3 cursor-pointer">

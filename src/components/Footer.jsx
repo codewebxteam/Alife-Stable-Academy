@@ -1,5 +1,5 @@
- import React from "react";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Twitter,
   Linkedin,
@@ -7,38 +7,185 @@ import {
   Github,
   Send,
   Heart,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck, // Admin icon ke liye
+  ShieldCheck,
+  X, // Added for Modal Close
 } from "lucide-react";
+
+// --- POLICY CONTENT DATA ---
+const POLICY_CONTENT = {
+  privacy: {
+    title: "Privacy Policy",
+    content: (
+      <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
+        <section>
+          <h4 className="text-white font-bold mb-2">Information Collection</h4>
+          <p>
+            We collect personal information such as name, email, phone number,
+            and payment details for the purpose of course enrollment and
+            support.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">How We Use Information</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>To provide and manage access to courses.</li>
+            <li>To communicate course updates and announcements.</li>
+            <li>To process payments securely via Razorpay.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Information Sharing</h4>
+          <p className="mb-2">
+            We do not sell or share your personal information with third
+            parties, except:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>To comply with legal requirements.</li>
+            <li>
+              To process payments via Razorpay or other authorized payment
+              processors.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Cookies & Analytics</h4>
+          <p>
+            We may use cookies and analytics tools to improve website experience
+            and track course progress.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Data Security</h4>
+          <p>
+            We implement reasonable security measures to protect your personal
+            information from unauthorized access.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Your Rights</h4>
+          <p>
+            You may request access, correction, or deletion of your personal
+            data by contacting us at{" "}
+            <a
+              href="mailto:support@alifestable.com"
+              className="text-[#5edff4] hover:underline"
+            >
+              support@alifestable.com
+            </a>{" "}
+            or WhatsApp us at{" "}
+            <a
+              href="https://wa.me/918084037252"
+              className="text-[#5edff4] hover:underline"
+            >
+              8084037252
+            </a>
+            .
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Policy Updates</h4>
+          <p>
+            We may update this privacy policy from time to time. Updates will be
+            posted on this page.
+          </p>
+        </section>
+      </div>
+    ),
+  },
+  refund: {
+    title: "Refund Policy",
+    content: (
+      <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
+        <section>
+          <h4 className="text-white font-bold mb-2">
+            Digital Product Disclaimer
+          </h4>
+          <p>
+            All courses sold on Alife Stable Academy are digital products with
+            instant access after purchase. By completing a purchase, you
+            acknowledge that the product is digital and cannot be returned once
+            delivered.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">
+            No Refunds on Completed Access
+          </h4>
+          <p>
+            Due to the nature of online courses, we do not offer refunds once
+            the course content is accessed. This is standard practice for
+            digital products.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Exceptions / Support</h4>
+          <p>
+            We value our learners. If you experience technical issues preventing
+            access to course content, please contact us at{" "}
+            <a
+              href="mailto:support@alifestable.com"
+              className="text-[#5edff4] hover:underline"
+            >
+              support@alifestable.com
+            </a>{" "}
+            or WhatsApp us at{" "}
+            <a
+              href="https://wa.me/918084037252"
+              className="text-[#5edff4] hover:underline"
+            >
+              8084037252
+            </a>
+            . We will make all reasonable efforts to resolve access issues
+            promptly.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">
+            Cancellation Before Payment Completion
+          </h4>
+          <p>
+            If a payment fails or is canceled before full access is granted, no
+            charges will be processed.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="text-white font-bold mb-2">Disputes</h4>
+          <p>
+            All refund or payment disputes will be handled in accordance with
+            Razorpay’s terms and applicable laws.
+          </p>
+        </section>
+      </div>
+    ),
+  },
+};
 
 const footerLinks = {
   Academy: [
-    { name: "All Courses", href: "/courses" },
-    { name: "Live Bootcamps", href: "/bootcamps" },
-    { name: "Success Stories", href: "/stories" },
-    { name: "Scholarships", href: "/scholarships" },
+    { name: "Courses", href: "/courses" },
+    { name: "Ebooks", href: "/ebooks" },
   ],
   Company: [
     { name: "About Us", href: "/about" },
-    { name: "Careers", href: "/careers" },
-    { name: "Become a Mentor", href: "/teach" },
-    // ✨ NEW LINK: isPartner flag ke sath
     { name: "Register as a Partner", href: "#", isPartner: true },
   ],
   Resources: [
+    { name: "Capstone Projects", href: "/projects" },
     { name: "Blog", href: "/blog" },
-    { name: "Community", href: "/community" },
-    { name: "Cheatsheets", href: "/resources" },
-    { name: "Help Center", href: "/help" },
   ],
   Legal: [
-    { name: "Terms of Use", href: "/terms" },
-    { name: "Privacy Policy", href: "/privacy" },
-    { name: "Refund Policy", href: "/refund" },
-    // ✨ NEW LINK: Admin Dashboard Navigation
-    { name: "Admin Console", href: "/admin", isAdmin: true },
+    { name: "Privacy Policy", href: "#", type: "privacy" }, // Trigger Privacy Modal
+    { name: "Refund Policy", href: "#", type: "refund" }, // Trigger Refund Modal
   ],
 };
 
@@ -49,7 +196,7 @@ const SocialIcon = ({ Icon, href }) => (
       scale: 1.1,
       y: -3,
       backgroundColor: "#5edff4",
-      color: "#0f172a", // slate-900
+      color: "#0f172a",
       borderColor: "#5edff4",
     }}
     whileTap={{ scale: 0.9 }}
@@ -60,6 +207,8 @@ const SocialIcon = ({ Icon, href }) => (
 );
 
 const Footer = () => {
+  const [activePolicy, setActivePolicy] = useState(null); // 'privacy' | 'refund' | null
+
   return (
     <footer className="relative bg-slate-950 pt-24 pb-12 overflow-hidden font-sans border-t border-slate-900">
       {/* --- Background Effects --- */}
@@ -84,12 +233,11 @@ const Footer = () => {
               </span>
             </div>
             <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4 leading-tight">
-              Start your journey <br /> to{" "}
-              <span className="text-[#5edff4]">financial freedom</span>.
+              Start your journey <br /> toward{" "}
+              <span className="text-[#5edff4]">career-ready skills</span>.
             </h3>
             <p className="text-slate-400 text-base md:text-lg max-w-md">
-              Join 25,000+ students mastering the skills of tomorrow. No credit
-              card required for the demo.
+              Start learning future-focused skills with our growing community.
             </p>
           </motion.div>
 
@@ -143,17 +291,22 @@ const Footer = () => {
                     <a
                       href={link.href}
                       onClick={(e) => {
+                        // Handle Partner Modal
                         if (link.isPartner) {
                           e.preventDefault();
-                          // Signal to Navbar to open Partner Modal
                           window.dispatchEvent(
                             new CustomEvent("openPartnerModal")
                           );
                         }
+                        // Handle Policy Modals
+                        if (link.type) {
+                          e.preventDefault();
+                          setActivePolicy(link.type);
+                        }
                       }}
                       className={`group flex items-center gap-2 transition-colors text-sm font-medium ${
-                        link.isPartner || link.isAdmin
-                          ? "text-[#5edff4] hover:text-white font-bold"
+                        link.isPartner || link.isAdmin || link.type
+                          ? "text-[#5edff4] hover:text-white font-bold cursor-pointer"
                           : "text-slate-400 hover:text-[#5edff4]"
                       }`}
                     >
@@ -173,7 +326,7 @@ const Footer = () => {
         {/* --- Bottom Section: Copyright & Socials --- */}
         <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-slate-800/50 gap-6">
           <div className="flex items-center gap-2 text-slate-500 text-sm">
-            <span>© 2025 Alifestable Academy. All rights reserved.</span>
+            <span>© 2025 Alife Stable Academy. All rights reserved.</span>
           </div>
 
           <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -192,7 +345,6 @@ const Footer = () => {
             <SocialIcon Icon={Twitter} href="#" />
             <SocialIcon Icon={Linkedin} href="#" />
             <SocialIcon Icon={Instagram} href="#" />
-            <SocialIcon Icon={Github} href="#" />
           </div>
         </div>
       </div>
@@ -208,6 +360,58 @@ const Footer = () => {
           ALIFESTABLE
         </motion.h1>
       </div>
+
+      {/* --- POLICY MODAL --- */}
+      <AnimatePresence>
+        {activePolicy && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActivePolicy(null)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl z-10">
+                <h3 className="text-xl font-bold text-white">
+                  {POLICY_CONTENT[activePolicy].title}
+                </h3>
+                <button
+                  onClick={() => setActivePolicy(null)}
+                  className="size-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:bg-[#5edff4] hover:text-slate-900 transition-colors"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              {/* Modal Body (Scrollable) */}
+              <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                {POLICY_CONTENT[activePolicy].content}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-slate-800 bg-slate-900/50 backdrop-blur-xl text-center">
+                <button
+                  onClick={() => setActivePolicy(null)}
+                  className="px-6 py-2.5 rounded-xl bg-slate-800 text-white font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  Close Policy
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </footer>
   );
 };
