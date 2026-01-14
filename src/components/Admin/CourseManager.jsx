@@ -10,16 +10,14 @@ import {
   ArrowLeft,
   DollarSign,
   Rocket,
-  ChevronUp,
-  ChevronDown,
   Layout,
   BookOpen,
   Youtube,
   Link as LinkIcon,
-  FileText,
-  AlignLeft,
   List,
-  Menu,
+  PlayCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,18 +37,22 @@ const CourseManager = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+
   const initialFormState = {
     title: "",
     description: "",
     syllabus: "",
     price: 299,
     discountPrice: 999,
-    youtubeUrl: "",
-    youtubeId: "",
+    lectures: [],
     driveLink: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [tempVideoUrl, setTempVideoUrl] = useState("");
 
   useEffect(() => {
     fetchCourses();
@@ -63,71 +65,126 @@ const CourseManager = () => {
         id: doc.id,
         ...doc.data(),
       }));
+      // Sort by newest first
+      courseList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setCourses(courseList);
     } catch (error) {
       console.error("Error fetching courses:", error);
     }
   };
 
+  // Pagination Logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCourses = courses.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(courses.length / itemsPerPage);
+
   const extractVideoId = (url) => {
-    const regExp =
-      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
+    if (!url) return null;
+    let videoId = null;
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname.includes("youtube.com")) {
+        videoId = urlObj.searchParams.get("v");
+      } else if (urlObj.hostname.includes("youtu.be")) {
+        videoId = urlObj.pathname.slice(1);
+      }
+    } catch (e) {}
+    return videoId;
   };
 
   const handleLaunchNew = () => {
     setEditingId(null);
     setFormData(initialFormState);
+    setTempVideoUrl("");
     setCurrentStep(1);
     setShowModal(true);
   };
 
   const handleEdit = (course) => {
     setEditingId(course.id);
+
+    // Convert old single video data to new list format if needed
+    let existingLectures = course.lectures || [];
+    if (existingLectures.length === 0 && course.videoId) {
+      existingLectures = [
+        {
+          id: Date.now(),
+          url: course.url || "",
+          videoId: course.videoId,
+          title: "Lecture 1",
+        },
+      ];
+    }
+
     setFormData({
       title: course.title || "",
       description: course.description || "",
       syllabus: course.syllabus || "",
       price: course.price || 299,
       discountPrice: course.originalPrice || 999,
-      youtubeUrl: course.url || "",
-      youtubeId: course.videoId || "",
+      lectures: existingLectures,
       driveLink: course.driveLink || "",
     });
+    setTempVideoUrl("");
     setCurrentStep(1);
     setShowModal(true);
   };
 
-  const handleFinalSubmit = async () => {
-    if (!formData.title || !formData.youtubeUrl || !formData.price) {
-      alert("⚠️ Title, YouTube URL and Pricing are required!");
-      return;
-    }
+  const addVideo = () => {
+    const vidId = extractVideoId(tempVideoUrl);
+    if (!vidId) return alert("Invalid Link");
+    const newItem = {
+      id: Date.now(),
+      videoId: vidId,
+      url: tempVideoUrl,
+      title: `Lecture ${formData.lectures.length + 1}`,
+    };
+    setFormData({ ...formData, lectures: [...formData.lectures, newItem] });
+    setTempVideoUrl("");
+  };
 
-    const videoId = extractVideoId(formData.youtubeUrl);
-    if (!videoId) {
-      alert("Invalid YouTube URL");
+  const removeVideo = (id) => {
+    setFormData({
+      ...formData,
+      lectures: formData.lectures.filter((l) => l.id !== id),
+    });
+  };
+
+  const handleFinalSubmit = async () => {
+    if (!formData.title || formData.lectures.length === 0 || !formData.price) {
+      alert("⚠️ Title, Price and at least one Video are required!");
       return;
     }
 
     setLoading(true);
     try {
+      // [FIX] THUMBNAIL LOGIC: Always take from the 1st lecture
+      const firstVid = formData.lectures[0];
+      const thumbUrl = `https://img.youtube.com/vi/${firstVid.videoId}/maxresdefault.jpg`;
+
       const courseData = {
         title: formData.title,
         description: formData.description,
         syllabus: formData.syllabus,
-        url: formData.youtubeUrl,
-        videoId: videoId,
+        lectures: formData.lectures,
+
+        // Ensure backward compatibility
+        url: firstVid.url,
+        videoId: firstVid.videoId,
+
         driveLink: formData.driveLink,
         price: formData.price.toString(),
         originalPrice: formData.discountPrice.toString(),
         updatedAt: new Date().toISOString(),
-        image: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        instructor: "Experienced Mentor",
+
+        // [FIX] Explicitly saving image
+        image: thumbUrl,
+
+        instructor: "Admin",
         rating: 4.8,
-        lectures: "1 Module",
-        duration: "Flexible",
+        lecturesCount: `${formData.lectures.length} Lectures`,
+        duration: "Self Paced",
       };
 
       if (editingId) {
@@ -149,12 +206,20 @@ const CourseManager = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this module?")) return;
+    if (
+      !window.confirm("Are you sure? This will delete the course permanently.")
+    )
+      return;
     try {
       await deleteDoc(doc(db, "courseVideos", id));
+      // Refresh list immediately
+      const newCourses = courses.filter((course) => course.id !== id);
+      setCourses(newCourses);
+      // Optional: Refetch to be 100% sure
       fetchCourses();
     } catch (error) {
       console.error("Error deleting course:", error);
+      alert("Error deleting course. Check console.");
     }
   };
 
@@ -167,7 +232,7 @@ const CourseManager = () => {
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col lg:flex-row gap-6">
-      {/* 1. MOBILE HEADER (Only visible on small screens) */}
+      {/* 1. MOBILE HEADER */}
       <div className="lg:hidden flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-3">
           <div className="size-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
@@ -190,7 +255,7 @@ const CourseManager = () => {
         </button>
       </div>
 
-      {/* 2. DESKTOP SIDEBAR (Hidden on mobile) */}
+      {/* 2. DESKTOP SIDEBAR */}
       <div className="hidden lg:flex w-[350px] flex-col">
         <div className="bg-slate-950 p-8 rounded-[40px] text-white flex flex-col justify-between shadow-2xl relative overflow-hidden h-[500px] sticky top-0">
           <div className="absolute top-0 right-0 size-64 bg-indigo-500/20 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
@@ -223,9 +288,10 @@ const CourseManager = () => {
           <Layout size={16} className="text-slate-300" />
         </div>
 
+        {/* LIST GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
           <AnimatePresence mode="popLayout">
-            {courses.map((course) => (
+            {currentCourses.map((course) => (
               <motion.div
                 layout
                 key={course.id}
@@ -236,19 +302,24 @@ const CourseManager = () => {
               >
                 <div className="flex gap-4">
                   <div className="w-24 h-24 sm:w-28 sm:h-28 bg-slate-100 rounded-2xl overflow-hidden shrink-0 relative">
-                    {course.videoId ? (
+                    {/* [FIX] Displaying Thumbnail properly */}
+                    {course.image ? (
                       <img
-                        src={`https://img.youtube.com/vi/${course.videoId}/default.jpg`}
+                        src={course.image}
                         alt="Thumbnail"
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src =
+                            "https://img.youtube.com/vi/default/maxresdefault.jpg";
+                        }}
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-slate-300">
-                        <BookOpen size={24} />
+                      <div className="flex items-center justify-center h-full text-slate-300 bg-slate-200">
+                        <List size={24} />
                       </div>
                     )}
                     <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                      Video
+                      {course.lectures ? course.lectures.length : 1} Videos
                     </div>
                   </div>
 
@@ -292,23 +363,40 @@ const CourseManager = () => {
           </AnimatePresence>
         </div>
 
+        {/* [NEW] Pagination Controls */}
+        {courses.length > itemsPerPage && (
+          <div className="flex justify-center items-center gap-4 mt-8 pb-8">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 bg-white border border-slate-200 rounded-xl disabled:opacity-50 hover:bg-slate-50"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-sm font-bold text-slate-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 bg-white border border-slate-200 rounded-xl disabled:opacity-50 hover:bg-slate-50"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
         {courses.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <div className="size-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
               <BookOpen size={24} />
             </div>
             <p className="text-sm font-medium">No courses found.</p>
-            <button
-              onClick={handleLaunchNew}
-              className="mt-4 text-indigo-500 text-sm font-bold hover:underline lg:hidden"
-            >
-              Create your first course
-            </button>
           </div>
         )}
       </div>
 
-      {/* 4. RESPONSIVE MODAL */}
+      {/* 4. MODAL */}
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
@@ -326,23 +414,8 @@ const CourseManager = () => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="bg-white w-full max-w-4xl h-[95vh] sm:h-[85vh] sm:rounded-[40px] rounded-t-[32px] shadow-2xl relative z-10 flex flex-col overflow-hidden"
             >
-              {/* MODAL HEADER - Mobile Optimized */}
+              {/* MODAL HEADER */}
               <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-white z-20">
-                {/* Mobile Steps Indicator */}
-                <div className="flex gap-1 sm:hidden flex-1 mr-4">
-                  {steps.map((step) => (
-                    <div
-                      key={step.id}
-                      className={`h-1.5 flex-1 rounded-full transition-all ${
-                        currentStep >= step.id
-                          ? "bg-indigo-500"
-                          : "bg-slate-100"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Desktop Steps */}
                 <div className="hidden sm:flex items-center gap-2">
                   {steps.map((step) => (
                     <div
@@ -361,7 +434,6 @@ const CourseManager = () => {
                     </div>
                   ))}
                 </div>
-
                 <button
                   onClick={() => setShowModal(false)}
                   className="size-8 sm:size-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
@@ -370,7 +442,7 @@ const CourseManager = () => {
                 </button>
               </div>
 
-              {/* MODAL CONTENT - Scrollable */}
+              {/* MODAL CONTENT */}
               <div className="flex-1 overflow-y-auto p-5 sm:p-10 custom-scrollbar bg-white">
                 <div className="max-w-xl mx-auto pb-20 sm:pb-0">
                   <AnimatePresence mode="wait">
@@ -383,30 +455,264 @@ const CourseManager = () => {
                       className="space-y-6"
                     >
                       {currentStep === 1 && (
-                        <CourseInfoTab
-                          formData={formData}
-                          setFormData={setFormData}
-                        />
+                        <div className="space-y-6">
+                          <div className="text-center mb-8">
+                            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                              Basic Info
+                            </h3>
+                            <p className="text-slate-400 text-xs">
+                              Define your course details
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+                              Title
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Complete React Guide"
+                              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-900"
+                              value={formData.title}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  title: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+                              Description
+                            </label>
+                            <textarea
+                              rows="3"
+                              placeholder="What will students learn?"
+                              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-medium text-slate-700"
+                              value={formData.description}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  description: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+                              Syllabus
+                            </label>
+                            <textarea
+                              rows="4"
+                              placeholder="• Intro&#10;• Core Concepts"
+                              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-medium text-slate-700 font-mono"
+                              value={formData.syllabus}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  syllabus: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
                       )}
+
+                      {/* [STEP 2: CONTENT - MULTI VIDEO SUPPORT] */}
                       {currentStep === 2 && (
-                        <VideoSourceTab
-                          formData={formData}
-                          setFormData={setFormData}
-                        />
+                        <div className="space-y-6">
+                          <div className="text-center mb-8">
+                            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                              Curriculum
+                            </h3>
+                            <p className="text-slate-400 text-xs">
+                              Add videos to build the course
+                            </p>
+                          </div>
+
+                          {/* Add Video Input */}
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+                              Add Video
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Paste YouTube Link here..."
+                                className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-900"
+                                value={tempVideoUrl}
+                                onChange={(e) =>
+                                  setTempVideoUrl(e.target.value)
+                                }
+                                onKeyDown={(e) =>
+                                  e.key === "Enter" && addVideo()
+                                }
+                              />
+                              <button
+                                onClick={addVideo}
+                                className="bg-slate-900 text-white px-6 rounded-xl font-bold hover:bg-indigo-600 transition-colors flex items-center gap-2"
+                              >
+                                <Plus size={20} /> Add
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Added Videos List */}
+                          <div className="space-y-2 mt-2">
+                            {formData.lectures.length === 0 ? (
+                              <div className="text-center py-8 text-slate-300 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                <PlayCircle
+                                  size={32}
+                                  className="mx-auto mb-2 opacity-50"
+                                />
+                                <p className="text-xs font-bold">
+                                  No videos added yet.
+                                </p>
+                              </div>
+                            ) : (
+                              formData.lectures.map((lecture, index) => (
+                                <div
+                                  key={lecture.id}
+                                  className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm"
+                                >
+                                  <div className="text-slate-300 font-black text-sm w-6">
+                                    #{index + 1}
+                                  </div>
+                                  <img
+                                    src={`https://img.youtube.com/vi/${lecture.videoId}/default.jpg`}
+                                    className="w-12 h-9 object-cover rounded"
+                                    alt=""
+                                  />
+                                  <p className="text-xs font-bold text-slate-700 flex-1 truncate">
+                                    {lecture.url}
+                                  </p>
+                                  <button
+                                    onClick={() => removeVideo(lecture.id)}
+                                    className="text-slate-400 hover:text-red-500 p-2"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          {/* [FIX] Thumbnail Notice */}
+                          {formData.lectures.length > 0 && (
+                            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 justify-center">
+                              <CheckCircle2 size={12} /> Thumbnail will be set
+                              from Video #1
+                            </p>
+                          )}
+
+                          <div className="pt-4 border-t border-slate-100">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
+                              Drive Folder (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="https://drive.google.com/..."
+                              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-medium text-slate-700"
+                              value={formData.driveLink}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  driveLink: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
                       )}
+
                       {currentStep === 3 && (
-                        <PricingTab
-                          formData={formData}
-                          setFormData={setFormData}
-                        />
+                        <div className="space-y-6">
+                          <div className="text-center mb-8">
+                            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                              Pricing
+                            </h3>
+                          </div>
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="p-4 bg-white border border-slate-200 rounded-2xl">
+                              <p className="text-xs font-bold text-slate-400 uppercase mb-1">
+                                Selling Price
+                              </p>
+                              <input
+                                type="number"
+                                className="w-full text-2xl font-black text-emerald-600 outline-none"
+                                value={formData.price}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    price: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="p-4 bg-white border border-slate-200 rounded-2xl">
+                              <p className="text-xs font-bold text-slate-400 uppercase mb-1">
+                                Original Price
+                              </p>
+                              <input
+                                type="number"
+                                className="w-full text-xl font-bold text-slate-400 line-through outline-none"
+                                value={formData.discountPrice}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    discountPrice: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
                       )}
-                      {currentStep === 4 && <ReviewTab formData={formData} />}
+
+                      {currentStep === 4 && (
+                        <div className="text-center space-y-6 py-4">
+                          <div className="size-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <Rocket size={32} />
+                          </div>
+                          <h3 className="text-2xl font-black text-slate-900">
+                            Ready to Publish?
+                          </h3>
+                          <div className="bg-slate-50 p-6 rounded-2xl text-left space-y-3 border border-slate-100 max-w-sm mx-auto">
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase">
+                                Title
+                              </span>
+                              <p className="font-bold text-slate-900">
+                                {formData.title || "Untitled"}
+                              </p>
+                            </div>
+                            <div className="flex justify-between">
+                              <div>
+                                <span className="text-xs font-bold text-slate-400 uppercase">
+                                  Price
+                                </span>
+                                <p className="font-bold text-emerald-600">
+                                  ₹{formData.price}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-bold text-slate-400 uppercase">
+                                  Content
+                                </span>
+                                <p className="font-bold text-slate-900">
+                                  {formData.lectures.length} Videos
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
               </div>
 
-              {/* MODAL FOOTER - Fixed Bottom */}
+              {/* MODAL FOOTER */}
               <div className="p-4 sm:p-6 border-t border-slate-100 bg-white flex justify-between items-center z-20">
                 <button
                   onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
@@ -441,219 +747,5 @@ const CourseManager = () => {
     </div>
   );
 };
-
-// --- SUB-COMPONENTS ---
-
-const CourseInfoTab = ({ formData, setFormData }) => (
-  <div className="space-y-6">
-    <div className="text-center mb-8">
-      <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-        Basic Info
-      </h3>
-      <p className="text-slate-400 text-xs">Define your course details</p>
-    </div>
-
-    <div className="space-y-4">
-      <div>
-        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-          Title <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          placeholder="e.g. Complete React Guide"
-          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-          Description
-        </label>
-        <textarea
-          rows="3"
-          placeholder="What will students learn?"
-          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 focus:bg-white outline-none font-medium text-slate-700 transition-all text-sm resize-none"
-          value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
-          }
-        />
-      </div>
-
-      <div>
-        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-          Syllabus Highlights
-        </label>
-        <textarea
-          rows="4"
-          placeholder="• Intro&#10;• Core Concepts"
-          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-indigo-500 focus:bg-white outline-none font-medium text-slate-700 transition-all text-sm resize-none font-mono"
-          value={formData.syllabus}
-          onChange={(e) =>
-            setFormData({ ...formData, syllabus: e.target.value })
-          }
-        />
-      </div>
-    </div>
-  </div>
-);
-
-const VideoSourceTab = ({ formData, setFormData }) => {
-  const extractVideoId = (url) => {
-    const regExp =
-      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
-  };
-
-  const handleYouTubeUrlChange = (url) => {
-    const videoId = extractVideoId(url);
-    setFormData({ ...formData, youtubeUrl: url, youtubeId: videoId || "" });
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-          Content
-        </h3>
-        <p className="text-slate-400 text-xs">Link your video & materials</p>
-      </div>
-
-      <div>
-        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-          YouTube Link <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          placeholder="https://youtu.be/..."
-          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-red-500 focus:bg-white outline-none font-bold text-slate-900 transition-all text-sm"
-          value={formData.youtubeUrl || ""}
-          onChange={(e) => handleYouTubeUrlChange(e.target.value)}
-        />
-        {formData.youtubeId && (
-          <div className="mt-2 p-2 bg-slate-50 rounded-lg flex items-center gap-3 border border-slate-100">
-            <img
-              src={`https://img.youtube.com/vi/${formData.youtubeId}/default.jpg`}
-              className="w-12 h-9 object-cover rounded-md"
-              alt=""
-            />
-            <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-              <CheckCircle2 size={12} /> Valid Video
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="pt-4 border-t border-slate-100">
-        <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-          Drive Folder Link (Optional)
-        </label>
-        <input
-          type="text"
-          placeholder="https://drive.google.com/..."
-          className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white outline-none font-medium text-slate-700 transition-all text-sm"
-          value={formData.driveLink || ""}
-          onChange={(e) =>
-            setFormData({ ...formData, driveLink: e.target.value })
-          }
-        />
-      </div>
-    </div>
-  );
-};
-
-const PricingTab = ({ formData, setFormData }) => (
-  <div className="space-y-6">
-    <div className="text-center mb-8">
-      <h3 className="text-xl sm:text-2xl font-black text-slate-900">Pricing</h3>
-      <p className="text-slate-400 text-xs">Set your course value</p>
-    </div>
-
-    <div className="grid grid-cols-1 gap-4">
-      <PriceControl
-        label="Selling Price"
-        value={formData.price}
-        color="emerald"
-        onChange={(v) => setFormData({ ...formData, price: v })}
-      />
-      <PriceControl
-        label="Original Price (Strike-through)"
-        value={formData.discountPrice}
-        color="slate"
-        onChange={(v) => setFormData({ ...formData, discountPrice: v })}
-      />
-    </div>
-  </div>
-);
-
-const PriceControl = ({ label, value, onChange, color }) => (
-  <div
-    className={`p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-between`}
-  >
-    <div>
-      <p className="text-xs font-bold text-slate-400 uppercase">{label}</p>
-      <p
-        className={`text-2xl sm:text-3xl font-black text-${
-          color === "emerald" ? "emerald-600" : "slate-900"
-        }`}
-      >
-        ₹{value}
-      </p>
-    </div>
-    <div className="flex flex-col gap-1">
-      <button
-        onClick={() => onChange(Number(value) + 50)}
-        className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg"
-      >
-        <ChevronUp size={16} />
-      </button>
-      <button
-        onClick={() => onChange(Math.max(0, Number(value) - 50))}
-        className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg"
-      >
-        <ChevronDown size={16} />
-      </button>
-    </div>
-  </div>
-);
-
-const ReviewTab = ({ formData }) => (
-  <div className="text-center space-y-6 py-4">
-    <div className="size-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-      <Rocket size={32} />
-    </div>
-    <h3 className="text-2xl font-black text-slate-900">Ready to Publish?</h3>
-
-    <div className="bg-slate-50 p-6 rounded-2xl text-left space-y-3 border border-slate-100 max-w-sm mx-auto">
-      <div>
-        <span className="text-xs font-bold text-slate-400 uppercase">
-          Title
-        </span>
-        <p className="font-bold text-slate-900">
-          {formData.title || "Untitled"}
-        </p>
-      </div>
-      <div className="flex justify-between">
-        <div>
-          <span className="text-xs font-bold text-slate-400 uppercase">
-            Price
-          </span>
-          <p className="font-bold text-emerald-600">₹{formData.price}</p>
-        </div>
-        <div className="text-right">
-          <span className="text-xs font-bold text-slate-400 uppercase">
-            Content
-          </span>
-          <p className="font-bold text-slate-900">
-            {formData.youtubeId ? "Video Attached" : "No Video"}
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 export default CourseManager;

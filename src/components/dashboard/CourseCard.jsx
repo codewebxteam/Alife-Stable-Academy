@@ -1,16 +1,47 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PlayCircle, Clock, CheckCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import {
+  PlayCircle,
+  CheckCircle,
+  ListVideo,
+  Play,
+  ChevronRight,
+} from "lucide-react";
 
 const CourseCard = ({ course, onPlay }) => {
-  const progress = course.progress || 0;
-  const isCompleted = course.status === "completed";
+  const progress = Number(course.progress) || 0;
+  const isCompleted = course.status === "completed" || progress >= 100;
   const [timeAgo, setTimeAgo] = useState("");
+
+  // [CLEAN DATA FIX]
+  // 1. Array check karo
+  // 2. Agar Array nahi hai to 1 video maano (String garbage ignore karo)
+  let lecturesList = [];
+  if (course.lectures && Array.isArray(course.lectures)) {
+    lecturesList = course.lectures;
+  } else if (course.videoId || course.url) {
+    lecturesList = [1]; // Legacy support
+  }
+
+  const totalLectures = lecturesList.length;
+  const completedLecturesCount =
+    totalLectures > 0 ? Math.floor((progress / 100) * totalLectures) : 0;
+
+  // Clean 'Next Up' Logic
+  const nextIndex = Math.min(completedLecturesCount, totalLectures - 1);
+  const nextLectureData = lecturesList[nextIndex];
+
+  // Title ko safely nikalo (agar object hai to title, nahi to "Next Lesson")
+  const nextLectureTitle =
+    nextLectureData &&
+    typeof nextLectureData === "object" &&
+    nextLectureData.title
+      ? nextLectureData.title
+      : `Lesson ${nextIndex + 1}`;
 
   useEffect(() => {
     const calculateTimeAgo = () => {
-      if (!course.lastAccessed) return "Never";
+      if (!course.lastAccessed) return "Start Learning";
       const now = new Date();
       const lastAccess = new Date(course.lastAccessed);
       const diffMs = now - lastAccess;
@@ -19,15 +50,19 @@ const CourseCard = ({ course, onPlay }) => {
       const diffDays = Math.floor(diffMs / 86400000);
 
       if (diffMins < 1) return "Just now";
-      if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${diffDays}d ago`;
     };
-
     setTimeAgo(calculateTimeAgo());
-    const interval = setInterval(() => setTimeAgo(calculateTimeAgo()), 60000);
-    return () => clearInterval(interval);
   }, [course.lastAccessed]);
+
+  // [IMAGE FIX] 404 Error handling
+  const handleImageError = (e) => {
+    // Agar image na mile to default badhiya wali photo laga do
+    e.target.src =
+      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60";
+  };
 
   return (
     <motion.div
@@ -35,67 +70,114 @@ const CourseCard = ({ course, onPlay }) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -5 }}
-      className="bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/50 overflow-hidden flex flex-col h-full group"
+      className="bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/50 overflow-hidden flex flex-col h-full group hover:shadow-xl transition-all duration-300"
     >
-      {/* Thumbnail Area */}
+      {/* Thumbnail */}
       <div className="relative h-48 bg-slate-900 overflow-hidden">
         <img
-          src={
-            course.image ||
-            "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60"
-          }
+          src={course.image}
+          onError={handleImageError}
           alt={course.title}
-          className="w-full h-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-60 transition-all duration-500"
+          className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-500"
         />
+
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button
             onClick={() => onPlay && onPlay(course)}
-            className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/50 text-white hover:bg-[#5edff4] hover:border-[#5edff4] hover:text-slate-900 transition-all"
+            className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/50 text-white hover:bg-[#5edff4] hover:text-black transition-all transform hover:scale-110"
           >
-            <PlayCircle className="size-8" />
+            <PlayCircle className="size-10" />
           </button>
         </div>
 
-        {/* Progress Badge */}
-        <div className="absolute bottom-3 right-3 px-3 py-1 bg-slate-900/80 backdrop-blur-md rounded-lg text-xs font-bold text-[#5edff4] border border-white/10">
-          {isCompleted ? "Completed" : `${Math.round(progress)}%`}
+        {totalLectures > 0 && (
+          <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[10px] font-bold text-white flex items-center gap-1.5">
+            <ListVideo size={12} className="text-[#5edff4]" />
+            {totalLectures} Videos
+          </div>
+        )}
+
+        <div className="absolute bottom-3 right-3 px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-lg text-xs font-bold text-[#5edff4] border border-white/10">
+          {isCompleted ? (
+            <span className="flex items-center gap-1">
+              <CheckCircle size={12} /> Done
+            </span>
+          ) : (
+            `${Math.round(progress)}%`
+          )}
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="p-6 flex flex-col flex-1">
+      {/* Content */}
+      <div className="p-5 flex flex-col flex-1">
         <div className="mb-4">
-          <h3 className="font-bold text-lg text-slate-900 leading-tight mb-2 line-clamp-2 group-hover:text-[#0891b2] transition-colors">
-            {course.title}
+          <h3 className="font-bold text-lg text-slate-900 leading-tight mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+            {course.title || "Untitled Course"}
           </h3>
-          <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
-            <span className="size-2 rounded-full bg-green-500" />
-            Last Active: {timeAgo}
-          </p>
+
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`size-2 rounded-full ${
+                  course.lastAccessed ? "bg-green-500" : "bg-slate-300"
+                }`}
+              />
+              {timeAgo}
+            </div>
+            {totalLectures > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-slate-900 font-bold">
+                  {isCompleted ? totalLectures : completedLecturesCount}/
+                  {totalLectures}
+                </span>
+                <span>Completed</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-auto space-y-4">
-          <div>
-            <div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5">
-              <span>Progress</span>
-              <span>{Math.round(progress)}/100%</span>
+        {/* Up Next - Only valid logic */}
+        {!isCompleted && progress > 0 && totalLectures > 1 && (
+          <div
+            className="mb-4 cursor-pointer"
+            onClick={() => onPlay && onPlay(course)}
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+              Up Next
+            </p>
+            <div className="flex items-center justify-between p-2 bg-indigo-50/50 hover:bg-indigo-50 rounded-lg border border-indigo-100 transition-colors">
+              <p className="text-xs font-bold text-slate-900 truncate flex-1 pr-2">
+                {nextLectureTitle}
+              </p>
+              <ChevronRight size={14} className="text-indigo-400" />
             </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+          </div>
+        )}
+
+        <div className="mt-auto space-y-4">
+          {!isCompleted && (
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="h-full bg-linear-to-r from-[#5edff4] to-[#0891b2] rounded-full"
+                className="h-full bg-gradient-to-r from-[#5edff4] to-[#0891b2] rounded-full"
               />
             </div>
-          </div>
+          )}
 
           <button
             onClick={() => onPlay && onPlay(course)}
-            className="w-full block text-center py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20"
+            className={`w-full block text-center py-3 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 ${
+              isCompleted
+                ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                : "bg-slate-900 text-white hover:bg-indigo-600"
+            }`}
           >
-            {isCompleted ? "View Certificate" : "Continue Learning"}
+            {isCompleted
+              ? "Review Course"
+              : progress === 0
+              ? "Start Learning"
+              : "Continue"}
           </button>
         </div>
       </div>
