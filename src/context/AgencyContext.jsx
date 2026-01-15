@@ -74,6 +74,8 @@ export const AgencyProvider = ({ children }) => {
             whatsapp: data.whatsapp,
             upi: data.upi,
             customPrices: data.customPrices || {}, // { courseId: sellingPrice }
+            themeColor: data.themeColor || "#0f172a", // [ADDED]
+            accentColor: data.accentColor || "#5edff4", // [ADDED]
             subdomain: subdomain,
           });
           setIsMainSite(false);
@@ -98,28 +100,42 @@ export const AgencyProvider = ({ children }) => {
     refreshAgency();
   }, [refreshAgency]);
 
+  // --- [FIXED] DYNAMIC TITLE & THEME UPDATE ---
+  useEffect(() => {
+    if (!loading) {
+      if (!isMainSite && agency) {
+        // --- PARTNER SITE ---
+        // Partner ke colors inject karein
+        document.documentElement.style.setProperty(
+          "--brand-color",
+          agency.themeColor || "#0f172a"
+        );
+        document.documentElement.style.setProperty(
+          "--accent-color",
+          agency.accentColor || "#5edff4"
+        );
+        // Partner ka Title
+        document.title = `${agency.name} | Learning Portal`;
+      } else {
+        // --- MAIN SITE ---
+        // Default colors par wapas layein
+        document.documentElement.style.removeProperty("--brand-color");
+        document.documentElement.style.removeProperty("--accent-color");
+        // Main Site Title [UPDATED]
+        document.title = "Alife Stable Academy | Learn Smarter";
+      }
+    }
+  }, [agency, isMainSite, loading]);
+
   // --- HELPER: GET CUSTOM PRICE ---
-  // Yeh function check karega ki Partner ne apna price set kiya hai ya nahi
   const getPrice = (courseId, originalPrice) => {
-    // Agar Main Site hai ya Partner ne price set nahi kiya, toh Original Price dikhao
     if (isMainSite || !agency?.customPrices) return originalPrice;
 
     const customPrice = agency.customPrices[courseId];
-
-    // Agar custom price exist karta hai (aur khali nahi hai), toh wahi return karo
     return customPrice !== undefined && customPrice !== ""
       ? customPrice
       : originalPrice;
   };
-
-  // --- DYNAMIC TITLE UPDATE ---
-  useEffect(() => {
-    if (!loading) {
-      document.title = isMainSite
-        ? "CodeWebX Academy | Learn Coding"
-        : `${agency?.name || "Academy"} | Powered by CodeWebX`;
-    }
-  }, [agency, isMainSite, loading]);
 
   return (
     <AgencyContext.Provider
@@ -129,7 +145,7 @@ export const AgencyProvider = ({ children }) => {
         isPartner: !isMainSite, // Helper boolean
         loading,
         refreshAgency,
-        getPrice, // ✨ Most Important: Use this in CourseCard
+        getPrice,
       }}
     >
       {children}
