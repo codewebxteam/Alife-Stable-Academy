@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   PlayCircle,
@@ -10,13 +10,15 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useAgency } from "../../context/AgencyContext";
-import { useAuth } from "../../context/AuthContext"; // [ADDED] Import Auth Context
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import AuthModal from "../../components/AuthModal"; // [ADDED] Import AuthModal
 
 const PricingCard = ({ course, onEnroll, isEnrolled }) => {
-  const { currentUser } = useAuth(); // [ADDED] Get User Data
+  const { currentUser } = useAuth();
   const { agency, isMainSite, getPrice } = useAgency();
   const navigate = useNavigate();
+  const [isAuthOpen, setIsAuthOpen] = useState(false); // [ADDED] Local State
 
   // Dynamic Price
   const dynamicPrice = getPrice
@@ -35,18 +37,16 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
   const displayPrice = formatCurrency(dynamicPrice);
   const displayOriginalPrice = formatCurrency(course.originalPrice);
 
-  // --- [UPDATED] WhatsApp Redirect Logic with Beautiful Message ---
+  // --- WhatsApp Redirect Logic ---
   const handlePartnerBuy = () => {
     if (!agency?.whatsapp) {
       alert("Contact support for enrollment.");
       return;
     }
 
-    // Prepare Student Details
     const studentName = currentUser?.displayName || "Guest Student";
     const studentEmail = currentUser?.email || "Not Provided";
 
-    // Construct "Sundar" Message 📝
     const message =
       `*New Enrollment Request* 🎓\n\n` +
       `Hello, I am interested in purchasing this course. Here are my details:\n\n` +
@@ -57,13 +57,11 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
       `🆔 *Course ID:* ${course.id}\n\n` +
       `Please guide me with the payment process.`;
 
-    // WhatsApp URL
     const whatsappUrl = `https://wa.me/${agency.whatsapp.replace(
       /\D/g,
       ""
     )}?text=${encodeURIComponent(message)}`;
 
-    // Open in new tab
     window.open(whatsappUrl, "_blank");
   };
 
@@ -156,8 +154,14 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
             <button
               // [UPDATED CLICK HANDLER]
               onClick={() => {
+                // 1. Check Login First
+                if (!currentUser) {
+                  setIsAuthOpen(true);
+                  return;
+                }
+                // 2. Then Check Partner/Main Logic
                 if (!isMainSite && displayPrice !== "Free") {
-                  handlePartnerBuy(); // Redirect to WhatsApp for Partner Sites
+                  handlePartnerBuy();
                 } else {
                   onEnroll({
                     ...course,
@@ -196,6 +200,13 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
           </div>
         </div>
       </motion.div>
+
+      {/* [ADDED] Auth Modal for Login Prompt */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        defaultMode="login"
+      />
     </div>
   );
 };

@@ -1,34 +1,31 @@
-import React from "react";
+import React, { useState } from "react";
 import { ShieldCheck, CheckCircle, ShoppingBag, BookOpen } from "lucide-react";
-// [FIXED IMPORT PATH]
 import { useAgency } from "../../context/AgencyContext";
-import { useAuth } from "../../context/AuthContext"; // [ADDED] Import Auth Context
+import { useAuth } from "../../context/AuthContext";
+import AuthModal from "../../components/AuthModal"; // [ADDED] Import
 
 const BookPricingCard = ({ book, onAction }) => {
-  const { currentUser } = useAuth(); // [ADDED] Get User Data
-  const { getPrice, agency, isMainSite } = useAgency(); // [UPDATED] Get Agency Data
+  const { currentUser } = useAuth();
+  const { getPrice, agency, isMainSite } = useAgency();
+  const [isAuthOpen, setIsAuthOpen] = useState(false); // [ADDED] State
 
-  // [LOGIC] Get the correct price (Partner's or Admin's)
   const finalPrice = getPrice(book.id, book.price);
 
-  // Check if it's free based on the FINAL price
   const isFree =
     String(finalPrice).toLowerCase() === "free" ||
     finalPrice === 0 ||
     finalPrice === "0";
 
-  // --- [NEW] WhatsApp Redirect Logic with Beautiful Message ---
+  // --- WhatsApp Redirect Logic ---
   const handlePartnerBuy = () => {
     if (!agency?.whatsapp) {
       alert("Contact support for enrollment.");
       return;
     }
 
-    // Prepare Student Details
     const studentName = currentUser?.displayName || "Guest Student";
     const studentEmail = currentUser?.email || "Not Provided";
 
-    // Construct "Sundar" Message 📝
     const message =
       `*New E-Book Purchase Request* 📚\n\n` +
       `Hello, I want to purchase this E-Book. Here are my details:\n\n` +
@@ -39,13 +36,11 @@ const BookPricingCard = ({ book, onAction }) => {
       `🆔 *Book ID:* ${book.id}\n\n` +
       `Please guide me with the payment process.`;
 
-    // WhatsApp URL
     const whatsappUrl = `https://wa.me/${agency.whatsapp.replace(
       /\D/g,
       ""
     )}?text=${encodeURIComponent(message)}`;
 
-    // Open in new tab
     window.open(whatsappUrl, "_blank");
   };
 
@@ -99,11 +94,9 @@ const BookPricingCard = ({ book, onAction }) => {
                     isFree ? "text-emerald-600" : "text-slate-900"
                   }`}
                 >
-                  {/* [UPDATED] Show Final Dynamic Price */}
                   {isFree ? "Free" : `₹${finalPrice}`}
                 </span>
 
-                {/* Show Original Price only if it's different and not free */}
                 {!isFree && book.originalPrice && (
                   <span className="text-lg text-slate-400 line-through mb-1 font-bold">
                     ₹{book.originalPrice}
@@ -114,11 +107,15 @@ const BookPricingCard = ({ book, onAction }) => {
               <button
                 // [UPDATED CLICK HANDLER]
                 onClick={() => {
-                  // Partner Site + Paid Book = WhatsApp Redirect
+                  // 1. Check Login First
+                  if (!currentUser) {
+                    setIsAuthOpen(true);
+                    return;
+                  }
+                  // 2. Partner Site Logic
                   if (!isMainSite && !isFree) {
                     handlePartnerBuy();
                   } else {
-                    // Main Site OR Free Book = Normal Action (Payment/Read)
                     onAction();
                   }
                 }}
@@ -159,6 +156,13 @@ const BookPricingCard = ({ book, onAction }) => {
           </div>
         </div>
       </div>
+
+      {/* [ADDED] Auth Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        defaultMode="login"
+      />
     </div>
   );
 };

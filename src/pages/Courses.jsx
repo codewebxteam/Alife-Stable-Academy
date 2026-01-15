@@ -53,12 +53,18 @@ const Courses = () => {
 
   // --- [UPDATED] Handle Buy/Enroll Logic ---
   const handleBuyClick = async (course, rawPrice) => {
+    // 1. Check Login First (Global Rule)
+    if (!currentUser) {
+      setIsAuthOpen(true);
+      return; // Stop here if not logged in
+    }
+
     const priceDisplay =
       rawPrice === "Free" || rawPrice === 0 || rawPrice === "0"
         ? "Free"
         : `₹${rawPrice}`;
 
-    // 1. Partner Site Logic (WhatsApp Redirect with Details)
+    // 2. Partner Site Logic (WhatsApp Redirect with Details)
     if (!isMainSite && priceDisplay !== "Free") {
       if (!agency?.whatsapp) {
         return alert(
@@ -66,8 +72,8 @@ const Courses = () => {
         );
       }
 
-      // Prepare Student Details (if logged in, else placeholders)
-      const studentName = currentUser?.displayName || "Student (Not Logged In)";
+      // Prepare Student Details (User is definitely logged in here)
+      const studentName = currentUser?.displayName || "Student";
       const studentEmail = currentUser?.email || "Email Not Provided";
 
       // Construct "Sundar" Message 📝
@@ -90,17 +96,13 @@ const Courses = () => {
       return;
     }
 
-    // 2. Main Site / Free Course Logic (Direct Enrollment)
-    if (!currentUser) {
-      setIsAuthOpen(true);
-    } else {
-      try {
-        await enrollCourse(course);
-        navigate("/dashboard/my-courses");
-      } catch (error) {
-        console.error("Enrollment error:", error);
-        alert(error.message);
-      }
+    // 3. Main Site / Free Course Logic (Direct Enrollment)
+    try {
+      await enrollCourse(course);
+      navigate("/dashboard/my-courses");
+    } catch (error) {
+      console.error("Enrollment error:", error);
+      alert(error.message);
     }
   };
 

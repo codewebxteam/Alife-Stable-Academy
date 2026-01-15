@@ -5,7 +5,7 @@ import BookRequestSection from "../components/BookRequestSection";
 import AuthModal from "../components/AuthModal";
 import { useAuth } from "../context/AuthContext";
 import { useEBook } from "../context/EBookContext";
-import { useAgency } from "../context/AgencyContext"; // [ADDED]
+import { useAgency } from "../context/AgencyContext";
 import { db } from "../firebase/config";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
@@ -22,7 +22,7 @@ import {
 const EBooks = () => {
   const { currentUser } = useAuth();
   const { purchasedBooks } = useEBook();
-  const { getPrice, agency, isMainSite } = useAgency(); // [UPDATED] Get Agency Data
+  const { getPrice, agency, isMainSite } = useAgency();
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -109,22 +109,26 @@ const EBooks = () => {
     }
   };
 
-  // --- [NEW] Handle Buy Logic for Partner ---
+  // --- [UPDATED] Handle Buy Logic for Partner ---
   const handleBuy = (book, price) => {
+    // 1. Check Login First
+    if (!currentUser) {
+      setIsAuthOpen(true);
+      return;
+    }
+
     const isFree =
       String(price).toLowerCase() === "free" || price === 0 || price === "0";
 
-    // 1. Partner Site Logic (Redirect to WhatsApp)
+    // 2. Partner Site Logic (Redirect to WhatsApp)
     if (!isMainSite && !isFree) {
       if (!agency?.whatsapp) {
         return alert("Partner contact info missing. Please contact support.");
       }
 
-      // Prepare Student Details
-      const studentName = currentUser?.displayName || "Guest Student";
-      const studentEmail = currentUser?.email || "Not Provided";
+      const studentName = currentUser?.displayName || "Student";
+      const studentEmail = currentUser?.email || "Email Not Provided";
 
-      // Construct "Sundar" Message 📝
       const message =
         `*New E-Book Purchase Request* 📚\n\n` +
         `Hello, I want to purchase this E-Book. Here are my details:\n\n` +
@@ -142,7 +146,7 @@ const EBooks = () => {
 
       window.open(whatsappUrl, "_blank");
     } else {
-      // 2. Main Site OR Free Book -> Navigate to Details Page for Normal Flow
+      // 3. Main Site OR Free Book -> Navigate to Details Page for Normal Flow
       navigate(`/ebooks/${book.id}`);
     }
   };
@@ -187,14 +191,11 @@ const EBooks = () => {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
             >
               {filteredBooks.map((book) => {
-                // [LOGIC] Dynamic Price Check
                 const finalPrice = getPrice(book.id, book.price);
-
                 const isFree =
                   String(finalPrice).toLowerCase() === "free" ||
                   finalPrice === 0 ||
                   finalPrice === "0";
-
                 const isPurchased =
                   dbPurchasedIds.includes(book.id) ||
                   purchasedBooks.includes(book.id) ||
@@ -206,7 +207,7 @@ const EBooks = () => {
                     book={book}
                     isPurchased={isPurchased}
                     onRead={() => handleRead(book)}
-                    onBuy={() => handleBuy(book, finalPrice)} // [ADDED] Pass Handler
+                    onBuy={() => handleBuy(book, finalPrice)}
                     displayPrice={finalPrice}
                     isFree={isFree}
                   />
@@ -252,7 +253,6 @@ const BookCard = ({
       className="bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-full group hover:-translate-y-1 transition-transform duration-300"
     >
       <div className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-md mb-4 bg-slate-100 block">
-        {/* Click Logic for Image: Read if owned, otherwise Trigger Buy Logic */}
         {isPurchased ? (
           <div onClick={onRead} className="cursor-pointer h-full w-full">
             <img
@@ -312,7 +312,7 @@ const BookCard = ({
               </button>
             ) : (
               <button
-                onClick={onBuy} // [UPDATED] Use onBuy handler
+                onClick={onBuy}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <ShoppingBag className="size-4" /> Buy
