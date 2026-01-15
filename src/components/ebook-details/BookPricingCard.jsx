@@ -1,9 +1,11 @@
 import React from "react";
 import { ShieldCheck, CheckCircle, ShoppingBag, BookOpen } from "lucide-react";
-import { useAgency } from "../context/AgencyContext"; // [ADDED] Import Context
+// [FIXED IMPORT PATH]
+// "../" ki jagah "../../" use karein kyunki ye file 'ebook-details' folder ke andar hai
+import { useAgency } from "../../context/AgencyContext";
 
 const BookPricingCard = ({ book, onAction }) => {
-  const { getPrice } = useAgency(); // [ADDED] Hook for dynamic pricing
+  const { getPrice } = useAgency();
 
   // [LOGIC] Get the correct price (Partner's or Admin's)
   const finalPrice = getPrice(book.id, book.price);
