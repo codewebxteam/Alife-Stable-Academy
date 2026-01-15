@@ -12,56 +12,58 @@ const AgencyContext = createContext();
 
 export const useAgency = () => useContext(AgencyContext);
 
+// --- DEFAULT AGENCY DATA (For Main Site) ---
+// ताकी App कभी Crash न हो अगर agency null हो
+const DEFAULT_AGENCY = {
+  name: "Alife Stable Academy",
+  themeColor: "#0f172a", // Navy Blue (Default)
+  accentColor: "#5edff4", // Cyan (Default)
+  email: "support@alifestable.com",
+  whatsapp: "",
+  customPrices: {},
+};
+
 export const AgencyProvider = ({ children }) => {
   // --- STATE ---
-  const [agency, setAgency] = useState(null); // Partner Data (Name, Phone, Prices)
-  const [isMainSite, setIsMainSite] = useState(true); // True = Main Site, False = Partner Site
+  // Default data se shuru karein (null se nahi)
+  const [agency, setAgency] = useState(DEFAULT_AGENCY);
+  const [isMainSite, setIsMainSite] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  // --- REFRESH AGENCY LOGIC ---
+  // --- REFRESH LOGIC ---
   const refreshAgency = useCallback(async () => {
     setLoading(true);
     try {
-      const hostname = window.location.hostname; // e.g., "nexus.codewebx.com"
-
-      // 1. Detect Subdomain
+      const hostname = window.location.hostname;
       let subdomain = null;
 
-      // Localhost handling (e.g., test.localhost:5173)
       if (hostname.includes("localhost")) {
         const parts = hostname.split(".");
         if (parts.length > 1 && parts[0] !== "www") {
           subdomain = parts[0].toLowerCase();
         }
-      }
-      // Production handling (e.g., academy.yoursite.com)
-      else {
+      } else {
         const parts = hostname.split(".");
-        // Check if there is a subdomain (not www)
         if (parts.length >= 3 && parts[0] !== "www") {
           subdomain = parts[0].toLowerCase();
         }
       }
 
-      // If no subdomain, load Main Site
+      // 1. If NO Subdomain -> Load Main Site Data (Not NULL)
       if (!subdomain) {
         console.log("Loading Main Site");
-        setAgency(null);
+        setAgency(DEFAULT_AGENCY); // [FIX] Null ki jagah Default Object
         setIsMainSite(true);
         setLoading(false);
         return;
       }
 
-      console.log("🔍 Checking Agency for Subdomain:", subdomain);
-
-      // 2. Fetch Owner ID from 'subdomains' collection
+      console.log("🔍 Checking Agency for:", subdomain);
       const subDocRef = doc(db, "subdomains", subdomain);
       const subSnap = await getDoc(subDocRef);
 
       if (subSnap.exists()) {
         const { ownerId } = subSnap.data();
-
-        // 3. Fetch Full Details from 'agencies' collection
         const agencyDocRef = doc(db, "agencies", ownerId);
         const agencySnap = await getDoc(agencyDocRef);
 
@@ -73,64 +75,58 @@ export const AgencyProvider = ({ children }) => {
             email: data.email,
             whatsapp: data.whatsapp,
             upi: data.upi,
-            customPrices: data.customPrices || {}, // { courseId: sellingPrice }
-            themeColor: data.themeColor || "#0f172a", // [ADDED]
-            accentColor: data.accentColor || "#5edff4", // [ADDED]
+            customPrices: data.customPrices || {},
+            themeColor: data.themeColor || "#0f172a",
+            accentColor: data.accentColor || "#5edff4",
             subdomain: subdomain,
           });
           setIsMainSite(false);
         } else {
-          // Data consistency issue
+          setAgency(DEFAULT_AGENCY); // Fallback
           setIsMainSite(true);
         }
       } else {
-        // Subdomain not found
+        setAgency(DEFAULT_AGENCY); // Fallback
         setIsMainSite(true);
       }
     } catch (error) {
       console.error("❌ Agency Context Error:", error);
+      setAgency(DEFAULT_AGENCY);
       setIsMainSite(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial Load
   useEffect(() => {
     refreshAgency();
   }, [refreshAgency]);
 
-  // --- [FIXED] DYNAMIC TITLE & THEME UPDATE ---
+  // --- DYNAMIC TITLE & THEME ---
   useEffect(() => {
     if (!loading) {
-      if (!isMainSite && agency) {
-        // --- PARTNER SITE ---
-        // Partner ke colors inject karein
-        document.documentElement.style.setProperty(
-          "--brand-color",
-          agency.themeColor || "#0f172a"
-        );
-        document.documentElement.style.setProperty(
-          "--accent-color",
-          agency.accentColor || "#5edff4"
-        );
-        // Partner ka Title
-        document.title = `${agency.name} | Learning Portal`;
+      // Colors Set karein (Chahe Main ho ya Partner)
+      document.documentElement.style.setProperty(
+        "--brand-color",
+        agency?.themeColor || "#0f172a"
+      );
+      document.documentElement.style.setProperty(
+        "--accent-color",
+        agency?.accentColor || "#5edff4"
+      );
+
+      if (!isMainSite) {
+        // Partner Title
+        document.title = `${agency?.name} | Learning Portal`;
       } else {
-        // --- MAIN SITE ---
-        // Default colors par wapas layein
-        document.documentElement.style.removeProperty("--brand-color");
-        document.documentElement.style.removeProperty("--accent-color");
-        // Main Site Title [UPDATED]
+        // Main Site Title
         document.title = "Alife Stable Academy | Learn Smarter";
       }
     }
   }, [agency, isMainSite, loading]);
 
-  // --- HELPER: GET CUSTOM PRICE ---
   const getPrice = (courseId, originalPrice) => {
     if (isMainSite || !agency?.customPrices) return originalPrice;
-
     const customPrice = agency.customPrices[courseId];
     return customPrice !== undefined && customPrice !== ""
       ? customPrice
@@ -140,9 +136,9 @@ export const AgencyProvider = ({ children }) => {
   return (
     <AgencyContext.Provider
       value={{
-        agency,
+        agency, // Ab ye kabhi NULL nahi hoga -> Crash Fixed!
         isMainSite,
-        isPartner: !isMainSite, // Helper boolean
+        isPartner: !isMainSite,
         loading,
         refreshAgency,
         getPrice,
