@@ -13,18 +13,22 @@ import { Check, ArrowRight, Zap, Crown, Star, Bookmark } from "lucide-react";
 import { Link } from "react-router-dom";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 // ==========================================
 // SECTION 1: DYNAMIC CARD DESIGNS
 // ==========================================
 
 const FrontendCard = ({ data }) => {
-  // Use Real Data if available, else Fallback to Static
+  // [ADDED] Dynamic Price
+  const { getPrice } = useAgency();
+  const displayPrice = data ? getPrice(data.id, data.price) : 2999;
+
   const info = data
     ? {
         title: data.title,
         desc: data.description,
-        price: data.price,
+        price: displayPrice,
         features: ["Instant Access", "Video Lessons", "Secure Content"],
       }
     : {
@@ -51,7 +55,9 @@ const FrontendCard = ({ data }) => {
       <div className="relative z-10">
         <div className="flex items-baseline gap-1 mb-6">
           <span className="text-4xl font-bold text-slate-900">
-            {info.price == 0 ? "Free" : `₹${info.price}`}
+            {info.price == 0 || info.price === "Free"
+              ? "Free"
+              : `₹${info.price}`}
           </span>
           {!data && <span className="text-slate-400 text-sm">/course</span>}
         </div>
@@ -80,11 +86,15 @@ const FrontendCard = ({ data }) => {
 };
 
 const FullStackCard = ({ data }) => {
+  // [ADDED] Dynamic Price
+  const { getPrice } = useAgency();
+  const displayPrice = data ? getPrice(data.id, data.price) : 5999;
+
   const info = data
     ? {
         title: data.title,
         desc: data.description,
-        price: data.price,
+        price: displayPrice,
         features: ["Full Course Access", "Certificate", "Lifetime Updates"],
       }
     : {
@@ -114,7 +124,9 @@ const FullStackCard = ({ data }) => {
       <div className="relative z-10">
         <div className="flex items-baseline gap-1 mb-6">
           <span className="text-4xl font-bold text-white">
-            {info.price == 0 ? "Free" : `₹${info.price}`}
+            {info.price == 0 || info.price === "Free"
+              ? "Free"
+              : `₹${info.price}`}
           </span>
         </div>
         <ul className="space-y-3 mb-8">
@@ -142,11 +154,15 @@ const FullStackCard = ({ data }) => {
 };
 
 const DataScienceCard = ({ data }) => {
+  // [ADDED] Dynamic Price
+  const { getPrice } = useAgency();
+  const displayPrice = data ? getPrice(data.id, data.price) : 7999;
+
   const info = data
     ? {
         title: data.title,
         desc: data.description,
-        price: data.price,
+        price: displayPrice,
         features: ["HD Video Lessons", "Project Files", "Mobile Access"],
       }
     : {
@@ -172,7 +188,9 @@ const DataScienceCard = ({ data }) => {
       <div className="relative z-10">
         <div className="flex items-baseline gap-1 mb-6">
           <span className="text-4xl font-bold text-white">
-            {info.price == 0 ? "Free" : `₹${info.price}`}
+            {info.price == 0 || info.price === "Free"
+              ? "Free"
+              : `₹${info.price}`}
           </span>
         </div>
         <ul className="space-y-3 mb-8">
@@ -200,7 +218,7 @@ const DataScienceCard = ({ data }) => {
 };
 
 // ==========================================
-// SECTION 2: 3D ENGINE
+// SECTION 2: 3D ENGINE (No Changes Here)
 // ==========================================
 
 export const Card = forwardRef(({ customClass, ...rest }, ref) => (

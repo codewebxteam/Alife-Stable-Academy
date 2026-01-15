@@ -9,6 +9,7 @@ import { Check, ArrowRight, Star, Zap, Crown } from "lucide-react";
 import { collection, getDocs, limit, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { Link } from "react-router-dom";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 // Styling Config for dynamic cards
 const CARD_VARIANTS = [
@@ -26,6 +27,10 @@ const ProductCard = ({ product, index }) => {
   const ref = useRef(null);
   const style = CARD_VARIANTS[index % CARD_VARIANTS.length];
   const Icon = style.icon;
+
+  // [ADDED] Dynamic Price Logic
+  const { getPrice } = useAgency();
+  const finalPrice = getPrice(product.id, product.price);
 
   // 3D Tilt Logic
   const x = useMotionValue(0);
@@ -71,8 +76,6 @@ const ProductCard = ({ product, index }) => {
         }`}
       />
 
-      {/* [REMOVED] Top Rated Badge section was here */}
-
       <div
         className="relative h-44 rounded-t-4xl overflow-hidden bg-slate-800"
         style={{ transform: "translateZ(20px)" }}
@@ -114,9 +117,13 @@ const ProductCard = ({ product, index }) => {
 
           <div className="flex items-baseline gap-1 mb-3">
             <span className="text-2xl md:text-3xl font-bold text-white">
-              {product.price == 0 ? "Free" : `₹${product.price}`}
+              {/* [UPDATED] Using Final Price */}
+              {finalPrice == 0 || finalPrice === "Free"
+                ? "Free"
+                : `₹${finalPrice}`}
             </span>
-            {product.originalPrice && (
+            {/* Show original only if different and not free */}
+            {product.originalPrice && finalPrice !== "Free" && (
               <span className="text-slate-500 text-[10px] md:text-xs line-through">
                 ₹{product.originalPrice}
               </span>
