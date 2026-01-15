@@ -29,6 +29,9 @@ import {
   query,
   where,
   orderBy,
+  updateDoc, // [ADDED]
+  arrayUnion, // [ADDED]
+  doc, // [ADDED]
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
@@ -46,7 +49,7 @@ const PartnerDashboard = () => {
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [graphData, setGraphData] = useState([]);
 
-  // Enroll Form State [UPDATED: Removed Name & Password]
+  // Enroll Form State
   const [enrollData, setEnrollData] = useState({
     productType: "Course",
     studentEmail: "",
@@ -158,9 +161,8 @@ const PartnerDashboard = () => {
     };
   }, [orders]);
 
-  // --- HANDLERS ---
+  // --- [UPDATED] HANDLERS WITH ACCESS GRANTING LOGIC ---
   const handleEnrollSubmit = async () => {
-    // [UPDATED] Removed Name/Password Validation
     if (
       !enrollData.studentEmail ||
       !enrollData.selectedProductId ||
@@ -179,32 +181,64 @@ const PartnerDashboard = () => {
 
     setIsProcessing(true);
     try {
+      // 1. Find Student by Email
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", enrollData.studentEmail));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        alert(
+          "❌ Student not found! The student must register on the website first."
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      const studentDoc = querySnapshot.docs[0];
+      const studentId = studentDoc.id;
+      const studentData = studentDoc.data();
+
+      // 2. Grant Access (Update Student's DB Document)
+      const studentRef = doc(db, "users", studentId);
+
+      if (enrollData.productType === "Course") {
+        // Add to 'enrolledCourses' array
+        await updateDoc(studentRef, {
+          enrolledCourses: arrayUnion(selectedProduct.id),
+        });
+      } else {
+        // Add to 'purchasedBooks' array
+        await updateDoc(studentRef, {
+          purchasedBooks: arrayUnion(selectedProduct.id),
+        });
+      }
+
+      // 3. Create Order Record (For Partner Dashboard)
       const adminPrice = Number(
         selectedProduct.price || selectedProduct.discountPrice || 0
       );
       const sellingPrice = Number(enrollData.sellingPrice);
 
-      // [UPDATED] Order Payload
       const orderPayload = {
         partnerId: partnerId,
         studentEmail: enrollData.studentEmail,
-        // Since we don't ask for name, we use the email username for display (e.g., john from john@mail.com)
-        studentName: enrollData.studentEmail.split("@")[0],
+        studentName:
+          studentData.displayName || enrollData.studentEmail.split("@")[0],
         courseId: selectedProduct.id,
         courseTitle: selectedProduct.title,
         productType: enrollData.productType,
         adminPrice: adminPrice,
         sellingPrice: sellingPrice,
         profit: sellingPrice - adminPrice,
-        status: "Success", // Payment Considered Success
+        status: "Success",
         createdAt: serverTimestamp(),
         type: "Enrollment",
       };
 
       await addDoc(collection(db, "orders"), orderPayload);
 
+      // 4. Cleanup & Feedback
       setShowEnrollModal(false);
-      // Reset Form [UPDATED]
       setEnrollData({
         productType: "Course",
         studentEmail: "",
@@ -214,11 +248,11 @@ const PartnerDashboard = () => {
 
       fetchInitialData();
       alert(
-        `✅ Payment of ₹${adminPrice} to Admin Successful! Access Granted to Student.`
+        `✅ Success! Access granted to ${enrollData.studentEmail} for "${selectedProduct.title}".`
       );
     } catch (error) {
       console.error("Enrollment failed:", error);
-      alert("Transaction Failed. Please try again.");
+      alert("Transaction Failed. Please check console.");
     } finally {
       setIsProcessing(false);
     }
@@ -451,7 +485,7 @@ const PartnerDashboard = () => {
         </div>
       </div>
 
-      {/* --- ENROLLMENT MODAL (UPDATED FOR EXISTING STUDENTS) --- */}
+      {/* --- ENROLLMENT MODAL --- */}
       <AnimatePresence>
         {showEnrollModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -495,7 +529,6 @@ const PartnerDashboard = () => {
                     Student Details (From WhatsApp)
                   </p>
                   <div className="grid grid-cols-1 gap-4">
-                    {/* [UPDATED] Only asking for Email */}
                     <input
                       type="email"
                       placeholder="Student Registered Email Address"
