@@ -22,7 +22,7 @@ import {
 const EBooks = () => {
   const { currentUser } = useAuth();
   const { purchasedBooks } = useEBook();
-  const { getPrice } = useAgency(); // [ADDED] Get Dynamic Price Function
+  const { getPrice, agency, isMainSite } = useAgency(); // [UPDATED] Get Agency Data
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -109,6 +109,44 @@ const EBooks = () => {
     }
   };
 
+  // --- [NEW] Handle Buy Logic for Partner ---
+  const handleBuy = (book, price) => {
+    const isFree =
+      String(price).toLowerCase() === "free" || price === 0 || price === "0";
+
+    // 1. Partner Site Logic (Redirect to WhatsApp)
+    if (!isMainSite && !isFree) {
+      if (!agency?.whatsapp) {
+        return alert("Partner contact info missing. Please contact support.");
+      }
+
+      // Prepare Student Details
+      const studentName = currentUser?.displayName || "Guest Student";
+      const studentEmail = currentUser?.email || "Not Provided";
+
+      // Construct "Sundar" Message 📝
+      const message =
+        `*New E-Book Purchase Request* 📚\n\n` +
+        `Hello, I want to purchase this E-Book. Here are my details:\n\n` +
+        `👤 *Student Name:* ${studentName}\n` +
+        `📧 *Mail:* ${studentEmail}\n\n` +
+        `📖 *Book Title:* ${book.title}\n` +
+        `💰 *Price:* ₹${price}\n` +
+        `🆔 *Book ID:* ${book.id}\n\n` +
+        `Please guide me with the payment process.`;
+
+      const whatsappUrl = `https://wa.me/${agency.whatsapp.replace(
+        /\D/g,
+        ""
+      )}?text=${encodeURIComponent(message)}`;
+
+      window.open(whatsappUrl, "_blank");
+    } else {
+      // 2. Main Site OR Free Book -> Navigate to Details Page for Normal Flow
+      navigate(`/ebooks/${book.id}`);
+    }
+  };
+
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -168,8 +206,9 @@ const EBooks = () => {
                     book={book}
                     isPurchased={isPurchased}
                     onRead={() => handleRead(book)}
-                    displayPrice={finalPrice} // [ADDED] Pass dynamic price prop
-                    isFree={isFree} // [ADDED] Pass isFree flag
+                    onBuy={() => handleBuy(book, finalPrice)} // [ADDED] Pass Handler
+                    displayPrice={finalPrice}
+                    isFree={isFree}
                   />
                 );
               })}
@@ -197,7 +236,14 @@ const EBooks = () => {
   );
 };
 
-const BookCard = ({ book, isPurchased, onRead, displayPrice, isFree }) => {
+const BookCard = ({
+  book,
+  isPurchased,
+  onRead,
+  onBuy,
+  displayPrice,
+  isFree,
+}) => {
   return (
     <motion.div
       layout
@@ -206,6 +252,7 @@ const BookCard = ({ book, isPurchased, onRead, displayPrice, isFree }) => {
       className="bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-full group hover:-translate-y-1 transition-transform duration-300"
     >
       <div className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-md mb-4 bg-slate-100 block">
+        {/* Click Logic for Image: Read if owned, otherwise Trigger Buy Logic */}
         {isPurchased ? (
           <div onClick={onRead} className="cursor-pointer h-full w-full">
             <img
@@ -216,14 +263,14 @@ const BookCard = ({ book, isPurchased, onRead, displayPrice, isFree }) => {
             />
           </div>
         ) : (
-          <Link to={`/ebooks/${book.id}`} className="h-full w-full block">
+          <div onClick={onBuy} className="cursor-pointer h-full w-full">
             <img
               src={book.image}
               alt={book.title}
               className="size-full object-cover"
               loading="lazy"
             />
-          </Link>
+          </div>
         )}
 
         <div className="absolute top-3 right-3">
@@ -264,12 +311,12 @@ const BookCard = ({ book, isPurchased, onRead, displayPrice, isFree }) => {
                 <BookOpen className="size-4" /> Read
               </button>
             ) : (
-              <Link
-                to={`/ebooks/${book.id}`}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2"
+              <button
+                onClick={onBuy} // [UPDATED] Use onBuy handler
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <ShoppingBag className="size-4" /> Buy
-              </Link>
+              </button>
             )}
           </div>
         </div>

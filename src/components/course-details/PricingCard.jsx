@@ -9,46 +9,70 @@ import {
   FileText,
   CheckCircle,
 } from "lucide-react";
-import { useAgency } from "../../context/AgencyContext"; // Ensure correct path
+import { useAgency } from "../../context/AgencyContext";
+import { useAuth } from "../../context/AuthContext"; // [ADDED] Import Auth Context
 import { useNavigate } from "react-router-dom";
 
 const PricingCard = ({ course, onEnroll, isEnrolled }) => {
-  // [FIX] Destructure getPrice from context
-  const { agency, isPartner, getPrice } = useAgency();
+  const { currentUser } = useAuth(); // [ADDED] Get User Data
+  const { agency, isMainSite, getPrice } = useAgency();
   const navigate = useNavigate();
 
-  // --- [FIXED DYNAMIC PRICING LOGIC] ---
-  // Use getPrice helper to fetch Partner's Custom Price or Default Price
+  // Dynamic Price
   const dynamicPrice = getPrice
     ? getPrice(course.id, course.price)
     : course.price;
 
-  // Formatting Helper
   const formatCurrency = (amount) => {
     if (!amount) return "Free";
     const strAmount = String(amount).toLowerCase();
     if (strAmount === "free" || strAmount === "0") return "Free";
-
-    // Clean string and convert to number
     const numericValue = parseInt(String(amount).replace(/[^0-9]/g, ""));
-
-    // Check for valid number
     if (isNaN(numericValue) || numericValue === 0) return "Free";
-
     return `₹${numericValue.toLocaleString("en-IN")}`;
   };
 
   const displayPrice = formatCurrency(dynamicPrice);
   const displayOriginalPrice = formatCurrency(course.originalPrice);
 
+  // --- [UPDATED] WhatsApp Redirect Logic with Beautiful Message ---
+  const handlePartnerBuy = () => {
+    if (!agency?.whatsapp) {
+      alert("Contact support for enrollment.");
+      return;
+    }
+
+    // Prepare Student Details
+    const studentName = currentUser?.displayName || "Guest Student";
+    const studentEmail = currentUser?.email || "Not Provided";
+
+    // Construct "Sundar" Message 📝
+    const message =
+      `*New Enrollment Request* 🎓\n\n` +
+      `Hello, I am interested in purchasing this course. Here are my details:\n\n` +
+      `👤 *Student Name:* ${studentName}\n` +
+      `📧 *Mail:* ${studentEmail}\n\n` +
+      `📚 *Course Name:* ${course.title}\n` +
+      `💰 *Price:* ${displayPrice}\n` +
+      `🆔 *Course ID:* ${course.id}\n\n` +
+      `Please guide me with the payment process.`;
+
+    // WhatsApp URL
+    const whatsappUrl = `https://wa.me/${agency.whatsapp.replace(
+      /\D/g,
+      ""
+    )}?text=${encodeURIComponent(message)}`;
+
+    // Open in new tab
+    window.open(whatsappUrl, "_blank");
+  };
+
   const calculateDiscount = () => {
     if (displayPrice === "Free" || !course.originalPrice) return "100% off";
-
     const offerPrice = parseInt(String(dynamicPrice).replace(/[^0-9]/g, ""));
     const listingPrice = parseInt(
       String(course.originalPrice).replace(/[^0-9]/g, "")
     );
-
     if (
       !isNaN(offerPrice) &&
       !isNaN(listingPrice) &&
@@ -88,7 +112,6 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
         </div>
 
         <div className="p-8">
-          {/* Show "Purchased" status if enrolled */}
           {isEnrolled ? (
             <div className="mb-6 flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
               <CheckCircle className="size-6 shrink-0" />
@@ -121,29 +144,31 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
             </div>
           )}
 
-          {/* Button Change based on Enrollment */}
           {isEnrolled ? (
             <button
               onClick={() => navigate("/dashboard/my-courses")}
               className="w-full py-4 text-white font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2"
-              style={{
-                boxShadow: `0 10px 15px -3px rgba(16, 185, 129, 0.3)`,
-              }}
+              style={{ boxShadow: `0 10px 15px -3px rgba(16, 185, 129, 0.3)` }}
             >
               Go to Dashboard
             </button>
           ) : (
             <button
-              onClick={() =>
-                onEnroll({
-                  ...course,
-                  finalPrice: dynamicPrice, // Pass dynamic price
-                  commission: isPartner ? "Calculated at Checkout" : 0,
-                })
-              }
+              // [UPDATED CLICK HANDLER]
+              onClick={() => {
+                if (!isMainSite && displayPrice !== "Free") {
+                  handlePartnerBuy(); // Redirect to WhatsApp for Partner Sites
+                } else {
+                  onEnroll({
+                    ...course,
+                    finalPrice: dynamicPrice,
+                    commission: !isMainSite ? "Calculated at Checkout" : 0,
+                  });
+                }
+              }}
               className="w-full py-4 text-slate-900 font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer"
               style={{
-                backgroundColor: agency?.accentColor || "#5edff4", // Safe access
+                backgroundColor: agency?.accentColor || "#5edff4",
                 boxShadow: `0 10px 15px -3px ${
                   agency?.accentColor || "#5edff4"
                 }33`,

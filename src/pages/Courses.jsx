@@ -51,12 +51,50 @@ const Courses = () => {
     }
   };
 
-  const handleBuyClick = async (course) => {
+  // --- [UPDATED] Handle Buy/Enroll Logic ---
+  const handleBuyClick = async (course, rawPrice) => {
+    const priceDisplay =
+      rawPrice === "Free" || rawPrice === 0 || rawPrice === "0"
+        ? "Free"
+        : `₹${rawPrice}`;
+
+    // 1. Partner Site Logic (WhatsApp Redirect with Details)
+    if (!isMainSite && priceDisplay !== "Free") {
+      if (!agency?.whatsapp) {
+        return alert(
+          "Partner contact number not found. Please contact support."
+        );
+      }
+
+      // Prepare Student Details (if logged in, else placeholders)
+      const studentName = currentUser?.displayName || "Student (Not Logged In)";
+      const studentEmail = currentUser?.email || "Email Not Provided";
+
+      // Construct "Sundar" Message 📝
+      const message =
+        `*New Course Enrollment Request* 🎓\n\n` +
+        `Hello, I am interested in purchasing this course. Here are my details:\n\n` +
+        `👤 *Student Name:* ${studentName}\n` +
+        `📧 *Mail:* ${studentEmail}\n\n` +
+        `📚 *Course Name:* ${course.title}\n` +
+        `💰 *Price:* ${priceDisplay}\n` +
+        `🆔 *Course ID:* ${course.id}\n\n` +
+        `Please guide me with the payment process.`;
+
+      const whatsappUrl = `https://wa.me/${agency.whatsapp.replace(
+        /\D/g,
+        ""
+      )}?text=${encodeURIComponent(message)}`;
+
+      window.open(whatsappUrl, "_blank");
+      return;
+    }
+
+    // 2. Main Site / Free Course Logic (Direct Enrollment)
     if (!currentUser) {
       setIsAuthOpen(true);
     } else {
       try {
-        // [UPDATED] Pass dynamic price during enrollment if needed in future logic
         await enrollCourse(course);
         navigate("/dashboard/my-courses");
       } catch (error) {
@@ -85,7 +123,7 @@ const Courses = () => {
         <div className="max-w-7xl mx-auto px-6 mb-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-center md:text-left">
-              {/* [UPDATED] Dynamic Header Logic */}
+              {/* Dynamic Header Logic */}
               {!isMainSite && agency ? (
                 <>
                   <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-2">
@@ -139,17 +177,22 @@ const Courses = () => {
                   layout
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
                 >
-                  {filteredCourses.map((course) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isEnrolled={isEnrolled(course.id)}
-                      onBuy={() => handleBuyClick(course)}
-                      onPlay={() => handlePlayVideo(course.id)}
-                      // [MAGIC] Pass the custom price from AgencyContext
-                      displayPrice={getPrice(course.id, course.price)}
-                    />
-                  ))}
+                  {filteredCourses.map((course) => {
+                    // [IMPORTANT] Get Price Here to pass to both Display & Handler
+                    const dynamicPrice = getPrice(course.id, course.price);
+
+                    return (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        isEnrolled={isEnrolled(course.id)}
+                        // Pass dynamicPrice to handleBuyClick
+                        onBuy={() => handleBuyClick(course, dynamicPrice)}
+                        onPlay={() => handlePlayVideo(course.id)}
+                        displayPrice={dynamicPrice}
+                      />
+                    );
+                  })}
                 </motion.div>
               ) : (
                 <motion.div
@@ -189,7 +232,7 @@ const Courses = () => {
   );
 };
 
-// --- UPDATED COURSE CARD COMPONENT ---
+// --- COURSE CARD COMPONENT ---
 const CourseCard = ({ course, isEnrolled, onBuy, onPlay, displayPrice }) => {
   const imageUrl =
     course.image ||

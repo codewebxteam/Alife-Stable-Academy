@@ -13,19 +13,13 @@ import {
 import {
   Users,
   TrendingUp,
-  BookOpen,
-  GraduationCap,
   ChevronDown,
-  ArrowUpRight,
-  Filter,
-  User,
-  Clock,
   Plus,
   X,
-  CheckCircle2,
   DollarSign,
   Briefcase,
   FileText,
+  GraduationCap,
 } from "lucide-react";
 import {
   collection,
@@ -47,18 +41,16 @@ const PartnerDashboard = () => {
   // --- STATES ---
   const [orders, setOrders] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [ebooks, setEbooks] = useState([]); // ✨ New: E-Books State
+  const [ebooks, setEbooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
-  const [graphData, setGraphData] = useState([]); // ✨ New: Real Graph Data
+  const [graphData, setGraphData] = useState([]);
 
-  // Enroll Form State
+  // Enroll Form State [UPDATED: Removed Name & Password]
   const [enrollData, setEnrollData] = useState({
-    productType: "Course", // ✨ New: Course or EBook
-    studentName: "",
+    productType: "Course",
     studentEmail: "",
-    studentPassword: "",
-    selectedProductId: "", // Changed from selectedCourseId
+    selectedProductId: "",
     sellingPrice: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -80,7 +72,7 @@ const PartnerDashboard = () => {
       }));
       setCourses(coursesList);
 
-      // 2. Fetch E-Books (✨ Added)
+      // 2. Fetch E-Books
       const ebooksSnap = await getDocs(collection(db, "ebooks"));
       const ebooksList = ebooksSnap.docs.map((doc) => ({
         id: doc.id,
@@ -105,7 +97,7 @@ const PartnerDashboard = () => {
             : new Date(),
         }));
         setOrders(ordersList);
-        processGraphData(ordersList); // ✨ Process Real Data
+        processGraphData(ordersList);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -128,7 +120,6 @@ const PartnerDashboard = () => {
     const chartData = last7Days.map((date) => {
       const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
 
-      // Filter orders for this specific day
       const dayOrders = data.filter((o) => {
         const orderDate = new Date(o.createdAtDate);
         return orderDate.toDateString() === date.toDateString();
@@ -169,8 +160,8 @@ const PartnerDashboard = () => {
 
   // --- HANDLERS ---
   const handleEnrollSubmit = async () => {
+    // [UPDATED] Removed Name/Password Validation
     if (
-      !enrollData.studentName ||
       !enrollData.studentEmail ||
       !enrollData.selectedProductId ||
       !enrollData.sellingPrice
@@ -179,7 +170,6 @@ const PartnerDashboard = () => {
       return;
     }
 
-    // Find selected product (Course or E-Book)
     const productList = enrollData.productType === "Course" ? courses : ebooks;
     const selectedProduct = productList.find(
       (p) => p.id === enrollData.selectedProductId
@@ -191,21 +181,22 @@ const PartnerDashboard = () => {
     try {
       const adminPrice = Number(
         selectedProduct.price || selectedProduct.discountPrice || 0
-      ); // Handle different price field names if any
+      );
       const sellingPrice = Number(enrollData.sellingPrice);
 
+      // [UPDATED] Order Payload
       const orderPayload = {
         partnerId: partnerId,
-        studentName: enrollData.studentName,
         studentEmail: enrollData.studentEmail,
-        studentPassword: enrollData.studentPassword,
-        courseId: selectedProduct.id, // Using generic ID field
-        courseTitle: selectedProduct.title, // Title
-        productType: enrollData.productType, // ✨ Store Type (Course/E-Book)
+        // Since we don't ask for name, we use the email username for display (e.g., john from john@mail.com)
+        studentName: enrollData.studentEmail.split("@")[0],
+        courseId: selectedProduct.id,
+        courseTitle: selectedProduct.title,
+        productType: enrollData.productType,
         adminPrice: adminPrice,
         sellingPrice: sellingPrice,
         profit: sellingPrice - adminPrice,
-        status: "Success",
+        status: "Success", // Payment Considered Success
         createdAt: serverTimestamp(),
         type: "Enrollment",
       };
@@ -213,26 +204,26 @@ const PartnerDashboard = () => {
       await addDoc(collection(db, "orders"), orderPayload);
 
       setShowEnrollModal(false);
+      // Reset Form [UPDATED]
       setEnrollData({
         productType: "Course",
-        studentName: "",
         studentEmail: "",
-        studentPassword: "",
         selectedProductId: "",
         sellingPrice: "",
       });
 
-      fetchInitialData(); // Refresh data & graph
-      alert("✅ Student Enrolled Successfully!");
+      fetchInitialData();
+      alert(
+        `✅ Payment of ₹${adminPrice} to Admin Successful! Access Granted to Student.`
+      );
     } catch (error) {
       console.error("Enrollment failed:", error);
-      alert("Failed to enroll student. Please try again.");
+      alert("Transaction Failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Helper to get selected product details for display
   const getSelectedProductDetails = () => {
     const list = enrollData.productType === "Course" ? courses : ebooks;
     return list.find((p) => p.id === enrollData.selectedProductId);
@@ -263,7 +254,6 @@ const PartnerDashboard = () => {
 
       {/* --- KPI CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Students */}
         <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
             <Users size={80} className="text-blue-600" />
@@ -282,7 +272,6 @@ const PartnerDashboard = () => {
           </p>
         </div>
 
-        {/* Total Revenue */}
         <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
             <TrendingUp size={80} className="text-indigo-600" />
@@ -301,7 +290,6 @@ const PartnerDashboard = () => {
           </p>
         </div>
 
-        {/* Net Profit */}
         <div className="bg-slate-900 p-7 rounded-[40px] border border-slate-800 shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
             <DollarSign size={80} className="text-emerald-400" />
@@ -323,7 +311,6 @@ const PartnerDashboard = () => {
 
       {/* --- CHART & TABLE GRID --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Chart Section */}
         <div className="lg:col-span-2 bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">
@@ -397,7 +384,6 @@ const PartnerDashboard = () => {
           </div>
         </div>
 
-        {/* Live Enrollment Feed */}
         <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm flex flex-col h-full">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
@@ -465,7 +451,7 @@ const PartnerDashboard = () => {
         </div>
       </div>
 
-      {/* --- ENROLLMENT MODAL --- */}
+      {/* --- ENROLLMENT MODAL (UPDATED FOR EXISTING STUDENTS) --- */}
       <AnimatePresence>
         {showEnrollModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -488,10 +474,10 @@ const PartnerDashboard = () => {
                   <GraduationCap size={100} />
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter">
-                  New Enrollment
+                  Fulfill Order
                 </h3>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-                  Create Access & Assign Product
+                  Pay Admin & Grant Student Access
                 </p>
                 <button
                   onClick={() => setShowEnrollModal(false)}
@@ -503,27 +489,16 @@ const PartnerDashboard = () => {
 
               {/* Modal Form */}
               <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                {/* 1. Student Details */}
+                {/* 1. Student Details (Email Only) */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    Student Credentials
+                    Student Details (From WhatsApp)
                   </p>
                   <div className="grid grid-cols-1 gap-4">
-                    <input
-                      type="text"
-                      placeholder="Full Name"
-                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
-                      value={enrollData.studentName}
-                      onChange={(e) =>
-                        setEnrollData({
-                          ...enrollData,
-                          studentName: e.target.value,
-                        })
-                      }
-                    />
+                    {/* [UPDATED] Only asking for Email */}
                     <input
                       type="email"
-                      placeholder="Email Address"
+                      placeholder="Student Registered Email Address"
                       className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
                       value={enrollData.studentEmail}
                       onChange={(e) =>
@@ -533,26 +508,14 @@ const PartnerDashboard = () => {
                         })
                       }
                     />
-                    <input
-                      type="password"
-                      placeholder="Create Password"
-                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-indigo-100 focus:bg-white transition-all"
-                      value={enrollData.studentPassword}
-                      onChange={(e) =>
-                        setEnrollData({
-                          ...enrollData,
-                          studentPassword: e.target.value,
-                        })
-                      }
-                    />
                   </div>
                 </div>
 
-                {/* 2. Product Selection (Course/E-Book) */}
+                {/* 2. Product Selection */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Allocation Type
+                      Product Requested
                     </p>
                     {/* Toggle Button */}
                     <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -618,32 +581,33 @@ const PartnerDashboard = () => {
                     />
                   </div>
 
+                  {/* ADMIN PRICE DISPLAY (Important for Partner) */}
                   {enrollData.selectedProductId && (
-                    <div className="flex justify-between items-center px-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">
-                        Admin Base Price:
+                    <div className="flex justify-between items-center px-4 py-3 bg-red-50 rounded-xl border border-red-100">
+                      <span className="text-[10px] font-bold text-red-400 uppercase">
+                        Amount to Pay Admin:
                       </span>
-                      <span className="text-sm font-black text-slate-900">
+                      <span className="text-lg font-black text-red-600">
                         ₹{getSelectedProductDetails()?.price}
                       </span>
                     </div>
                   )}
                 </div>
 
-                {/* 3. Financials */}
+                {/* 3. Financials (Profit Calc) */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    Transaction Details
+                    Your Profit Calculation
                   </p>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">
-                      Selling Price (To Student)
+                      Sold Price (What Student Paid You)
                     </label>
                     <div className="relative">
                       <input
                         type="number"
                         placeholder="0.00"
-                        className="w-full bg-indigo-50/50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-indigo-200 transition-all text-indigo-900"
+                        className="w-full bg-emerald-50/50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-emerald-200 transition-all text-emerald-900"
                         value={enrollData.sellingPrice}
                         onChange={(e) =>
                           setEnrollData({
@@ -652,22 +616,18 @@ const PartnerDashboard = () => {
                           })
                         }
                       />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 font-bold">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-300 font-bold">
                         ₹
                       </span>
                     </div>
-                    <p className="text-[9px] font-bold text-slate-400 italic flex items-center gap-1">
-                      <div className="size-1 rounded-full bg-orange-400" /> Only
-                      for your revenue tracking, do not share with anyone.
-                    </p>
                   </div>
 
                   {enrollData.selectedProductId && enrollData.sellingPrice && (
-                    <div className="bg-emerald-50 p-4 rounded-2xl flex justify-between items-center border border-emerald-100">
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                        Est. Profit
+                    <div className="flex justify-between items-center p-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        Net Profit:
                       </span>
-                      <span className="text-xl font-black text-emerald-600">
+                      <span className="text-sm font-black text-emerald-600">
                         ₹
                         {Number(enrollData.sellingPrice) -
                           Number(getSelectedProductDetails()?.price)}
@@ -676,18 +636,19 @@ const PartnerDashboard = () => {
                   )}
                 </div>
 
+                {/* ACTION BUTTON - PAYMENT SIMULATION */}
                 <button
                   onClick={handleEnrollSubmit}
                   disabled={isProcessing}
                   className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isProcessing
-                    ? "Processing..."
-                    : `Pay ₹${
+                    ? "Processing Payment..."
+                    : `Pay Admin ₹${
                         enrollData.selectedProductId
                           ? getSelectedProductDetails()?.price
                           : "0"
-                      } & Enroll`}
+                      } & Grant Access`}
                 </button>
               </div>
             </motion.div>
