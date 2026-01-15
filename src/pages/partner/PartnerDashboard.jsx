@@ -20,6 +20,7 @@ import {
   Briefcase,
   FileText,
   GraduationCap,
+  BookOpen, // [ADDED] Icon for Courses
 } from "lucide-react";
 import {
   collection,
@@ -386,17 +387,24 @@ const PartnerDashboard = () => {
           </h3>
         </div>
 
-        {/* KPI 2: E-Books Sold */}
+        {/* KPI 2: Courses & E-Books (UPDATED) */}
         <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
           <div className="size-12 bg-orange-50 text-orange-600 rounded-2xl mb-4 flex items-center justify-center">
-            <FileText size={20} />
+            <BookOpen size={20} />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            E-Books Sold
+            Courses Sold
           </p>
-          <h3 className="text-3xl font-black text-slate-900">
-            {metrics.ebooksSold}
-          </h3>
+          <div className="flex flex-col">
+            <h3 className="text-3xl font-black text-slate-900 leading-none">
+              {metrics.coursesSold}
+            </h3>
+            {/* Extremely Small Text for E-Books */}
+            <p className="text-[9px] font-bold text-slate-400 mt-1.5 flex items-center gap-1">
+              <span className="size-1 rounded-full bg-orange-400"></span>+{" "}
+              {metrics.ebooksSold} E-Books
+            </p>
+          </div>
         </div>
 
         {/* KPI 3: Revenue */}

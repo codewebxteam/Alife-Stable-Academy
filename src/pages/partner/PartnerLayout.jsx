@@ -20,21 +20,21 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase/config"; // ✨ Added DB import
-import { doc, onSnapshot } from "firebase/firestore"; // ✨ Added Firestore imports
+import { db } from "../../firebase/config";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const PartnerLayout = () => {
   const { currentUser, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [partnerAgency, setPartnerAgency] = useState(null); // ✨ Local state for real data
+  const [partnerAgency, setPartnerAgency] = useState(null);
   const [loadingAgency, setLoadingAgency] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✨ Fetch Real Partner Data directly from DB
+  // Fetch Real Partner Data
   useEffect(() => {
     if (!currentUser?.uid) return;
 
@@ -89,6 +89,8 @@ const PartnerLayout = () => {
   }, [location.pathname]);
 
   const handleLogoutClick = () => {
+    // Mobile menu open ho to close kardo
+    if (isMobileMenuOpen) setIsMobileMenuOpen(false);
     setShowLogoutConfirm(true);
   };
 
@@ -113,7 +115,7 @@ const PartnerLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-[#F4F7FE] font-sans selection:bg-indigo-500/10">
-      {/* 1. DESKTOP SIDEBAR */}
+      {/* 1. DESKTOP SIDEBAR (HIDDEN ON MOBILE) */}
       <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-slate-200 sticky top-0 h-screen z-50">
         {/* Logo Section */}
         <div className="p-8 flex items-center gap-3">
@@ -165,7 +167,7 @@ const PartnerLayout = () => {
           })}
         </nav>
 
-        {/* Bottom Agency Context (Domain Logic) */}
+        {/* Bottom Agency Context */}
         <div className="p-6 mt-auto border-t border-slate-50">
           <div
             className={`rounded-3xl p-5 mb-4 border transition-all ${
@@ -174,7 +176,6 @@ const PartnerLayout = () => {
                 : "bg-[#F4F7FE] border-slate-100"
             }`}
           >
-            {/* Logic: If Subdomain Exists -> Show Domain */}
             {!loadingAgency && partnerAgency?.subdomain ? (
               <>
                 <div className="flex items-center justify-between mb-3">
@@ -206,7 +207,6 @@ const PartnerLayout = () => {
                 </p>
               </>
             ) : (
-              /* Logic: If No Subdomain -> Show Setup Prompt */
               <div className="text-center space-y-3">
                 <div className="flex items-center justify-center gap-2 text-orange-600">
                   <AlertCircle size={18} />
@@ -241,6 +241,7 @@ const PartnerLayout = () => {
         {/* Header */}
         <header className="h-20 lg:h-24 bg-[#F4F7FE]/80 backdrop-blur-xl sticky top-0 z-40 px-6 lg:px-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-3 bg-white border border-slate-200 text-slate-900 rounded-2xl shadow-sm"
@@ -259,7 +260,6 @@ const PartnerLayout = () => {
 
           {/* Top Actions */}
           <div className="flex items-center gap-6">
-            {/* The Nice Line */}
             <div className="hidden md:flex items-center gap-2 text-slate-400 bg-white/50 px-4 py-2 rounded-2xl border border-slate-100/50">
               <Sparkles size={14} className="text-indigo-400" />
               <span className="text-xs font-bold italic tracking-wide">
@@ -269,7 +269,6 @@ const PartnerLayout = () => {
 
             <div className="h-8 w-px bg-slate-200 hidden md:block mx-1"></div>
 
-            {/* Avatar */}
             <button
               onClick={() => navigate("/partner/profile")}
               className="flex items-center gap-3 pl-2 pr-1 group"
@@ -294,7 +293,7 @@ const PartnerLayout = () => {
         </main>
       </div>
 
-      {/* 4. MOBILE DRAWER */}
+      {/* 4. MOBILE DRAWER (UPDATED WITH LOGOUT BUTTON) */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -310,20 +309,33 @@ const PartnerLayout = () => {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-80 bg-white z-[101] lg:hidden flex flex-col p-8"
+              className="fixed inset-y-0 left-0 w-80 bg-white z-[101] lg:hidden flex flex-col p-6 h-full" // Added h-full
             >
-              <div className="flex justify-between items-center mb-12">
-                <div className="size-10 bg-slate-950 rounded-xl flex items-center justify-center">
-                  <Command size={20} className="text-emerald-400" />
+              {/* Drawer Header */}
+              <div className="flex justify-between items-center mb-8 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 bg-slate-950 rounded-xl flex items-center justify-center shadow-lg">
+                    <Command size={20} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <span className="text-lg font-black tracking-tight uppercase block leading-none text-slate-900">
+                      Partner
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                      Mobile Console
+                    </span>
+                  </div>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 bg-slate-50 rounded-xl text-slate-400"
+                  className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
-              <div className="space-y-2">
+
+              {/* Scrollable Nav Items */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                 {navItems.map((item) => (
                   <button
                     key={item.path}
@@ -331,60 +343,82 @@ const PartnerLayout = () => {
                       navigate(item.path);
                       setIsMobileMenuOpen(false);
                     }}
-                    className={`w-full text-left px-6 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
+                    className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
                       location.pathname === item.path
-                        ? "bg-slate-950 text-white"
-                        : "text-slate-400"
+                        ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
+                        : "text-slate-400 hover:bg-slate-50"
                     }`}
                   >
-                    {item.label}
+                    {item.icon}
+                    <span className="text-xs">{item.label}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* [ADDED] Mobile Bottom Section (Logout) */}
+              <div className="mt-6 pt-6 border-t border-slate-100 shrink-0 space-y-4">
+                {/* Domain Info (Optional for Mobile) */}
+                {partnerAgency?.subdomain && (
+                  <div className="px-2 py-1 flex items-center gap-2 text-[10px] text-slate-400 font-medium bg-slate-50 rounded-lg justify-center mb-2">
+                    <Globe size={12} />
+                    <span className="truncate max-w-[200px]">
+                      {partnerAgency.subdomain}.alifestableacademy.com
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleLogoutClick}
+                  className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-red-50 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-100 hover:text-red-600 transition-all border border-red-100"
+                >
+                  <LogOut size={18} />
+                  <span>Sign Out</span>
+                </button>
               </div>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* Logout Modal */}
+      {/* --- LOGOUT MODAL (Fixed Width) --- */}
       <AnimatePresence>
         {showLogoutConfirm && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowLogoutConfirm(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white w-full max-sm rounded-[32px] p-8 shadow-2xl relative z-10 border border-slate-100 text-center"
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative z-10 border border-slate-100 text-center"
             >
-              <div className="size-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <AlertCircle size={32} />
+              <div className="size-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <AlertCircle size={28} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-2">
-                Terminate Session?
+              <h3 className="text-lg font-black text-slate-900 mb-2">
+                Sign Out?
               </h3>
-              <p className="text-sm text-slate-500 font-medium mb-8">
-                Are you sure you want to log out? You will need to
-                re-authenticate to access the console.
+              <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">
+                You will need to sign in again to access your partner console.
               </p>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={confirmLogout}
-                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-red-100"
-                >
-                  Confirm Logout
-                </button>
+              <div className="flex gap-3">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="w-full py-4 bg-slate-50 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all"
+                  className="flex-1 py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-slate-100 transition-all active:scale-95"
                 >
-                  Stay Connected
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-red-600 transition-all shadow-lg shadow-red-200 active:scale-95"
+                >
+                  Logout
                 </button>
               </div>
             </motion.div>
