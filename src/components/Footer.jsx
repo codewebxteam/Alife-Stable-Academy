@@ -10,184 +10,7 @@ import {
   ShieldCheck,
   X, // Added for Modal Close
 } from "lucide-react";
-
-// --- POLICY CONTENT DATA ---
-const POLICY_CONTENT = {
-  privacy: {
-    title: "Privacy Policy",
-    content: (
-      <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
-        <section>
-          <h4 className="text-white font-bold mb-2">Information Collection</h4>
-          <p>
-            We collect personal information such as name, email, phone number,
-            and payment details for the purpose of course enrollment and
-            support.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">How We Use Information</h4>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>To provide and manage access to courses.</li>
-            <li>To communicate course updates and announcements.</li>
-            <li>To process payments securely via Razorpay.</li>
-          </ul>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Information Sharing</h4>
-          <p className="mb-2">
-            We do not sell or share your personal information with third
-            parties, except:
-          </p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>To comply with legal requirements.</li>
-            <li>
-              To process payments via Razorpay or other authorized payment
-              processors.
-            </li>
-          </ul>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Cookies & Analytics</h4>
-          <p>
-            We may use cookies and analytics tools to improve website experience
-            and track course progress.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Data Security</h4>
-          <p>
-            We implement reasonable security measures to protect your personal
-            information from unauthorized access.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Your Rights</h4>
-          <p>
-            You may request access, correction, or deletion of your personal
-            data by contacting us at{" "}
-            <a
-              href="mailto:support@alifestable.com"
-              className="text-[#5edff4] hover:underline"
-            >
-              support@alifestable.com
-            </a>{" "}
-            or WhatsApp us at{" "}
-            <a
-              href="https://wa.me/918084037252"
-              className="text-[#5edff4] hover:underline"
-            >
-              8084037252
-            </a>
-            .
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Policy Updates</h4>
-          <p>
-            We may update this privacy policy from time to time. Updates will be
-            posted on this page.
-          </p>
-        </section>
-      </div>
-    ),
-  },
-  refund: {
-    title: "Refund Policy",
-    content: (
-      <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
-        <section>
-          <h4 className="text-white font-bold mb-2">
-            Digital Product Disclaimer
-          </h4>
-          <p>
-            All courses sold on Alife Stable Academy are digital products with
-            instant access after purchase. By completing a purchase, you
-            acknowledge that the product is digital and cannot be returned once
-            delivered.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">
-            No Refunds on Completed Access
-          </h4>
-          <p>
-            Due to the nature of online courses, we do not offer refunds once
-            the course content is accessed. This is standard practice for
-            digital products.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Exceptions / Support</h4>
-          <p>
-            We value our learners. If you experience technical issues preventing
-            access to course content, please contact us at{" "}
-            <a
-              href="mailto:support@alifestable.com"
-              className="text-[#5edff4] hover:underline"
-            >
-              support@alifestable.com
-            </a>{" "}
-            or WhatsApp us at{" "}
-            <a
-              href="https://wa.me/918084037252"
-              className="text-[#5edff4] hover:underline"
-            >
-              8084037252
-            </a>
-            . We will make all reasonable efforts to resolve access issues
-            promptly.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">
-            Cancellation Before Payment Completion
-          </h4>
-          <p>
-            If a payment fails or is canceled before full access is granted, no
-            charges will be processed.
-          </p>
-        </section>
-
-        <section>
-          <h4 className="text-white font-bold mb-2">Disputes</h4>
-          <p>
-            All refund or payment disputes will be handled in accordance with
-            Razorpay’s terms and applicable laws.
-          </p>
-        </section>
-      </div>
-    ),
-  },
-};
-
-const footerLinks = {
-  Academy: [
-    { name: "Courses", href: "/courses" },
-    { name: "Ebooks", href: "/ebooks" },
-  ],
-  Company: [
-    { name: "About Us", href: "/about" },
-    { name: "Register as a Partner", href: "#", isPartner: true },
-  ],
-  Resources: [
-    { name: "Capstone Projects", href: "/projects" },
-    { name: "Blog", href: "/blog" },
-  ],
-  Legal: [
-    { name: "Privacy Policy", href: "#", type: "privacy" }, // Trigger Privacy Modal
-    { name: "Refund Policy", href: "#", type: "refund" }, // Trigger Refund Modal
-  ],
-};
+import { useAgency } from "../context/AgencyContext"; // [ADDED] Import Context
 
 const SocialIcon = ({ Icon, href }) => (
   <motion.a
@@ -209,6 +32,198 @@ const SocialIcon = ({ Icon, href }) => (
 const Footer = () => {
   const [activePolicy, setActivePolicy] = useState(null); // 'privacy' | 'refund' | null
 
+  // [ADDED] Agency Context Hook
+  const { agency, isMainSite } = useAgency();
+
+  // [LOGIC] Dynamic Data Variables
+  const academyName =
+    !isMainSite && agency ? agency.name : "Alife Stable Academy";
+  const supportEmail =
+    !isMainSite && agency?.email ? agency.email : "support@alifestable.com";
+  const supportPhone =
+    !isMainSite && agency?.whatsapp ? agency.whatsapp : "918084037252";
+  const whatsappLink = `https://wa.me/${supportPhone.replace(/\D/g, "")}`;
+
+  // [UPDATED] POLICY CONTENT MOVED INSIDE TO USE VARIABLES
+  const POLICY_CONTENT = {
+    privacy: {
+      title: "Privacy Policy",
+      content: (
+        <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
+          <section>
+            <h4 className="text-white font-bold mb-2">
+              Information Collection
+            </h4>
+            <p>
+              We collect personal information such as name, email, phone number,
+              and payment details for the purpose of course enrollment and
+              support.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">
+              How We Use Information
+            </h4>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>To provide and manage access to courses.</li>
+              <li>To communicate course updates and announcements.</li>
+              <li>To process payments securely via Razorpay.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Information Sharing</h4>
+            <p className="mb-2">
+              We do not sell or share your personal information with third
+              parties, except:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>To comply with legal requirements.</li>
+              <li>
+                To process payments via Razorpay or other authorized payment
+                processors.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Cookies & Analytics</h4>
+            <p>
+              We may use cookies and analytics tools to improve website
+              experience and track course progress.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Data Security</h4>
+            <p>
+              We implement reasonable security measures to protect your personal
+              information from unauthorized access.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Your Rights</h4>
+            <p>
+              You may request access, correction, or deletion of your personal
+              data by contacting us at{" "}
+              <a
+                href={`mailto:${supportEmail}`}
+                className="text-[#5edff4] hover:underline"
+              >
+                {supportEmail}
+              </a>{" "}
+              or WhatsApp us at{" "}
+              <a href={whatsappLink} className="text-[#5edff4] hover:underline">
+                {supportPhone}
+              </a>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Policy Updates</h4>
+            <p>
+              We may update this privacy policy from time to time. Updates will
+              be posted on this page.
+            </p>
+          </section>
+        </div>
+      ),
+    },
+    refund: {
+      title: "Refund Policy",
+      content: (
+        <div className="space-y-6 text-slate-300 text-sm md:text-base leading-relaxed">
+          <section>
+            <h4 className="text-white font-bold mb-2">
+              Digital Product Disclaimer
+            </h4>
+            <p>
+              All courses sold on {academyName} are digital products with
+              instant access after purchase. By completing a purchase, you
+              acknowledge that the product is digital and cannot be returned
+              once delivered.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">
+              No Refunds on Completed Access
+            </h4>
+            <p>
+              Due to the nature of online courses, we do not offer refunds once
+              the course content is accessed. This is standard practice for
+              digital products.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Exceptions / Support</h4>
+            <p>
+              We value our learners. If you experience technical issues
+              preventing access to course content, please contact us at{" "}
+              <a
+                href={`mailto:${supportEmail}`}
+                className="text-[#5edff4] hover:underline"
+              >
+                {supportEmail}
+              </a>{" "}
+              or WhatsApp us at{" "}
+              <a href={whatsappLink} className="text-[#5edff4] hover:underline">
+                {supportPhone}
+              </a>
+              . We will make all reasonable efforts to resolve access issues
+              promptly.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">
+              Cancellation Before Payment Completion
+            </h4>
+            <p>
+              If a payment fails or is canceled before full access is granted,
+              no charges will be processed.
+            </p>
+          </section>
+
+          <section>
+            <h4 className="text-white font-bold mb-2">Disputes</h4>
+            <p>
+              All refund or payment disputes will be handled in accordance with
+              Razorpay’s terms and applicable laws.
+            </p>
+          </section>
+        </div>
+      ),
+    },
+  };
+
+  // [UPDATED] Footer Links - Dynamic "Register as Partner"
+  const footerLinks = {
+    Academy: [
+      { name: "Courses", href: "/courses" },
+      { name: "Ebooks", href: "/ebooks" },
+    ],
+    Company: [
+      { name: "About Us", href: "/about" },
+      // Only show Partner Registration on Main Site
+      ...(isMainSite
+        ? [{ name: "Register as a Partner", href: "#", isPartner: true }]
+        : []),
+    ],
+    Resources: [
+      { name: "Capstone Projects", href: "/projects" },
+      { name: "Blog", href: "/blog" },
+    ],
+    Legal: [
+      { name: "Privacy Policy", href: "#", type: "privacy" }, // Trigger Privacy Modal
+      { name: "Refund Policy", href: "#", type: "refund" }, // Trigger Refund Modal
+    ],
+  };
+
   return (
     <footer className="relative bg-slate-950 pt-24 pb-12 overflow-hidden font-sans border-t border-slate-900">
       {/* --- Background Effects --- */}
@@ -226,10 +241,12 @@ const Footer = () => {
           >
             <div className="flex items-center gap-2 mb-6">
               <div className="size-10 bg-linear-to-br from-[#5edff4] to-[#0891b2] rounded-xl flex items-center justify-center shadow-lg shadow-[#5edff4]/20">
-                <span className="text-slate-900 font-bold text-xl">A</span>
+                <span className="text-slate-900 font-bold text-xl">
+                  {academyName.charAt(0)}
+                </span>
               </div>
               <span className="text-2xl font-bold text-white tracking-tight">
-                Alife Stable Academy
+                {academyName}
               </span>
             </div>
             <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4 leading-tight">
@@ -326,7 +343,7 @@ const Footer = () => {
         {/* --- Bottom Section: Copyright & Socials --- */}
         <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-slate-800/50 gap-6">
           <div className="flex items-center gap-2 text-slate-500 text-sm">
-            <span>© 2025 Alife Stable Academy. All rights reserved.</span>
+            <span>© 2025 {academyName}. All rights reserved.</span>
           </div>
 
           <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -355,9 +372,9 @@ const Footer = () => {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 0.05 }}
           transition={{ duration: 2 }}
-          className="text-[12vw] md:text-[15vw] font-black text-white leading-none tracking-tighter whitespace-nowrap"
+          className="text-[12vw] md:text-[15vw] font-black text-white leading-none tracking-tighter whitespace-nowrap uppercase"
         >
-          ALIFESTABLE
+          {academyName.split(" ")[0]}
         </motion.h1>
       </div>
 

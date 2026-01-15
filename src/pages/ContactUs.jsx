@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Globe,
 } from "lucide-react";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 // --- FAQ Data (Same as Home Page) ---
 const faqs = [
@@ -41,6 +42,19 @@ const faqs = [
 const ContactUs = () => {
   const [formState, setFormState] = useState("idle"); // idle, submitting, success
 
+  // [ADDED] Agency Context Hook
+  const { agency, isMainSite } = useAgency();
+
+  // [LOGIC] Dynamic Data Selection
+  // Agar Partner Site hai to Agency ka data, nahi to Default Alife Stable ka data
+  const contactEmail =
+    !isMainSite && agency?.email ? agency.email : "support@alifestable.com";
+  const contactPhone =
+    !isMainSite && agency?.whatsapp ? agency.whatsapp : "+91 80840 37252";
+  const contactAddress = isMainSite
+    ? "Near Metro Station, Nirman Vihar, East Delhi 110092"
+    : "Digital Campus (Online)"; // Partner ka address nahi hai to generic text
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormState("submitting");
@@ -63,18 +77,19 @@ const ContactUs = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            {/* [REMOVED] 24/7 Support Badge */}
-
             <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6">
               Let's Start a <br />
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-[#5edff4] to-[#0891b2]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5edff4] to-[#0891b2]">
                 Conversation.
               </span>
             </h1>
 
-            {/* [UPDATED] Sub-headline */}
             <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Questions or just want to say hi? We’re here to help you grow.
+              Questions for{" "}
+              <span className="font-bold text-slate-900">
+                {!isMainSite && agency ? agency.name : "us"}
+              </span>
+              ? We’re here to help you grow.
             </p>
           </motion.div>
         </div>
@@ -99,27 +114,30 @@ const ContactUs = () => {
               <div className="relative z-10">
                 <h3 className="text-2xl font-bold mb-2">Contact Information</h3>
                 <p className="text-slate-400 mb-10 text-sm">
-                  Reach out to us directly through these channels.
+                  Reach out to {!isMainSite && agency ? agency.name : "us"}{" "}
+                  directly through these channels.
                 </p>
 
                 <div className="space-y-8">
-                  {/* [UPDATED] Contact Details */}
+                  {/* [UPDATED] Dynamic Contact Details */}
                   <ContactItem
                     icon={Mail}
                     title="Email Us"
-                    value="support@alifestable.com"
-                    link="mailto:support@alifestable.com"
+                    value={contactEmail}
+                    link={`mailto:${contactEmail}`}
                   />
                   <ContactItem
                     icon={Phone}
-                    title="Call Us"
-                    value="+91 80840 37252"
-                    link="tel:+918084037252"
+                    title="Call / WhatsApp"
+                    value={contactPhone}
+                    link={`https://wa.me/${contactPhone.replace(/\D/g, "")}`} // WhatsApp Link
                   />
+
+                  {/* Address Section - Only show proper address for Main Site */}
                   <ContactItem
                     icon={MapPin}
-                    title="Visit HQ"
-                    value="Near Metro Station, Nirman Vihar, East Delhi 110092"
+                    title="Location"
+                    value={contactAddress}
                   />
                 </div>
               </div>
@@ -292,7 +310,9 @@ const ContactItem = ({ icon: Icon, title, value, link }) => (
       {link ? (
         <a
           href={link}
-          className="text-lg font-bold text-white hover:text-[#5edff4] transition-colors"
+          target="_blank" // Opens WhatsApp/Mail in new tab if needed
+          rel="noopener noreferrer"
+          className="text-lg font-bold text-white hover:text-[#5edff4] transition-colors break-all"
         >
           {value}
         </a>

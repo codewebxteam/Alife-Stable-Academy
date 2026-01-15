@@ -1,16 +1,22 @@
 import React from "react";
 import { motion } from "framer-motion";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 const MarqueeSection = () => {
-  // Text to repeat
-  const marqueeText = "INNOVATE • EDUCATE • ELEVATE • ALIFESTABLE ACADEMY • ";
+  const { agency, isMainSite } = useAgency(); // [ADDED]
+
+  // [LOGIC] Dynamic Name Logic
+  // Agar Partner hai to uska naam (Uppercase me), nahi to Default
+  const academyName =
+    !isMainSite && agency ? agency.name.toUpperCase() : "ALIFESTABLE ACADEMY";
+
+  const marqueeText = `INNOVATE • EDUCATE • ELEVATE • ${academyName} • `;
 
   return (
     <section className="relative w-full bg-slate-950 py-10 overflow-hidden border-y border-slate-900">
       {/* --- Gradient Overlays (Fade Effect on Edges) --- */}
-      {/* Tailwind 4.1: bg-linear-to-r instead of bg-gradient-to-r */}
-      <div className="absolute left-0 top-0 bottom-0 w-32 bg-linear-to-r from-slate-950 to-transparent z-10 hidden md:block pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-32 bg-linear-to-l from-slate-950 to-transparent z-10 hidden md:block pointer-events-none" />
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-slate-950 to-transparent z-10 hidden md:block pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-slate-950 to-transparent z-10 hidden md:block pointer-events-none" />
 
       {/* --- Scrolling Content --- */}
       <div className="flex whitespace-nowrap select-none">

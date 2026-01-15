@@ -33,8 +33,9 @@ const Navbar = () => {
   const profileMenuRef = useRef(null);
 
   // Dynamic Styles based on Agency Settings
-  const brandColor = agency.themeColor || "#0f172a";
-  const accentColor = agency.accentColor || "#5edff4";
+  // Safe check added for agency
+  const brandColor = agency?.themeColor || "#0f172a";
+  const accentColor = agency?.accentColor || "#5edff4";
 
   // --- [UPDATED] Logical Dashboard Paths for Student, Partner & Admin ---
   const isPartner = userData?.role === "partner";
@@ -131,7 +132,7 @@ const Navbar = () => {
                 shadowColor: `${accentColor}33`,
               }}
             >
-              {agency.logoUrl ? (
+              {agency?.logoUrl ? (
                 <img
                   src={agency.logoUrl}
                   alt="logo"
@@ -145,8 +146,9 @@ const Navbar = () => {
               )}
             </div>
             <div className="flex flex-col">
+              {/* [FIXED] Use agency.name instead of agency.agencyName */}
               <span className="text-sm sm:text-lg font-bold tracking-tight text-slate-900 leading-none">
-                {agency.agencyName || "Alife Stable"}
+                {agency?.name || "Alife Stable Academy"}
               </span>
               <span
                 className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase block"

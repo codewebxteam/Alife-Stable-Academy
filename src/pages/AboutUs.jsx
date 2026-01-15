@@ -16,8 +16,16 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 const AboutUs = () => {
+  const { agency, isMainSite } = useAgency(); // [ADDED]
+
+  // [LOGIC] Dynamic Name
+  const academyName =
+    !isMainSite && agency ? agency.name : "Alife Stable Academy";
+  const shortName = !isMainSite && agency ? agency.name : "Alife Stable";
+
   return (
     <div className="min-h-screen w-full bg-slate-50 font-sans selection:bg-[#5edff4] selection:text-slate-900">
       {/* --- Main Spacing Wrapper (Matches Courses/Hero) --- */}
@@ -41,18 +49,18 @@ const AboutUs = () => {
 
               <h1 className="text-4xl md:text-6xl font-bold text-slate-900 leading-[1.1] mb-6">
                 We Are Building The <br />
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-[#5edff4] to-[#0891b2]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5edff4] to-[#0891b2]">
                   Future of Learning.
                 </span>
               </h1>
 
-              {/* [UPDATED] Intro Text */}
+              {/* [UPDATED] Intro Text with Dynamic Name */}
               <p className="text-lg text-slate-600 leading-relaxed mb-8 max-w-xl">
-                Alife Stable Academy wasn’t built in a boardroom. It started
-                with a simple vision: education should be accessible, practical,
-                and future-ready. We empower learners with AI-driven tools,
-                hands-on projects, and industry-aligned skills to bridge the gap
-                between knowledge and real-world careers.
+                {academyName} wasn’t built in a boardroom. It started with a
+                simple vision: education should be accessible, practical, and
+                future-ready. We empower learners with AI-driven tools, hands-on
+                projects, and industry-aligned skills to bridge the gap between
+                knowledge and real-world careers.
               </p>
 
               <div className="flex flex-wrap gap-4">
@@ -64,7 +72,6 @@ const AboutUs = () => {
                     <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">
                       Mission
                     </p>
-                    {/* [UPDATED] Mission Statement */}
                     <p className="font-bold text-slate-900">
                       Empower 1M+ Creators
                     </p>
@@ -118,7 +125,6 @@ const AboutUs = () => {
                     alt="Meeting"
                     className="w-full h-64 object-cover rounded-2xl shadow-xl"
                   />
-                  {/* [UPDATED] Removed "15+ Years" block as requested */}
                   <img
                     src="https://images.unsplash.com/photo-1606761568499-6d2451b23c66?q=80&w=400&auto=format&fit=crop"
                     alt="Creative Workspace"
@@ -131,14 +137,13 @@ const AboutUs = () => {
         </div>
 
         {/* =========================================
-            2. CORE VALUES SECTION (Replaces Stats)
+            2. CORE VALUES SECTION
         ========================================= */}
         <div className="bg-slate-900 py-20 text-white relative overflow-hidden">
           {/* Background Grid */}
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
           <div className="max-w-7xl mx-auto px-6 relative z-10">
-            {/* [UPDATED] Replaced numbers with Core Value Identifiers */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 text-center">
               {[
                 { label: "Industry-Aligned", icon: Briefcase },
@@ -157,7 +162,6 @@ const AboutUs = () => {
                   <div className="size-14 mb-5 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-[#5edff4] group-hover:text-slate-900 transition-colors duration-300 border border-slate-700">
                     <item.icon className="size-7" />
                   </div>
-                  {/* Used h3 for the main label to make it prominent like the stats were */}
                   <h3 className="text-xl md:text-2xl font-bold mb-2 leading-tight">
                     {item.label}
                   </h3>
@@ -172,8 +176,9 @@ const AboutUs = () => {
         ========================================= */}
         <div className="max-w-7xl mx-auto px-6 py-20 md:py-32">
           <div className="text-center max-w-2xl mx-auto mb-16">
+            {/* [UPDATED] Dynamic Heading */}
             <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">
-              Why Alife Stable?
+              Why {shortName}?
             </h2>
             <p className="text-slate-600">
               We don't just sell courses; we curate career paths. Here is what
@@ -185,19 +190,16 @@ const AboutUs = () => {
             {[
               {
                 title: "Curated Content",
-                // [UPDATED]
                 desc: "We manually verify every course. No outdated tutorials. Only industry-standard, high-quality AI-Powered lessons.",
                 color: "bg-blue-50 text-blue-600",
               },
               {
                 title: "Community Driven",
-                // [UPDATED]
                 desc: "We foster a supportive learning community where creators grow, collaborate, and learn together.",
                 color: "bg-[#f0fdff] text-[#0891b2]",
               },
               {
                 title: "Affordable Pricing",
-                // [UPDATED]
                 desc: "High-quality education should be accessible. We work directly with creators to offer fair, region-appropriate pricing without compromising on quality.",
                 color: "bg-purple-50 text-purple-600",
               },
@@ -225,15 +227,14 @@ const AboutUs = () => {
         </div>
 
         {/* =========================================
-            4. LEARNING PHILOSOPHY (Replaces Founder's Note)
+            4. LEARNING PHILOSOPHY
         ========================================= */}
         <div className="bg-[#f0fdff] py-20 md:py-32 border-y border-[#cff9fe]">
           <div className="max-w-5xl mx-auto px-6">
             <div className="flex flex-col md:flex-row items-center gap-12">
-              {/* Image: Abstract / Learning Focus */}
+              {/* Image */}
               <div className="relative shrink-0">
                 <div className="size-48 md:size-64 rounded-full overflow-hidden border-4 border-white shadow-2xl">
-                  {/* [UPDATED] Replaced founder image with abstract learning image */}
                   <img
                     src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?q=80&w=400&auto=format&fit=crop"
                     alt="Philosophy"
@@ -247,27 +248,25 @@ const AboutUs = () => {
 
               {/* Text */}
               <div className="text-center md:text-left">
-                {/* [UPDATED] New Heading */}
                 <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mb-6">
                   Our Learning Philosophy
                 </h3>
 
                 <div className="relative">
-                  {/* Kept the quote style for aesthetic but used it for the philosophy text */}
                   <span className="absolute -top-4 -left-4 text-6xl text-[#5edff4] opacity-50 font-serif hidden md:block">
                     "
                   </span>
-                  {/* [UPDATED] New Text Content */}
+                  {/* [UPDATED] Dynamic Name in Text */}
                   <p className="text-lg text-slate-700 leading-relaxed relative z-10">
-                    At Alife Stable Academy, we believe learning should be
-                    practical, accessible, and future-ready. Our philosophy is
-                    built around hands-on, project-based education that reflects
-                    real industry workflows. By combining structured learning
-                    paths, modern tools, and AI-driven approaches, we help
-                    learners move beyond theory and build skills that are
-                    relevant, applicable, and career-focused. Every course is
-                    designed to support creators at every stage—guiding them
-                    from foundational concepts to industry-ready confidence.
+                    At {academyName}, we believe learning should be practical,
+                    accessible, and future-ready. Our philosophy is built around
+                    hands-on, project-based education that reflects real
+                    industry workflows. By combining structured learning paths,
+                    modern tools, and AI-driven approaches, we help learners
+                    move beyond theory and build skills that are relevant,
+                    applicable, and career-focused. Every course is designed to
+                    support creators at every stage—guiding them from
+                    foundational concepts to industry-ready confidence.
                   </p>
                 </div>
               </div>
@@ -291,7 +290,6 @@ const AboutUs = () => {
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 relative z-10">
               Ready to start your journey?
             </h2>
-            {/* [UPDATED] CTA Subtext */}
             <p className="text-slate-400 max-w-2xl mx-auto mb-10 text-lg relative z-10">
               Transform your career today. Get unlimited access to our premium
               library.
