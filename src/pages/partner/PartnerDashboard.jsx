@@ -32,6 +32,7 @@ import {
   updateDoc,
   arrayUnion,
   doc,
+  setDoc, // [CRITICAL ADDITION]
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
@@ -84,7 +85,7 @@ const PartnerDashboard = () => {
       }));
       setEbooks(ebooksList);
 
-      // 3. Fetch Orders (For Partner History)
+      // 3. Fetch Orders
       if (partnerId) {
         const q = query(
           collection(db, "orders"),
@@ -140,13 +141,12 @@ const PartnerDashboard = () => {
     setGraphData(chartData);
   };
 
-  // --- CALCULATE METRICS (Fixed E-Book Count Logic) ---
+  // --- CALCULATE METRICS (Fixed Count Logic) ---
   const metrics = useMemo(() => {
     let totalStudents = new Set(orders.map((o) => o.studentEmail)).size;
     let totalRevenue = 0;
     let totalCost = 0;
 
-    // [FIX] Separate Counts
     let ebookCount = 0;
     let courseCount = 0;
 
@@ -154,7 +154,8 @@ const PartnerDashboard = () => {
       totalRevenue += Number(order.sellingPrice || 0);
       totalCost += Number(order.adminPrice || 0);
 
-      if (order.productType === "E-Book") {
+      const pType = (order.productType || "").toLowerCase();
+      if (pType.includes("book")) {
         ebookCount += 1;
       } else {
         courseCount += 1;
@@ -165,12 +166,12 @@ const PartnerDashboard = () => {
       students: totalStudents,
       revenue: totalRevenue,
       profit: totalRevenue - totalCost,
-      ebooksSold: ebookCount, // New Metric
-      coursesSold: courseCount, // New Metric
+      ebooksSold: ebookCount,
+      coursesSold: courseCount,
     };
   }, [orders]);
 
-  // --- [FIXED] HANDLE ENROLLMENT WITH EXACT DATABASE MATCH ---
+  // --- [FIXED] HANDLE ENROLLMENT WITH FULL OBJECT LOGIC ---
   const handleEnrollSubmit = async () => {
     if (
       !enrollData.studentEmail ||
@@ -220,41 +221,90 @@ const PartnerDashboard = () => {
       const sellingPrice = Number(enrollData.sellingPrice);
 
       // =========================================================
-      // STEP A: WRITE TO 'enrollments' (Exact Structure)
+      // STEP A: GRANT ACCESS (MIMIC COURSE CONTEXT)
+      // =========================================================
+
+      if (enrollData.productType === "Course") {
+        // [CRITICAL FIX] Create FULL Course Object like Context
+        let safeLectures = [];
+        if (
+          selectedProduct.lectures &&
+          Array.isArray(selectedProduct.lectures)
+        ) {
+          safeLectures = selectedProduct.lectures;
+        } else if (selectedProduct.videoId) {
+          safeLectures = [
+            {
+              id: Date.now(),
+              videoId: selectedProduct.videoId,
+              title: selectedProduct.title,
+              url: selectedProduct.url || "",
+            },
+          ];
+        }
+
+        const newCourseObject = {
+          courseId: String(selectedProduct.id),
+          title: String(selectedProduct.title || "Untitled Course"),
+          image: String(
+            selectedProduct.image || selectedProduct.thumbnail || ""
+          ),
+          instructor: String(selectedProduct.instructor || "Unknown"),
+          progress: 0,
+          status: "in-progress",
+          enrolledAt: new Date().toISOString(),
+          lastAccessed: new Date().toISOString(),
+          videoProgress: 0,
+          totalDuration: String(selectedProduct.duration || "Self Paced"),
+          watchedDuration: 0,
+          price: String(sellingPrice),
+          originalPrice: String(selectedProduct.price || "Free"),
+          category: String(selectedProduct.category || "General"),
+          lectures: safeLectures, // Array!
+          rating: Number(selectedProduct.rating || 0),
+          level: String(selectedProduct.level || "Beginner"),
+          videoUrl: String(selectedProduct.videoUrl || ""),
+          youtubeId: String(
+            selectedProduct.youtubeId || selectedProduct.videoId || ""
+          ),
+        };
+
+        // Write to 'enrolledCourses' Collection (This is what Main Site uses!)
+        const enrolledCoursesRef = doc(db, "enrolledCourses", studentId);
+        await setDoc(
+          enrolledCoursesRef,
+          {
+            courses: arrayUnion(newCourseObject),
+          },
+          { merge: true }
+        );
+
+        console.log("✅ Written Full Object to enrolledCourses Collection");
+      } else {
+        // Handle E-Books (Simple Array in Users)
+        await updateDoc(studentRef, {
+          purchasedBooks: arrayUnion(String(selectedProduct.id)),
+        });
+        console.log("✅ Updated E-Book Access in User Profile");
+      }
+
+      // =========================================================
+      // STEP B: WRITE TO 'enrollments' (For Record)
       // =========================================================
       const enrollmentPayload = {
         courseId: String(selectedProduct.id),
         courseName: selectedProduct.title,
         studentId: studentId,
         price: sellingPrice,
-        source: "direct", // As per your DB dump
+        source: "partner",
         createdAt: serverTimestamp(),
+        type: enrollData.productType,
       };
-
-      // Only add to enrollments collection if it's a COURSE
-      // (Assuming E-books don't use 'enrollments' collection based on your feedback that E-books work differently)
-      if (enrollData.productType === "Course") {
-        await addDoc(collection(db, "enrollments"), enrollmentPayload);
-        console.log("✅ Written to enrollments collection (Course)");
-      }
+      await addDoc(collection(db, "enrollments"), enrollmentPayload);
+      console.log("✅ Written to enrollments collection");
 
       // =========================================================
-      // STEP B: UPDATE 'users' DOCUMENT (Direct Access)
-      // =========================================================
-      if (enrollData.productType === "Course") {
-        await updateDoc(studentRef, {
-          enrolledCourses: arrayUnion(String(selectedProduct.id)),
-          courses: arrayUnion(String(selectedProduct.id)), // Backup field
-        });
-      } else {
-        await updateDoc(studentRef, {
-          purchasedBooks: arrayUnion(String(selectedProduct.id)),
-        });
-      }
-      console.log("✅ Updated User Profile");
-
-      // =========================================================
-      // STEP C: CREATE 'orders' RECORD (Partner History)
+      // STEP C: CREATE 'orders' RECORD (For Dashboard)
       // =========================================================
       const orderPayload = {
         partnerId: partnerId,
@@ -321,7 +371,7 @@ const PartnerDashboard = () => {
         </div>
       </div>
 
-      {/* --- KPI CARDS (Updated for E-Books) --- */}
+      {/* --- KPI CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* KPI 1: Students */}
         <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
@@ -336,7 +386,7 @@ const PartnerDashboard = () => {
           </h3>
         </div>
 
-        {/* KPI 2: E-Books Sold (NEW) */}
+        {/* KPI 2: E-Books Sold */}
         <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
           <div className="size-12 bg-orange-50 text-orange-600 rounded-2xl mb-4 flex items-center justify-center">
             <FileText size={20} />
@@ -355,7 +405,7 @@ const PartnerDashboard = () => {
             <Briefcase size={20} />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Revenue
+            Total Revenue
           </p>
           <h3 className="text-3xl font-black text-slate-900">
             ₹{metrics.revenue.toLocaleString()}
