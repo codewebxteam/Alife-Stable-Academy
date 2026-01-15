@@ -9,35 +9,51 @@ import {
   FileText,
   CheckCircle,
 } from "lucide-react";
-import { useAgency } from "../../context/AgencyContext";
-import { useNavigate } from "react-router-dom"; // [NEW] Navigation hook
+import { useAgency } from "../../context/AgencyContext"; // Ensure correct path
+import { useNavigate } from "react-router-dom";
 
 const PricingCard = ({ course, onEnroll, isEnrolled }) => {
-  const { agency, isPartner } = useAgency();
-  const navigate = useNavigate(); // [NEW] Navigate hook
+  // [FIX] Destructure getPrice from context
+  const { agency, isPartner, getPrice } = useAgency();
+  const navigate = useNavigate();
 
-  // --- [DYNAMIC PRICING LOGIC] ---
-  const calculatePrice = (originalPriceStr) => {
-    if (originalPriceStr === "Free") return "Free";
-    const numericPrice = parseInt(
-      String(originalPriceStr).replace(/[^0-9]/g, "")
-    );
-    const finalPrice = isPartner
-      ? Math.round(numericPrice * agency.pricingMultiplier)
-      : numericPrice;
-    return `₹${finalPrice.toLocaleString("en-IN")}`;
+  // --- [FIXED DYNAMIC PRICING LOGIC] ---
+  // Use getPrice helper to fetch Partner's Custom Price or Default Price
+  const dynamicPrice = getPrice
+    ? getPrice(course.id, course.price)
+    : course.price;
+
+  // Formatting Helper
+  const formatCurrency = (amount) => {
+    if (!amount) return "Free";
+    const strAmount = String(amount).toLowerCase();
+    if (strAmount === "free" || strAmount === "0") return "Free";
+
+    // Clean string and convert to number
+    const numericValue = parseInt(String(amount).replace(/[^0-9]/g, ""));
+
+    // Check for valid number
+    if (isNaN(numericValue) || numericValue === 0) return "Free";
+
+    return `₹${numericValue.toLocaleString("en-IN")}`;
   };
 
-  const displayPrice = calculatePrice(course.price);
-  const displayOriginalPrice = calculatePrice(course.originalPrice);
+  const displayPrice = formatCurrency(dynamicPrice);
+  const displayOriginalPrice = formatCurrency(course.originalPrice);
 
   const calculateDiscount = () => {
-    if (course.price === "Free" || !course.originalPrice) return "100% off";
-    const offerPrice = parseInt(String(course.price).replace(/[^0-9]/g, ""));
+    if (displayPrice === "Free" || !course.originalPrice) return "100% off";
+
+    const offerPrice = parseInt(String(dynamicPrice).replace(/[^0-9]/g, ""));
     const listingPrice = parseInt(
       String(course.originalPrice).replace(/[^0-9]/g, "")
     );
-    if (listingPrice > offerPrice) {
+
+    if (
+      !isNaN(offerPrice) &&
+      !isNaN(listingPrice) &&
+      listingPrice > offerPrice
+    ) {
       const discount = Math.round(
         ((listingPrice - offerPrice) / listingPrice) * 100
       );
@@ -72,7 +88,7 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
         </div>
 
         <div className="p-8">
-          {/* [FIX] Show "Purchased" status if enrolled */}
+          {/* Show "Purchased" status if enrolled */}
           {isEnrolled ? (
             <div className="mb-6 flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
               <CheckCircle className="size-6 shrink-0" />
@@ -91,7 +107,8 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
                 {displayPrice}
               </span>
               {displayOriginalPrice &&
-                displayOriginalPrice !== displayPrice && (
+                displayOriginalPrice !== displayPrice &&
+                displayOriginalPrice !== "Free" && (
                   <>
                     <span className="text-lg text-slate-400 line-through">
                       {displayOriginalPrice}
@@ -104,10 +121,10 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
             </div>
           )}
 
-          {/* [FIX] Button Change based on Enrollment */}
+          {/* Button Change based on Enrollment */}
           {isEnrolled ? (
             <button
-              onClick={() => navigate("/dashboard/my-courses")} // Navigate to Dashboard
+              onClick={() => navigate("/dashboard/my-courses")}
               className="w-full py-4 text-white font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2"
               style={{
                 boxShadow: `0 10px 15px -3px rgba(16, 185, 129, 0.3)`,
@@ -120,17 +137,19 @@ const PricingCard = ({ course, onEnroll, isEnrolled }) => {
               onClick={() =>
                 onEnroll({
                   ...course,
-                  finalPrice: displayPrice,
+                  finalPrice: dynamicPrice, // Pass dynamic price
                   commission: isPartner ? "Calculated at Checkout" : 0,
                 })
               }
               className="w-full py-4 text-slate-900 font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 mb-4 cursor-pointer"
               style={{
-                backgroundColor: agency.accentColor || "#5edff4",
-                boxShadow: `0 10px 15px -3px ${agency.accentColor}33`,
+                backgroundColor: agency?.accentColor || "#5edff4", // Safe access
+                boxShadow: `0 10px 15px -3px ${
+                  agency?.accentColor || "#5edff4"
+                }33`,
               }}
             >
-              {course.price === "Free" ? "Enroll for Free" : "Buy Now"}
+              {displayPrice === "Free" ? "Enroll for Free" : "Buy Now"}
             </button>
           )}
 

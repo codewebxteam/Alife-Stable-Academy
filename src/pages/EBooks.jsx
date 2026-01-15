@@ -5,6 +5,7 @@ import BookRequestSection from "../components/BookRequestSection";
 import AuthModal from "../components/AuthModal";
 import { useAuth } from "../context/AuthContext";
 import { useEBook } from "../context/EBookContext";
+import { useAgency } from "../context/AgencyContext"; // [ADDED]
 import { db } from "../firebase/config";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
@@ -20,14 +21,15 @@ import {
 
 const EBooks = () => {
   const { currentUser } = useAuth();
-  const { purchasedBooks } = useEBook(); // Context fallback
+  const { purchasedBooks } = useEBook();
+  const { getPrice } = useAgency(); // [ADDED] Get Dynamic Price Function
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [readingBook, setReadingBook] = useState(null);
   const [ebooks, setEbooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dbPurchasedIds, setDbPurchasedIds] = useState([]); // Database IDs
+  const [dbPurchasedIds, setDbPurchasedIds] = useState([]);
 
   // --- Helper for Images ---
   const getValidImageUrl = (url) => {
@@ -147,10 +149,14 @@ const EBooks = () => {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
             >
               {filteredBooks.map((book) => {
-                // Check if purchased (DB or Context or Free)
+                // [LOGIC] Dynamic Price Check
+                const finalPrice = getPrice(book.id, book.price);
+
                 const isFree =
-                  String(book.price).toLowerCase() === "free" ||
-                  book.price === 0;
+                  String(finalPrice).toLowerCase() === "free" ||
+                  finalPrice === 0 ||
+                  finalPrice === "0";
+
                 const isPurchased =
                   dbPurchasedIds.includes(book.id) ||
                   purchasedBooks.includes(book.id) ||
@@ -162,6 +168,8 @@ const EBooks = () => {
                     book={book}
                     isPurchased={isPurchased}
                     onRead={() => handleRead(book)}
+                    displayPrice={finalPrice} // [ADDED] Pass dynamic price prop
+                    isFree={isFree} // [ADDED] Pass isFree flag
                   />
                 );
               })}
@@ -189,10 +197,7 @@ const EBooks = () => {
   );
 };
 
-const BookCard = ({ book, isPurchased, onRead }) => {
-  const isFree =
-    String(book.price).toLowerCase() === "free" || book.price === 0;
-
+const BookCard = ({ book, isPurchased, onRead, displayPrice, isFree }) => {
   return (
     <motion.div
       layout
@@ -201,7 +206,6 @@ const BookCard = ({ book, isPurchased, onRead }) => {
       className="bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-full group hover:-translate-y-1 transition-transform duration-300"
     >
       <div className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-md mb-4 bg-slate-100 block">
-        {/* Click Image: If purchased -> Read, Else -> Details */}
         {isPurchased ? (
           <div onClick={onRead} className="cursor-pointer h-full w-full">
             <img
@@ -248,10 +252,10 @@ const BookCard = ({ book, isPurchased, onRead }) => {
                 isFree ? "text-green-600" : "text-slate-900"
               }`}
             >
-              {isFree ? "FREE" : `₹${book.price}`}
+              {/* [UPDATED] Use dynamic price prop */}
+              {isFree ? "FREE" : `₹${displayPrice}`}
             </span>
 
-            {/* Logic: Read Button OR Buy Button */}
             {isPurchased ? (
               <button
                 onClick={onRead}
@@ -284,7 +288,7 @@ const SecurePDFViewer = ({ book, onClose }) => {
         if (url.includes("/file/d/"))
           id = url.split("/file/d/")[1].split("/")[0];
         else if (url.includes("id=")) id = url.split("id=")[1].split("&")[0];
-        if (id) return `https://drive.google.com/file/d/${id}/preview`; // Force Preview
+        if (id) return `https://drive.google.com/file/d/${id}/preview`;
       }
     } catch (e) {
       console.error(e);
@@ -316,11 +320,9 @@ const SecurePDFViewer = ({ book, onClose }) => {
             </span>
           </div>
         </div>
-        {/* NO DOWNLOAD BUTTON */}
       </div>
       <div className="flex-1 bg-slate-950 relative flex flex-col items-center justify-center p-0 lg:p-4">
         <div className="w-full h-full max-w-5xl bg-white lg:rounded-2xl overflow-hidden shadow-2xl relative">
-          {/* Overlay for Security */}
           <div
             className="absolute inset-0 z-10 pointer-events-none"
             onContextMenu={(e) => e.preventDefault()}
