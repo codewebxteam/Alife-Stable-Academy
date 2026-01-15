@@ -35,16 +35,16 @@ import ExploreCourses from "./pages/dashboard/ExploreCourses";
 import Certificates from "./pages/dashboard/Certificates";
 import Profile from "./pages/dashboard/Profile";
 
-// --- [FINAL] Partner Pages ---
+// --- Partner Pages ---
 import PartnerLayout from "./pages/partner/PartnerLayout";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import Financials from "./pages/partner/Financials";
-import AgencySetup from "./pages/partner/AgencySetup";
+import AgencySetup from "./pages/partner/AgencySetup"; // [FIXED PATH]
 import CouponIntelligence from "./pages/partner/CouponIntelligence";
 import SalesIntelligence from "./pages/partner/SalesIntelligence";
 import StudentIntelligence from "./pages/partner/StudentIntelligence";
 
-// --- [NEW] Admin Pages ---
+// --- Admin Pages ---
 import AdminLayout from "./pages/Admin/AdminLayout";
 import IntelligenceHub from "./components/Admin/IntelligenceHub";
 import PartnerIntelligence from "./components/Admin/PartnerIntelligence";
@@ -53,6 +53,7 @@ import SalesManager from "./components/Admin/SalesManager";
 import PaymentManager from "./components/Admin/PaymentManager";
 import CourseManager from "./components/Admin/CourseManager";
 import EBookManager from "./components/Admin/EBookManager";
+
 // --- Scroll To Top Helper ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -62,7 +63,7 @@ const ScrollToTop = () => {
   return null;
 };
 
-// --- [PRESERVED] Protected Route Wrapper ---
+// --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
@@ -73,7 +74,6 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/partner" replace />;
   }
 
-  // [NEW] Redirect Admin to Admin Panel if they try to access Student Dashboard
   if (userData && userData.role === "admin") {
     return <Navigate to="/admin" replace />;
   }
@@ -81,7 +81,7 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// --- [PRESERVED] Partner Route Wrapper ---
+// --- Partner Route Wrapper ---
 const PartnerRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
@@ -89,7 +89,6 @@ const PartnerRoute = ({ children }) => {
   if (!currentUser) return <Navigate to="/" replace />;
 
   if (userData && userData.role !== "partner") {
-    // If Admin tries to access partner, send them to Admin Panel
     if (userData && userData.role === "admin") {
       return <Navigate to="/admin" replace />;
     }
@@ -99,14 +98,13 @@ const PartnerRoute = ({ children }) => {
   return children;
 };
 
-// --- [NEW] Admin Route Wrapper ---
+// --- Admin Route Wrapper ---
 const AdminRoute = ({ children }) => {
   const { currentUser, userData, loading } = useAuth();
 
   if (loading) return null;
   if (!currentUser) return <Navigate to="/" replace />;
 
-  // Only allow users with role 'admin'
   if (userData && userData.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -115,7 +113,7 @@ const AdminRoute = ({ children }) => {
 };
 
 const AppContent = () => {
-  const { loading: agencyLoading, isAgencyMode, agencyData } = useAgency();
+  const { loading: agencyLoading, isMainSite, agency } = useAgency();
 
   if (agencyLoading) {
     return (
@@ -123,8 +121,8 @@ const AppContent = () => {
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5edff4]"></div>
           <p className="text-slate-400 font-bold animate-pulse">
-            {isAgencyMode
-              ? `Loading ${agencyData?.agencyName}...`
+            {!isMainSite && agency
+              ? `Loading ${agency.name}...`
               : "Initializing Academy..."}
           </p>
         </div>
@@ -208,6 +206,7 @@ const AppContent = () => {
           }
         />
 
+        {/* AGENCY SETUP */}
         <Route
           path="/agency-setup"
           element={
@@ -219,7 +218,7 @@ const AppContent = () => {
           }
         />
 
-        {/* --- [UPDATED] PARTNER CONSOLE ROUTES --- */}
+        {/* PARTNER CONSOLE ROUTES */}
         <Route
           path="/partner"
           element={
@@ -237,7 +236,7 @@ const AppContent = () => {
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* --- [UPDATED] ADMIN DASHBOARD ROUTES (PROTECTED) --- */}
+        {/* ADMIN DASHBOARD ROUTES */}
         <Route
           path="/admin"
           element={

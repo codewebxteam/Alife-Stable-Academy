@@ -4,6 +4,7 @@ import { Search, Star, BookOpen, Clock, Play, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCourse } from "../context/CourseContext";
+import { useAgency } from "../context/AgencyContext"; // [ADDED] Import Agency Context
 import AuthModal from "../components/AuthModal";
 import FAQSection from "../components/FAQSection";
 import CourseVideoPlayer from "../components/CourseVideoPlayer";
@@ -13,6 +14,7 @@ import { db } from "../firebase/config";
 const Courses = () => {
   const { currentUser } = useAuth();
   const { enrollCourse, isEnrolled, getEnrolledCourse } = useCourse();
+  const { agency, isMainSite, getPrice } = useAgency(); // [ADDED] Get Agency Data
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,6 +56,7 @@ const Courses = () => {
       setIsAuthOpen(true);
     } else {
       try {
+        // [UPDATED] Pass dynamic price during enrollment if needed in future logic
         await enrollCourse(course);
         navigate("/dashboard/my-courses");
       } catch (error) {
@@ -82,15 +85,30 @@ const Courses = () => {
         <div className="max-w-7xl mx-auto px-6 mb-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-center md:text-left">
-              <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-2">
-                Explore Our{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5edff4] to-[#0891b2]">
-                  Courses
-                </span>
-              </h1>
-              <p className="text-slate-500">
-                Transform your career with industry-leading skills.
-              </p>
+              {/* [UPDATED] Dynamic Header Logic */}
+              {!isMainSite && agency ? (
+                <>
+                  <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-2">
+                    Welcome to{" "}
+                    <span className="text-indigo-600">{agency.name}</span>
+                  </h1>
+                  <p className="text-slate-500">
+                    Your trusted learning partner. Start your journey today.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-2">
+                    Explore Our{" "}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5edff4] to-[#0891b2]">
+                      Courses
+                    </span>
+                  </h1>
+                  <p className="text-slate-500">
+                    Transform your career with industry-leading skills.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="relative w-full md:w-96 group">
@@ -128,6 +146,8 @@ const Courses = () => {
                       isEnrolled={isEnrolled(course.id)}
                       onBuy={() => handleBuyClick(course)}
                       onPlay={() => handlePlayVideo(course.id)}
+                      // [MAGIC] Pass the custom price from AgencyContext
+                      displayPrice={getPrice(course.id, course.price)}
                     />
                   ))}
                 </motion.div>
@@ -169,24 +189,43 @@ const Courses = () => {
   );
 };
 
-// Course Card
-const CourseCard = ({ course, isEnrolled, onBuy, onPlay }) => {
+// --- UPDATED COURSE CARD COMPONENT ---
+const CourseCard = ({ course, isEnrolled, onBuy, onPlay, displayPrice }) => {
   const imageUrl =
     course.image ||
     (course.videoId
       ? `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
       : "https://placehold.co/600x400?text=No+Image");
-  const priceDisplay = course.price ? `₹${course.price}` : "Free";
+
+  // [LOGIC] Use Custom Price if available, otherwise Original Price
+  const finalPrice =
+    displayPrice !== undefined && displayPrice !== null
+      ? displayPrice
+      : course.price;
+
+  const priceDisplay =
+    finalPrice === "Free" || finalPrice === 0 || finalPrice === "0"
+      ? "Free"
+      : `₹${finalPrice}`;
   const originalPrice = course.originalPrice
     ? `₹${course.originalPrice}`
     : null;
   const rating = course.rating || 4.5;
   const reviews = course.reviews || 0;
-  // [UPDATED] Replaced Alife Academy
   const instructor = course.instructor || "Mentor";
   const duration = course.duration || "Flexible";
-  const lectures = course.lectures || "1 Module";
   const category = course.category || "General";
+
+  // Lectures count logic
+  let lecturesCount = "1 Module";
+  if (course.lectures && Array.isArray(course.lectures)) {
+    lecturesCount = `${course.lectures.length} Lectures`;
+  } else if (
+    typeof course.lectures === "string" ||
+    typeof course.lectures === "number"
+  ) {
+    lecturesCount = course.lectures;
+  }
 
   return (
     <motion.div
@@ -235,7 +274,7 @@ const CourseCard = ({ course, isEnrolled, onBuy, onPlay }) => {
           <div className="size-1 rounded-full bg-slate-300" />
           <div className="flex items-center gap-1">
             <BookOpen className="size-3.5" />
-            {lectures}
+            {lecturesCount}
           </div>
         </div>
 
@@ -256,6 +295,7 @@ const CourseCard = ({ course, isEnrolled, onBuy, onPlay }) => {
                   {originalPrice}
                 </span>
               )}
+              {/* PRICE DISPLAY */}
               <span
                 className={`text-xl font-bold ${
                   priceDisplay === "Free" ? "text-green-600" : "text-slate-900"

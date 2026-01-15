@@ -26,9 +26,12 @@ const CourseVideoPlayer = ({
   initialIndex = 0,
   onClose,
 }) => {
-  // --- 1. DATA PREPARATION ---
+  // --- 1. DATA PREPARATION (Full Logic) ---
   const getVideoList = () => {
+    // Priority 1: Playlist Prop
     if (playlist && playlist.length > 0) return playlist;
+
+    // Priority 2: Database Lectures Array
     if (
       course.lectures &&
       Array.isArray(course.lectures) &&
@@ -36,15 +39,19 @@ const CourseVideoPlayer = ({
     )
       return course.lectures;
 
+    // Priority 3: Single Video ID (Legacy)
     const vidId = course.youtubeId || course.videoId;
     if (vidId)
       return [
         { id: "main", videoId: vidId, title: course.title, url: course.url },
       ];
+
+    // Priority 4: Single URL (Legacy)
     if (course.url)
       return [
         { id: "url-only", url: course.url, title: course.title, videoId: "" },
       ];
+
     return [];
   };
 
@@ -106,6 +113,8 @@ const CourseVideoPlayer = ({
   const handleUserActivity = () => {
     setIsHovering(true);
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+
+    // Only auto hide if settings are NOT open
     if (isPlaying && !showSettings) {
       hoverTimeoutRef.current = setTimeout(() => setIsHovering(false), 3000);
     }
@@ -264,6 +273,7 @@ const CourseVideoPlayer = ({
         console.warn("Speed change failed", err);
       }
     }
+    // Don't close immediately (better UX)
     setTimeout(() => {
       setShowSettings(false);
       setActiveMenu("main");
@@ -397,7 +407,8 @@ const CourseVideoPlayer = ({
           {/* --- SETTINGS MENU --- */}
           {showSettings && (
             <div
-              className="absolute top-14 right-0 w-64 bg-black/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60] text-white animate-in slide-in-from-top-2 fade-in duration-200"
+              // [FIX] Added 'touch-auto' here so clicks work in Landscape Mode
+              className="absolute top-14 right-0 w-64 max-h-[70vh] bg-black/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-y-auto touch-auto z-[60] text-white animate-in slide-in-from-top-2 fade-in duration-200"
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >

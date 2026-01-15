@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom"; // [ADDED]
 import { useAuth } from "../../context/AuthContext";
 import { useAgency } from "../../context/AgencyContext";
 import { db } from "../../firebase/config";
@@ -44,7 +45,8 @@ const simpleDebounce = (func, wait) => {
 
 const AgencySetup = () => {
   const { currentUser } = useAuth();
-  const { refreshAgency } = useAgency(); // Ensure Context has this function
+  const { refreshAgency } = useAgency();
+  const navigate = useNavigate(); // [ADDED]
 
   // --- STEPS CONFIG ---
   const [step, setStep] = useState(1);
@@ -63,11 +65,11 @@ const AgencySetup = () => {
     whatsappNumber: "",
     email: "",
     upiId: "",
-    customPrices: {}, // { itemId: sellingPrice }
+    customPrices: {},
   });
 
-  const [oldSubdomain, setOldSubdomain] = useState(null); // To handle subdomain changes
-  const [subdomainStatus, setSubdomainStatus] = useState("idle"); // idle, checking, available, unavailable
+  const [oldSubdomain, setOldSubdomain] = useState(null);
+  const [subdomainStatus, setSubdomainStatus] = useState("idle");
 
   // --- FETCH INITIAL DATA ---
   useEffect(() => {
@@ -88,7 +90,7 @@ const AgencySetup = () => {
           eSnap.docs.map((d) => ({ id: d.id, type: "ebook", ...d.data() }))
         );
 
-        // 2. Check Existing Agency in 'agencies' collection
+        // 2. Check Existing Agency
         const docRef = doc(db, "agencies", currentUser.uid);
         const docSnap = await getDoc(docRef);
 
@@ -102,10 +104,9 @@ const AgencySetup = () => {
             upiId: data.upi || "",
             customPrices: data.customPrices || {},
           });
-          setOldSubdomain(data.subdomain); // Save old subdomain to track changes
+          setOldSubdomain(data.subdomain);
           setIsEditMode(true);
         } else {
-          // New Setup
           setFormData((prev) => ({ ...prev, email: currentUser.email || "" }));
         }
       } catch (err) {
@@ -125,7 +126,6 @@ const AgencySetup = () => {
         return;
       }
 
-      // If editing and subdomain hasn't changed, it's valid
       if (isEditMode && sub === oldSubdomain) {
         setSubdomainStatus("available");
         return;
@@ -134,7 +134,6 @@ const AgencySetup = () => {
       setSubdomainStatus("checking");
 
       try {
-        // Check in 'subdomains' collection
         const subRef = doc(db, "subdomains", sub);
         const subSnap = await getDoc(subRef);
 
@@ -157,7 +156,6 @@ const AgencySetup = () => {
     checkAvailability(val);
   };
 
-  // --- PRICE HANDLER ---
   const handlePriceChange = (itemId, val) => {
     setFormData((prev) => ({
       ...prev,
@@ -168,7 +166,7 @@ const AgencySetup = () => {
     }));
   };
 
-  // --- SUBMIT (DIRECT FIREBASE SAVE) ---
+  // --- SUBMIT (FIXED REDIRECTION) ---
   const handleFinalSubmit = async () => {
     if (!currentUser?.uid) return;
     setLoading(true);
@@ -187,18 +185,15 @@ const AgencySetup = () => {
         status: "Active",
       };
 
-      // 1. Save to Agencies Collection
+      // 1. Save Agency
       await setDoc(agencyRef, payload, { merge: true });
 
-      // 2. Save Subdomain Mapping (Only if changed or new)
+      // 2. Save Subdomain
       if (formData.subdomain !== oldSubdomain) {
-        // Create new mapping
         await setDoc(doc(db, "subdomains", formData.subdomain), {
           ownerId: currentUser.uid,
           agencyName: formData.instituteName,
         });
-
-        // Optional: Delete old subdomain logic can be added here if needed
       }
 
       // 3. Refresh Context
@@ -206,11 +201,18 @@ const AgencySetup = () => {
         await refreshAgency();
       }
 
-      alert(
-        isEditMode
-          ? "Academy Settings Updated!"
-          : "Academy Launched Successfully! 🚀"
-      );
+      // [CRITICAL FIX] Handle Redirect
+      if (!isEditMode) {
+        // If NEW setup, force reload to Dashboard to update User Role/Claims
+        alert("Academy Launched Successfully! 🚀 Redirecting to Dashboard...");
+
+        // Using window.location.href instead of navigate ensures a FULL STATE REFRESH
+        // This fixes the issue where you have to logout/login to see the Partner Dashboard
+        window.location.href = "/agency/dashboard";
+        return;
+      }
+
+      alert("Academy Settings Updated!");
       setIsEditMode(true);
       setOldSubdomain(formData.subdomain);
     } catch (error) {
@@ -261,7 +263,7 @@ const AgencySetup = () => {
 
         {/* MAIN CARD */}
         <div className="bg-white rounded-[32px] lg:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden flex flex-col lg:flex-row min-h-[500px] lg:min-h-[600px]">
-          {/* LEFT: STEPS SIDEBAR (Mobile Friendly) */}
+          {/* LEFT: STEPS SIDEBAR */}
           <div className="w-full lg:w-[280px] bg-slate-950 p-6 lg:p-8 text-white flex flex-col justify-between shrink-0 relative overflow-hidden">
             <div className="absolute top-0 left-0 size-64 bg-indigo-500/20 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
 
@@ -275,13 +277,11 @@ const AgencySetup = () => {
                     Step {step} of 4
                   </p>
                 </div>
-                {/* Mobile Step Indicator */}
                 <div className="lg:hidden text-xs font-black bg-white/10 px-2 py-1 rounded-lg">
                   {step}/4
                 </div>
               </div>
 
-              {/* Steps List (Hidden on very small screens if needed, or styled horizontally) */}
               <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 scrollbar-hide">
                 {[
                   { id: 1, label: "Identity", icon: <Layout size={16} /> },
@@ -297,7 +297,7 @@ const AgencySetup = () => {
                     key={s.id}
                     onClick={() => {
                       if (isEditMode) setStep(s.id);
-                    }} // Allow click only in edit mode
+                    }}
                     className={`flex items-center gap-3 p-3 rounded-xl transition-all min-w-[120px] lg:min-w-0 ${
                       step === s.id
                         ? "bg-white/10 text-white shadow-lg border border-white/5"
@@ -393,7 +393,6 @@ const AgencySetup = () => {
                           </span>
                         </div>
 
-                        {/* Status Indicator */}
                         <div className="flex items-center gap-2 ml-1 h-5">
                           {subdomainStatus === "checking" && (
                             <>
@@ -431,7 +430,7 @@ const AgencySetup = () => {
                   </motion.div>
                 )}
 
-                {/* STEP 2: PRICING (COMMERCIALS) */}
+                {/* STEP 2: PRICING */}
                 {step === 2 && (
                   <motion.div
                     key="step2"
@@ -466,7 +465,7 @@ const AgencySetup = () => {
                     </div>
 
                     <div className="space-y-8">
-                      {/* Courses Section */}
+                      {/* Courses */}
                       <section>
                         <div className="flex items-center gap-2 mb-4">
                           <GraduationCap
@@ -483,7 +482,7 @@ const AgencySetup = () => {
                               course.price || course.discountPrice || 0
                             );
                             const sellingPrice =
-                              formData.customPrices[course.id] || adminPrice; // Default to admin price
+                              formData.customPrices[course.id] || adminPrice;
                             const profit = Math.max(
                               0,
                               sellingPrice - adminPrice
@@ -539,7 +538,7 @@ const AgencySetup = () => {
                         </div>
                       </section>
 
-                      {/* E-Books Section */}
+                      {/* E-Books */}
                       <section>
                         <div className="flex items-center gap-2 mb-4">
                           <BookOpen size={18} className="text-orange-600" />
@@ -788,7 +787,7 @@ const AgencySetup = () => {
               {step < 4 && (
                 <button
                   onClick={() => {
-                    // Basic Validation per step
+                    // Validation
                     if (
                       step === 1 &&
                       (!formData.instituteName ||
