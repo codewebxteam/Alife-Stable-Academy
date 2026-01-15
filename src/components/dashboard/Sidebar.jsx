@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   BookOpen,
   PlayCircle,
-  // BarChart2, // Removed unused import
   ShoppingCart,
   LogOut,
   X,
@@ -14,14 +13,21 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useAgency } from "../../context/AgencyContext"; // [ADDED] Import Agency Context
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { logout, currentUser } = useAuth();
+  const { agency, isMainSite } = useAgency(); // [ADDED] Get Agency Data
   const [dashboard, setDashboard] = useState(null);
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // [LOGIC] Dynamic Colors & Name
+  const accentColor = agency?.accentColor || "#5edff4";
+  const appName = !isMainSite && agency ? agency.name : "Alife Stable";
+  const appSuffix = isMainSite ? "Academy" : "Institute";
 
   const handleLogout = async () => {
     await logout();
@@ -56,18 +62,25 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const SidebarContent = (
     <div className="h-full flex flex-col bg-slate-900 text-white border-r border-slate-800 relative">
-      {/* 1. BRANDING AREA */}
+      {/* 1. BRANDING AREA (DYNAMIC) */}
       <div className="h-20 flex items-center px-6 border-b border-slate-800/50">
-        <div className="flex items-center gap-3 text-[#5edff4]">
-          <div className="p-2 bg-[#5edff4]/10 rounded-xl">
-            <GraduationCap className="size-6" />
+        <div className="flex items-center gap-3">
+          {/* Logo Box with Dynamic Color */}
+          <div
+            className="p-2 rounded-xl"
+            style={{ backgroundColor: `${accentColor}1A` }} // 10% Opacity
+          >
+            <GraduationCap className="size-6" style={{ color: accentColor }} />
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-lg tracking-wide text-white leading-none">
-              Alife Stable
+              {appName}
             </span>
-            <span className="text-[10px] font-bold text-[#5edff4] tracking-widest uppercase">
-              Academy
+            <span
+              className="text-[10px] font-bold tracking-widest uppercase"
+              style={{ color: accentColor }}
+            >
+              {appSuffix}
             </span>
           </div>
         </div>
@@ -90,10 +103,15 @@ const Sidebar = ({ isOpen, onClose }) => {
             to={item.path}
             onClick={() => window.innerWidth < 1024 && onClose()}
             end={item.path === "/dashboard"}
+            style={({ isActive }) => ({
+              backgroundColor: isActive ? accentColor : "transparent",
+              color: isActive ? "#0f172a" : undefined, // Slate-900 text on active
+              boxShadow: isActive ? `0 0 20px ${accentColor}4D` : "none", // 30% Opacity Glow
+            })}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden ${
                 isActive
-                  ? "bg-[#5edff4] text-slate-900 font-bold shadow-[0_0_20px_rgba(94,223,244,0.3)]"
+                  ? "font-bold"
                   : "text-slate-400 hover:bg-slate-800 hover:text-white"
               }`
             }

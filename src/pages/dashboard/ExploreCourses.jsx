@@ -3,16 +3,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingCart, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCourse } from "../../context/CourseContext";
-import { collection, getDocs } from "firebase/firestore"; // [NEW] Import Firestore
-import { db } from "../../firebase/config"; // [NEW] Import DB
+import { useAgency } from "../../context/AgencyContext"; // [ADDED] Import Agency Context
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config";
 
 const ExploreCourses = () => {
   const { isEnrolled } = useCourse();
   const [searchQuery, setSearchQuery] = useState("");
-  const [liveCourses, setLiveCourses] = useState([]); // [NEW] State for live courses
+  const [liveCourses, setLiveCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- [NEW] Fetch Courses from Firebase ---
+  // --- Fetch Courses from Firebase ---
   useEffect(() => {
     const fetchLiveCourses = async () => {
       try {
@@ -34,10 +35,7 @@ const ExploreCourses = () => {
 
   // Filter: Show only courses that are NOT enrolled AND match search query
   const availableCourses = liveCourses.filter((course) => {
-    // Check if the user is already enrolled
     const notEnrolled = !isEnrolled(course.id);
-
-    // Check search query
     const matchesSearch = (course.title || "")
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
@@ -106,65 +104,82 @@ const ExploreCourses = () => {
 };
 
 // Specialized Card Component
-const ExploreCard = ({ course }) => (
-  <motion.div
-    layout
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.9 }}
-    whileHover={{ y: -8 }}
-    className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
-  >
-    {/* Image */}
-    <div className="relative h-48 overflow-hidden">
-      <img
-        src={
-          course.image ||
-          course.thumbnail ||
-          `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
-        }
-        alt={course.title}
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-      />
-      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
-        <Star className="size-3 fill-yellow-400 text-yellow-400" />{" "}
-        {course.rating || 4.5}
-      </div>
-    </div>
+const ExploreCard = ({ course }) => {
+  const { getPrice } = useAgency(); // [ADDED] Get Helper
 
-    <div className="p-6 flex flex-col flex-1">
-      <div className="mb-4">
-        <span className="text-[10px] font-bold text-[#0891b2] uppercase tracking-wider">
-          {course.category || "General"}
-        </span>
-        <h3 className="text-lg font-bold text-slate-900 leading-tight mt-1 line-clamp-2">
-          {course.title}
-        </h3>
-        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-          By {course.instructor || "Alife Academy"}
-        </p>
-      </div>
+  // [LOGIC] Calculate Dynamic Price
+  const finalPrice = getPrice(course.id, course.price);
+  const isFree =
+    String(finalPrice).toLowerCase() === "free" ||
+    finalPrice === 0 ||
+    finalPrice === "0";
 
-      <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
-        <div>
-          <span className="block text-lg font-bold text-slate-900">
-            ₹{course.price}
-          </span>
-          {course.originalPrice && (
-            <span className="text-xs text-slate-400 line-through">
-              ₹{course.originalPrice}
-            </span>
-          )}
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      whileHover={{ y: -8 }}
+      className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
+    >
+      {/* Image */}
+      <div className="relative h-48 overflow-hidden">
+        <img
+          src={
+            course.image ||
+            course.thumbnail ||
+            `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
+          }
+          alt={course.title}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+        />
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
+          <Star className="size-3 fill-yellow-400 text-yellow-400" />{" "}
+          {course.rating || 4.5}
         </div>
-        <Link
-          to={`/courses/${course.id}`}
-          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20 flex items-center gap-2"
-        >
-          <ShoppingCart className="size-4" /> Buy Now
-        </Link>
       </div>
-    </div>
-  </motion.div>
-);
+
+      <div className="p-6 flex flex-col flex-1">
+        <div className="mb-4">
+          <span className="text-[10px] font-bold text-[#0891b2] uppercase tracking-wider">
+            {course.category || "General"}
+          </span>
+          <h3 className="text-lg font-bold text-slate-900 leading-tight mt-1 line-clamp-2">
+            {course.title}
+          </h3>
+          <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+            By {course.instructor || "Alife Academy"}
+          </p>
+        </div>
+
+        <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
+          <div>
+            <span
+              className={`block text-lg font-bold ${
+                isFree ? "text-green-600" : "text-slate-900"
+              }`}
+            >
+              {/* [UPDATED] Show Dynamic Price */}
+              {isFree ? "Free" : `₹${finalPrice}`}
+            </span>
+            {/* Show original price if exists and not free */}
+            {!isFree && course.originalPrice && (
+              <span className="text-xs text-slate-400 line-through">
+                ₹{course.originalPrice}
+              </span>
+            )}
+          </div>
+          <Link
+            to={`/courses/${course.id}`}
+            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20 flex items-center gap-2"
+          >
+            <ShoppingCart className="size-4" /> {isFree ? "Enroll" : "Buy Now"}
+          </Link>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 export default ExploreCourses;
