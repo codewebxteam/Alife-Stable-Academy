@@ -29,9 +29,9 @@ import {
   query,
   where,
   orderBy,
-  updateDoc, // [ADDED]
-  arrayUnion, // [ADDED]
-  doc, // [ADDED]
+  updateDoc,
+  arrayUnion,
+  doc,
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
@@ -84,7 +84,7 @@ const PartnerDashboard = () => {
       }));
       setEbooks(ebooksList);
 
-      // 3. Fetch Orders
+      // 3. Fetch Orders (For Partner History)
       if (partnerId) {
         const q = query(
           collection(db, "orders"),
@@ -109,7 +109,7 @@ const PartnerDashboard = () => {
     }
   };
 
-  // --- REAL-TIME GRAPH LOGIC (Last 7 Days) ---
+  // --- REAL-TIME GRAPH LOGIC ---
   const processGraphData = (data) => {
     const last7Days = [...Array(7)]
       .map((_, i) => {
@@ -122,12 +122,10 @@ const PartnerDashboard = () => {
 
     const chartData = last7Days.map((date) => {
       const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
-
       const dayOrders = data.filter((o) => {
         const orderDate = new Date(o.createdAtDate);
         return orderDate.toDateString() === date.toDateString();
       });
-
       const revenue = dayOrders.reduce(
         (sum, o) => sum + Number(o.sellingPrice || 0),
         0
@@ -136,39 +134,50 @@ const PartnerDashboard = () => {
         (sum, o) => sum + Number(o.profit || 0),
         0
       );
-
       return { name: dayName, revenue, profit };
     });
 
     setGraphData(chartData);
   };
 
-  // --- CALCULATE METRICS ---
+  // --- CALCULATE METRICS (Fixed E-Book Count Logic) ---
   const metrics = useMemo(() => {
     let totalStudents = new Set(orders.map((o) => o.studentEmail)).size;
     let totalRevenue = 0;
     let totalCost = 0;
 
+    // [FIX] Separate Counts
+    let ebookCount = 0;
+    let courseCount = 0;
+
     orders.forEach((order) => {
       totalRevenue += Number(order.sellingPrice || 0);
       totalCost += Number(order.adminPrice || 0);
+
+      if (order.productType === "E-Book") {
+        ebookCount += 1;
+      } else {
+        courseCount += 1;
+      }
     });
 
     return {
       students: totalStudents,
       revenue: totalRevenue,
       profit: totalRevenue - totalCost,
+      ebooksSold: ebookCount, // New Metric
+      coursesSold: courseCount, // New Metric
     };
   }, [orders]);
 
-  // --- [UPDATED] HANDLERS WITH ACCESS GRANTING LOGIC ---
+  // --- [FIXED] HANDLE ENROLLMENT WITH EXACT DATABASE MATCH ---
   const handleEnrollSubmit = async () => {
     if (
       !enrollData.studentEmail ||
       !enrollData.selectedProductId ||
       !enrollData.sellingPrice
     ) {
-      alert("Please fill all fields properly.");
+      alert("⚠️ Please fill all fields properly.");
       return;
     }
 
@@ -177,56 +186,83 @@ const PartnerDashboard = () => {
       (p) => p.id === enrollData.selectedProductId
     );
 
-    if (!selectedProduct) return;
+    if (!selectedProduct) {
+      alert("⚠️ Product not found in database.");
+      return;
+    }
 
     setIsProcessing(true);
     try {
-      // 1. Find Student by Email
+      console.log("🚀 Starting Enrollment...");
+
+      // 1. Find Student
+      const safeEmail = enrollData.studentEmail.trim();
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", enrollData.studentEmail));
+      const q = query(usersRef, where("email", "==", safeEmail));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        alert(
-          "❌ Student not found! The student must register on the website first."
-        );
+        alert("❌ Student Not Found! Ask them to register first.");
         setIsProcessing(false);
         return;
       }
 
       const studentDoc = querySnapshot.docs[0];
-      const studentId = studentDoc.id;
+      const studentId = studentDoc.id; // UID
       const studentData = studentDoc.data();
-
-      // 2. Grant Access (Update Student's DB Document)
       const studentRef = doc(db, "users", studentId);
 
-      if (enrollData.productType === "Course") {
-        // Add to 'enrolledCourses' array
-        await updateDoc(studentRef, {
-          enrolledCourses: arrayUnion(selectedProduct.id),
-        });
-      } else {
-        // Add to 'purchasedBooks' array
-        await updateDoc(studentRef, {
-          purchasedBooks: arrayUnion(selectedProduct.id),
-        });
-      }
+      console.log(`✅ Student Found: ${studentId}`);
 
-      // 3. Create Order Record (For Partner Dashboard)
       const adminPrice = Number(
         selectedProduct.price || selectedProduct.discountPrice || 0
       );
       const sellingPrice = Number(enrollData.sellingPrice);
 
+      // =========================================================
+      // STEP A: WRITE TO 'enrollments' (Exact Structure)
+      // =========================================================
+      const enrollmentPayload = {
+        courseId: String(selectedProduct.id),
+        courseName: selectedProduct.title,
+        studentId: studentId,
+        price: sellingPrice,
+        source: "direct", // As per your DB dump
+        createdAt: serverTimestamp(),
+      };
+
+      // Only add to enrollments collection if it's a COURSE
+      // (Assuming E-books don't use 'enrollments' collection based on your feedback that E-books work differently)
+      if (enrollData.productType === "Course") {
+        await addDoc(collection(db, "enrollments"), enrollmentPayload);
+        console.log("✅ Written to enrollments collection (Course)");
+      }
+
+      // =========================================================
+      // STEP B: UPDATE 'users' DOCUMENT (Direct Access)
+      // =========================================================
+      if (enrollData.productType === "Course") {
+        await updateDoc(studentRef, {
+          enrolledCourses: arrayUnion(String(selectedProduct.id)),
+          courses: arrayUnion(String(selectedProduct.id)), // Backup field
+        });
+      } else {
+        await updateDoc(studentRef, {
+          purchasedBooks: arrayUnion(String(selectedProduct.id)),
+        });
+      }
+      console.log("✅ Updated User Profile");
+
+      // =========================================================
+      // STEP C: CREATE 'orders' RECORD (Partner History)
+      // =========================================================
       const orderPayload = {
         partnerId: partnerId,
-        studentEmail: enrollData.studentEmail,
-        studentName:
-          studentData.displayName || enrollData.studentEmail.split("@")[0],
-        courseId: selectedProduct.id,
+        studentEmail: safeEmail,
+        studentName: studentData.displayName || safeEmail.split("@")[0],
+        courseId: String(selectedProduct.id),
         courseTitle: selectedProduct.title,
-        productType: enrollData.productType,
+        productType: enrollData.productType, // "Course" or "E-Book"
         adminPrice: adminPrice,
         sellingPrice: sellingPrice,
         profit: sellingPrice - adminPrice,
@@ -236,8 +272,9 @@ const PartnerDashboard = () => {
       };
 
       await addDoc(collection(db, "orders"), orderPayload);
+      console.log("✅ Order History Created");
 
-      // 4. Cleanup & Feedback
+      // 6. Success
       setShowEnrollModal(false);
       setEnrollData({
         productType: "Course",
@@ -245,14 +282,12 @@ const PartnerDashboard = () => {
         selectedProductId: "",
         sellingPrice: "",
       });
-
       fetchInitialData();
-      alert(
-        `✅ Success! Access granted to ${enrollData.studentEmail} for "${selectedProduct.title}".`
-      );
+
+      alert(`🎉 Success! Access Granted to: ${safeEmail}`);
     } catch (error) {
-      console.error("Enrollment failed:", error);
-      alert("Transaction Failed. Please check console.");
+      console.error("Enrollment Error:", error);
+      alert(`❌ Failed: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -286,60 +321,58 @@ const PartnerDashboard = () => {
         </div>
       </div>
 
-      {/* --- KPI CARDS --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-            <Users size={80} className="text-blue-600" />
-          </div>
-          <div className="size-14 bg-blue-50 text-blue-600 rounded-[20px] mb-6 flex items-center justify-center">
-            <Users size={24} />
+      {/* --- KPI CARDS (Updated for E-Books) --- */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* KPI 1: Students */}
+        <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
+          <div className="size-12 bg-blue-50 text-blue-600 rounded-2xl mb-4 flex items-center justify-center">
+            <Users size={20} />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
             Total Students
           </p>
-          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">
+          <h3 className="text-3xl font-black text-slate-900">
             {metrics.students}
           </h3>
-          <p className="text-[10px] font-bold text-slate-400 mt-2">
-            Active Learners
-          </p>
         </div>
 
-        <div className="bg-white p-7 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-            <TrendingUp size={80} className="text-indigo-600" />
-          </div>
-          <div className="size-14 bg-indigo-50 text-indigo-600 rounded-[20px] mb-6 flex items-center justify-center">
-            <Briefcase size={24} />
+        {/* KPI 2: E-Books Sold (NEW) */}
+        <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
+          <div className="size-12 bg-orange-50 text-orange-600 rounded-2xl mb-4 flex items-center justify-center">
+            <FileText size={20} />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Total Revenue
+            E-Books Sold
           </p>
-          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">
-            ₹{metrics.revenue.toLocaleString()}
+          <h3 className="text-3xl font-black text-slate-900">
+            {metrics.ebooksSold}
           </h3>
-          <p className="text-[10px] font-bold text-slate-400 mt-2">
-            Gross Sales Volume
-          </p>
         </div>
 
-        <div className="bg-slate-900 p-7 rounded-[40px] border border-slate-800 shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-            <DollarSign size={80} className="text-emerald-400" />
+        {/* KPI 3: Revenue */}
+        <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm relative overflow-hidden group">
+          <div className="size-12 bg-indigo-50 text-indigo-600 rounded-2xl mb-4 flex items-center justify-center">
+            <Briefcase size={20} />
           </div>
-          <div className="size-14 bg-white/10 text-emerald-400 rounded-[20px] mb-6 flex items-center justify-center backdrop-blur-sm">
-            <DollarSign size={24} />
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            Revenue
+          </p>
+          <h3 className="text-3xl font-black text-slate-900">
+            ₹{metrics.revenue.toLocaleString()}
+          </h3>
+        </div>
+
+        {/* KPI 4: Profit */}
+        <div className="bg-slate-900 p-6 rounded-[30px] border border-slate-800 shadow-xl relative overflow-hidden group">
+          <div className="size-12 bg-white/10 text-emerald-400 rounded-2xl mb-4 flex items-center justify-center backdrop-blur-sm">
+            <DollarSign size={20} />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
             Net Profit
           </p>
-          <h3 className="text-4xl font-black text-white tracking-tighter">
+          <h3 className="text-3xl font-black text-white">
             ₹{metrics.profit.toLocaleString()}
           </h3>
-          <p className="text-[10px] font-bold text-emerald-400 mt-2">
-            Your Total Earnings
-          </p>
         </div>
       </div>
 
@@ -350,11 +383,6 @@ const PartnerDashboard = () => {
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">
               Performance Pulse
             </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400">
-                Last 7 Days Activity
-              </span>
-            </div>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -423,9 +451,6 @@ const PartnerDashboard = () => {
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
               Recent Enrollments
             </h3>
-            <div className="size-8 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center animate-pulse">
-              <div className="size-2 bg-emerald-500 rounded-full" />
-            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar max-h-[300px]">
@@ -502,7 +527,6 @@ const PartnerDashboard = () => {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh]"
             >
-              {/* Modal Header */}
               <div className="bg-slate-900 p-8 text-white relative shrink-0">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                   <GraduationCap size={100} />
@@ -521,9 +545,7 @@ const PartnerDashboard = () => {
                 </button>
               </div>
 
-              {/* Modal Form */}
               <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                {/* 1. Student Details (Email Only) */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
                     Student Details (From WhatsApp)
@@ -544,13 +566,11 @@ const PartnerDashboard = () => {
                   </div>
                 </div>
 
-                {/* 2. Product Selection */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       Product Requested
                     </p>
-                    {/* Toggle Button */}
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                       <button
                         onClick={() =>
@@ -614,7 +634,6 @@ const PartnerDashboard = () => {
                     />
                   </div>
 
-                  {/* ADMIN PRICE DISPLAY (Important for Partner) */}
                   {enrollData.selectedProductId && (
                     <div className="flex justify-between items-center px-4 py-3 bg-red-50 rounded-xl border border-red-100">
                       <span className="text-[10px] font-bold text-red-400 uppercase">
@@ -627,7 +646,6 @@ const PartnerDashboard = () => {
                   )}
                 </div>
 
-                {/* 3. Financials (Profit Calc) */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
                     Your Profit Calculation
@@ -669,7 +687,6 @@ const PartnerDashboard = () => {
                   )}
                 </div>
 
-                {/* ACTION BUTTON - PAYMENT SIMULATION */}
                 <button
                   onClick={handleEnrollSubmit}
                   disabled={isProcessing}
