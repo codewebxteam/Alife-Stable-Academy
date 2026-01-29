@@ -30,7 +30,6 @@ import DashboardLayout from "./components/dashboard/DashboardLayout";
 import StudentDashboard from "./pages/dashboard/StudentDashboard";
 import MyCourses from "./pages/dashboard/MyCourses";
 import EBookLibrary from "./pages/dashboard/EBookLibrary";
-import ProgressReport from "./pages/dashboard/ProgressReport";
 import ExploreCourses from "./pages/dashboard/ExploreCourses";
 import Certificates from "./pages/dashboard/Certificates";
 import Profile from "./pages/dashboard/Profile";
@@ -266,7 +265,6 @@ const AppContent = () => {
           <Route index element={<StudentDashboard />} />
           <Route path="my-courses" element={<MyCourses />} />
           <Route path="ebooks" element={<EBookLibrary />} />
-          <Route path="progress" element={<ProgressReport />} />
           <Route path="explore" element={<ExploreCourses />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="profile" element={<Profile />} />

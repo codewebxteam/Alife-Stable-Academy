@@ -46,22 +46,45 @@ const ContactUs = () => {
   const { agency, isMainSite } = useAgency();
 
   // [LOGIC] Dynamic Data Selection
-  // Agar Partner Site hai to Agency ka data, nahi to Default Alife Stable ka data
   const contactEmail =
     !isMainSite && agency?.email ? agency.email : "support@alifestable.com";
   const contactPhone =
     !isMainSite && agency?.whatsapp ? agency.whatsapp : "+91 80840 37252";
   const contactAddress = isMainSite
     ? "Near Metro Station, Nirman Vihar, East Delhi 110092"
-    : "Digital Campus (Online)"; // Partner ka address nahi hai to generic text
+    : "Digital Campus (Online)";
 
+  // [UPDATED] Handle Submit to Send WhatsApp Message
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormState("submitting");
-    // Simulate API call
-    setTimeout(() => {
-      setFormState("success");
-    }, 2000);
+
+    // 1. Get Form Data
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+
+    // 2. Format WhatsApp Message (Clean & Organized)
+    const message =
+      `*New Contact Inquiry* 📩\n\n` +
+      `*Name:* ${data.firstName} ${data.lastName}\n` +
+      `*Email:* ${data.email}\n` +
+      `*Phone:* ${data.phone || "N/A"}\n` +
+      `*Subject:* ${data.subject}\n` +
+      `--------------------------------\n` +
+      `*Message:* \n${data.message}`;
+
+    // 3. Create WhatsApp URL
+    // Remove spaces, +, or dashes from phone number for the URL
+    const cleanPhone = contactPhone.replace(/\D/g, "");
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+      message,
+    )}`;
+
+    // 4. Open WhatsApp in New Tab
+    window.open(whatsappUrl, "_blank");
+
+    // 5. Show Success State
+    setFormState("success");
   };
 
   return (
@@ -119,7 +142,6 @@ const ContactUs = () => {
                 </p>
 
                 <div className="space-y-8">
-                  {/* [UPDATED] Dynamic Contact Details */}
                   <ContactItem
                     icon={Mail}
                     title="Email Us"
@@ -130,10 +152,8 @@ const ContactUs = () => {
                     icon={Phone}
                     title="Call / WhatsApp"
                     value={contactPhone}
-                    link={`https://wa.me/${contactPhone.replace(/\D/g, "")}`} // WhatsApp Link
+                    link={`https://wa.me/${contactPhone.replace(/\D/g, "")}`}
                   />
-
-                  {/* Address Section - Only show proper address for Main Site */}
                   <ContactItem
                     icon={MapPin}
                     title="Location"
@@ -166,8 +186,8 @@ const ContactUs = () => {
                     Message Sent!
                   </h3>
                   <p className="text-slate-500 max-w-md">
-                    Thank you for reaching out. Our team will get back to you
-                    within 24 hours.
+                    Opening WhatsApp to send your inquiry. We'll get back to you
+                    shortly!
                   </p>
                   <button
                     onClick={() => setFormState("idle")}
@@ -185,6 +205,7 @@ const ContactUs = () => {
                       </label>
                       <input
                         required
+                        name="firstName" // [ADDED]
                         type="text"
                         placeholder="John"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all"
@@ -196,6 +217,7 @@ const ContactUs = () => {
                       </label>
                       <input
                         required
+                        name="lastName" // [ADDED]
                         type="text"
                         placeholder="Doe"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all"
@@ -210,6 +232,7 @@ const ContactUs = () => {
                       </label>
                       <input
                         required
+                        name="email" // [ADDED]
                         type="email"
                         placeholder="john@example.com"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all"
@@ -220,6 +243,7 @@ const ContactUs = () => {
                         Phone (Optional)
                       </label>
                       <input
+                        name="phone" // [ADDED]
                         type="tel"
                         placeholder="+91..."
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all"
@@ -231,7 +255,10 @@ const ContactUs = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                       Subject
                     </label>
-                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all cursor-pointer">
+                    <select
+                      name="subject" // [ADDED]
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all cursor-pointer"
+                    >
                       <option>General Inquiry</option>
                       <option>Course Support</option>
                       <option>Business Partnership</option>
@@ -245,6 +272,7 @@ const ContactUs = () => {
                     </label>
                     <textarea
                       required
+                      name="message" // [ADDED]
                       rows="4"
                       placeholder="How can we help you?"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all resize-none"

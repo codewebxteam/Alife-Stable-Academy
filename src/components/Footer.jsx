@@ -4,17 +4,18 @@ import {
   Twitter,
   Linkedin,
   Instagram,
-  Github,
-  Send,
   Heart,
+  X,
+  MessageCircle,
   ShieldCheck,
-  X, // Added for Modal Close
 } from "lucide-react";
-import { useAgency } from "../context/AgencyContext"; // [ADDED] Import Context
+import { useAgency } from "../context/AgencyContext";
 
 const SocialIcon = ({ Icon, href }) => (
   <motion.a
     href={href}
+    target="_blank"
+    rel="noreferrer"
     whileHover={{
       scale: 1.1,
       y: -3,
@@ -23,7 +24,7 @@ const SocialIcon = ({ Icon, href }) => (
       borderColor: "#5edff4",
     }}
     whileTap={{ scale: 0.9 }}
-    className="size-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 transition-all duration-300 hover:shadow-[0_0_15px_rgba(94,223,244,0.5)]"
+    className="size-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 transition-all duration-300 hover:shadow-[0_0_15px_rgba(94,223,244,0.5)] cursor-pointer"
   >
     <Icon className="size-5" />
   </motion.a>
@@ -32,19 +33,30 @@ const SocialIcon = ({ Icon, href }) => (
 const Footer = () => {
   const [activePolicy, setActivePolicy] = useState(null); // 'privacy' | 'refund' | null
 
-  // [ADDED] Agency Context Hook
+  // [LOGIC] Agency Context Hook
   const { agency, isMainSite } = useAgency();
 
-  // [LOGIC] Dynamic Data Variables
+  // [FIXED] Dynamic Data Variables (Default is now Alife Stable Academy)
   const academyName =
     !isMainSite && agency ? agency.name : "Alife Stable Academy";
+
   const supportEmail =
-    !isMainSite && agency?.email ? agency.email : "support@alifestable.com";
+    !isMainSite && agency?.email ? agency.email : "support@alifestable.com"; // [FIXED] Default Email
+
   const supportPhone =
-    !isMainSite && agency?.whatsapp ? agency.whatsapp : "918084037252";
+    !isMainSite && agency?.whatsapp ? agency.whatsapp : "+91 74818 96182";
+
   const whatsappLink = `https://wa.me/${supportPhone.replace(/\D/g, "")}`;
 
-  // [UPDATED] POLICY CONTENT MOVED INSIDE TO USE VARIABLES
+  const instaLink =
+    !isMainSite && agency?.instagram
+      ? agency.instagram
+      : "https://www.instagram.com/"; // [FIXED] Removed Impact link
+
+  // [LOGIC] Dynamic Year for Copyright
+  const currentYear = new Date().getFullYear();
+
+  // [CONTENT] Policy Content
   const POLICY_CONTENT = {
     privacy: {
       title: "Privacy Policy",
@@ -201,7 +213,6 @@ const Footer = () => {
     },
   };
 
-  // [UPDATED] Footer Links - Dynamic "Register as Partner"
   const footerLinks = {
     Academy: [
       { name: "Courses", href: "/courses" },
@@ -209,29 +220,26 @@ const Footer = () => {
     ],
     Company: [
       { name: "About Us", href: "/about" },
-      // Only show Partner Registration on Main Site
-      ...(isMainSite
-        ? [{ name: "Register as a Partner", href: "#", isPartner: true }]
-        : []),
+      { name: "Contact Us", href: "/contact" },
     ],
     Resources: [
-      { name: "Capstone Projects", href: "/projects" },
+      { name: "Verify Certificate", href: "/verify" },
       { name: "Blog", href: "/blog" },
     ],
     Legal: [
-      { name: "Privacy Policy", href: "#", type: "privacy" }, // Trigger Privacy Modal
-      { name: "Refund Policy", href: "#", type: "refund" }, // Trigger Refund Modal
+      { name: "Privacy Policy", href: "#", type: "privacy" },
+      { name: "Refund Policy", href: "#", type: "refund" },
     ],
   };
 
   return (
     <footer className="relative bg-slate-950 pt-24 pb-12 overflow-hidden font-sans border-t border-slate-900">
-      {/* --- Background Effects --- */}
+      {/* Background Effects */}
       <div className="absolute top-0 left-0 size-200 bg-[#5edff4]/5 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 size-150 bg-[#0891b2]/5 rounded-full blur-[100px] pointer-events-none translate-x-1/3 translate-y-1/3" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
-        {/* --- Top Section: CTA & Newsletter --- */}
+        {/* Top Section */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 mb-20 pb-12 border-b border-slate-800/50">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -241,7 +249,7 @@ const Footer = () => {
           >
             <div className="flex items-center gap-2 mb-6">
               <div className="size-10 bg-linear-to-br from-[#5edff4] to-[#0891b2] rounded-xl flex items-center justify-center shadow-lg shadow-[#5edff4]/20">
-                <span className="text-slate-900 font-bold text-xl">
+                <span className="text-slate-900 font-bold text-xl uppercase">
                   {academyName.charAt(0)}
                 </span>
               </div>
@@ -258,7 +266,7 @@ const Footer = () => {
             </p>
           </motion.div>
 
-          {/* Newsletter Box */}
+          {/* Community Card */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -269,29 +277,25 @@ const Footer = () => {
             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-sm relative overflow-hidden group">
               <div className="absolute inset-0 bg-linear-to-r from-[#5edff4]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <h4 className="text-white font-bold text-xl mb-2 relative z-10">
-                Subscribe to our newsletter
+                Join our Community
               </h4>
               <p className="text-slate-400 mb-6 text-sm relative z-10">
-                Get the latest trends, tips, and free resources weekly.
+                Connect with mentors, get instant updates, and clear your doubts
+                directly on WhatsApp.
               </p>
-              <form className="relative flex items-center z-10">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="w-full bg-slate-950 text-white border border-slate-800 rounded-full py-4 pl-6 pr-16 focus:outline-none focus:border-[#5edff4] focus:ring-1 focus:ring-[#5edff4] transition-all placeholder:text-slate-600"
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 size-10 bg-[#5edff4] rounded-full flex items-center justify-center text-slate-900 hover:bg-[#cff9fe] hover:scale-105 transition-all shadow-lg shadow-[#5edff4]/25 cursor-pointer"
-                >
-                  <Send className="size-4" />
-                </button>
-              </form>
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full bg-[#5edff4] text-slate-900 font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-[#cff9fe] hover:scale-[1.02] transition-all shadow-lg shadow-[#5edff4]/20 cursor-pointer relative z-10"
+              >
+                <MessageCircle className="size-5" /> Join WhatsApp Group
+              </a>
             </div>
           </motion.div>
         </div>
 
-        {/* --- Middle Section: Links Grid --- */}
+        {/* Links Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-20">
           {Object.entries(footerLinks).map(([title, links], categoryIndex) => (
             <motion.div
@@ -308,27 +312,25 @@ const Footer = () => {
                     <a
                       href={link.href}
                       onClick={(e) => {
-                        // Handle Partner Modal
                         if (link.isPartner) {
                           e.preventDefault();
                           window.dispatchEvent(
-                            new CustomEvent("openPartnerModal")
+                            new CustomEvent("openPartnerModal"),
                           );
                         }
-                        // Handle Policy Modals
                         if (link.type) {
                           e.preventDefault();
                           setActivePolicy(link.type);
                         }
                       }}
                       className={`group flex items-center gap-2 transition-colors text-sm font-medium ${
-                        link.isPartner || link.isAdmin || link.type
+                        link.isPartner || link.type
                           ? "text-[#5edff4] hover:text-white font-bold cursor-pointer"
                           : "text-slate-400 hover:text-[#5edff4]"
                       }`}
                     >
                       <span className="relative flex items-center gap-1.5">
-                        {link.isAdmin && <ShieldCheck className="size-3.5" />}
+                        {link.isPartner && <ShieldCheck className="size-3.5" />}
                         {link.name}
                         <span className="absolute -bottom-1 left-0 w-0 h-px bg-[#5edff4] transition-all group-hover:w-full"></span>
                       </span>
@@ -340,10 +342,13 @@ const Footer = () => {
           ))}
         </div>
 
-        {/* --- Bottom Section: Copyright & Socials --- */}
+        {/* Bottom Section - COPYRIGHT & SOCIALS */}
         <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-slate-800/50 gap-6">
           <div className="flex items-center gap-2 text-slate-500 text-sm">
-            <span>© 2025 {academyName}. All rights reserved.</span>
+            {/* [FIXED] Dynamic Year & Academy Name */}
+            <span>
+              © {currentYear} {academyName}. All rights reserved.
+            </span>
           </div>
 
           <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -352,6 +357,8 @@ const Footer = () => {
             <span>by</span>
             <a
               href="https://www.codewebx.in/"
+              target="_blank"
+              rel="noreferrer"
               className="text-[#5edff4] hover:text-[#cff9fe] transition-colors font-bold"
             >
               CodeWebX
@@ -361,28 +368,27 @@ const Footer = () => {
           <div className="flex items-center gap-4">
             <SocialIcon Icon={Twitter} href="#" />
             <SocialIcon Icon={Linkedin} href="#" />
-            <SocialIcon Icon={Instagram} href="#" />
+            <SocialIcon Icon={Instagram} href={instaLink} />
           </div>
         </div>
       </div>
 
-      {/* --- Giant Background Watermark --- */}
+      {/* Watermark */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/4 w-full text-center pointer-events-none select-none overflow-hidden">
         <motion.h1
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 0.05 }}
           transition={{ duration: 2 }}
-          className="text-[12vw] md:text-[15vw] font-black text-white leading-none tracking-tighter whitespace-nowrap uppercase"
+          className="text-[12vw] sm:text-[8vw] md:text-[6vw] lg:text-[5.5vw] font-black text-white leading-none tracking-tighter whitespace-nowrap uppercase"
         >
-          {academyName.split(" ")[0]}
+          {academyName}
         </motion.h1>
       </div>
 
-      {/* --- POLICY MODAL --- */}
+      {/* Policy Modal */}
       <AnimatePresence>
         {activePolicy && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -390,15 +396,12 @@ const Footer = () => {
               onClick={() => setActivePolicy(null)}
               className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
             />
-
-            {/* Modal Content */}
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl z-10">
                 <h3 className="text-xl font-bold text-white">
                   {POLICY_CONTENT[activePolicy].title}
@@ -410,13 +413,9 @@ const Footer = () => {
                   <X className="size-5" />
                 </button>
               </div>
-
-              {/* Modal Body (Scrollable) */}
               <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
                 {POLICY_CONTENT[activePolicy].content}
               </div>
-
-              {/* Modal Footer */}
               <div className="p-6 border-t border-slate-800 bg-slate-900/50 backdrop-blur-xl text-center">
                 <button
                   onClick={() => setActivePolicy(null)}

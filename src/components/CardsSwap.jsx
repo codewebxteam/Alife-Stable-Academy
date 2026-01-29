@@ -16,11 +16,10 @@ import { db } from "../firebase/config";
 import { useAgency } from "../context/AgencyContext"; // [ADDED]
 
 // ==========================================
-// SECTION 1: DYNAMIC CARD DESIGNS
+// SECTION 1: DYNAMIC CARD DESIGNS (Compact for Mobile)
 // ==========================================
 
 const FrontendCard = ({ data }) => {
-  // [ADDED] Dynamic Price
   const { getPrice } = useAgency();
   const displayPrice = data ? getPrice(data.id, data.price) : 2999;
 
@@ -39,29 +38,32 @@ const FrontendCard = ({ data }) => {
       };
 
   return (
-    <div className="size-full bg-white rounded-4xl border border-slate-200 shadow-2xl shadow-slate-200/50 p-8 flex flex-col justify-between relative overflow-hidden group">
+    // [FIXED] Padding reduced to p-6 for better fit
+    <div className="size-full bg-white rounded-4xl border border-slate-200 shadow-2xl shadow-slate-200/50 p-6 flex flex-col justify-between relative overflow-hidden group">
       <div className="absolute top-0 right-0 size-32 bg-[#f0fdff] rounded-bl-[4rem] -mr-4 -mt-4 z-0 transition-transform duration-700 group-hover:scale-110" />
       <div className="relative z-10">
-        <div className="size-12 bg-[#f0fdff] rounded-2xl flex items-center justify-center text-[#0891b2] mb-6">
-          <Zap className="size-6" />
+        <div className="size-10 bg-[#f0fdff] rounded-2xl flex items-center justify-center text-[#0891b2] mb-4">
+          <Zap className="size-5" />
         </div>
         <h3 className="text-2xl font-bold text-slate-900 line-clamp-1">
           {info.title}
         </h3>
-        <p className="text-slate-500 mt-2 text-sm font-medium line-clamp-2">
+        {/* [FIXED] Margin reduced */}
+        <p className="text-slate-500 mt-2 text-sm font-medium line-clamp-2 mb-2">
           {info.desc}
         </p>
       </div>
       <div className="relative z-10">
-        <div className="flex items-baseline gap-1 mb-6">
-          <span className="text-4xl font-bold text-slate-900">
+        <div className="flex items-baseline gap-1 mb-4">
+          <span className="text-3xl font-bold text-slate-900">
             {info.price == 0 || info.price === "Free"
               ? "Free"
               : `₹${info.price}`}
           </span>
           {!data && <span className="text-slate-400 text-sm">/course</span>}
         </div>
-        <ul className="space-y-3 mb-8">
+        {/* [FIXED] Spacing reduced */}
+        <ul className="space-y-2 mb-6">
           {info.features.map((item) => (
             <li
               key={item}
@@ -76,7 +78,7 @@ const FrontendCard = ({ data }) => {
         </ul>
         <Link
           to={data ? `/courses/${data.id}` : "/courses"}
-          className="w-full py-3.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-sm hover:bg-[#f0fdff] hover:border-[#cff9fe] transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3 rounded-xl border border-slate-200 text-slate-900 font-bold text-sm hover:bg-[#f0fdff] hover:border-[#cff9fe] transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           View Details <ArrowRight className="size-4" />
         </Link>
@@ -86,7 +88,6 @@ const FrontendCard = ({ data }) => {
 };
 
 const FullStackCard = ({ data }) => {
-  // [ADDED] Dynamic Price
   const { getPrice } = useAgency();
   const displayPrice = data ? getPrice(data.id, data.price) : 5999;
 
@@ -109,27 +110,28 @@ const FullStackCard = ({ data }) => {
       };
 
   return (
-    <div className="size-full bg-linear-to-br from-[#5edff4] to-[#06b6d4] rounded-4xl shadow-2xl shadow-[#5edff4]/40 p-8 flex flex-col justify-between relative overflow-hidden border border-white/20 group">
+    // [FIXED] Padding reduced
+    <div className="size-full bg-linear-to-br from-[#5edff4] to-[#06b6d4] rounded-4xl shadow-2xl shadow-[#5edff4]/40 p-6 flex flex-col justify-between relative overflow-hidden border border-white/20 group">
       <div className="relative z-10">
-        <div className="size-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-6 shadow-inner border border-white/20">
-          <Crown className="size-6" />
+        <div className="size-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-4 shadow-inner border border-white/20">
+          <Crown className="size-5" />
         </div>
         <h3 className="text-2xl font-bold text-white line-clamp-1">
           {info.title}
         </h3>
-        <p className="text-[#cff9fe] mt-2 text-sm font-medium line-clamp-2">
+        <p className="text-[#cff9fe] mt-2 text-sm font-medium line-clamp-2 mb-2">
           {info.desc}
         </p>
       </div>
       <div className="relative z-10">
-        <div className="flex items-baseline gap-1 mb-6">
-          <span className="text-4xl font-bold text-white">
+        <div className="flex items-baseline gap-1 mb-4">
+          <span className="text-3xl font-bold text-white">
             {info.price == 0 || info.price === "Free"
               ? "Free"
               : `₹${info.price}`}
           </span>
         </div>
-        <ul className="space-y-3 mb-8">
+        <ul className="space-y-2 mb-6">
           {info.features.map((item) => (
             <li
               key={item}
@@ -144,7 +146,7 @@ const FullStackCard = ({ data }) => {
         </ul>
         <Link
           to={data ? `/courses/${data.id}` : "/courses"}
-          className="w-full py-3.5 rounded-xl bg-white text-[#0891b2] font-bold text-sm hover:bg-[#f0fdff] hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3 rounded-xl bg-white text-[#0891b2] font-bold text-sm hover:bg-[#f0fdff] hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           Enroll Now <ArrowRight className="size-4" />
         </Link>
@@ -154,7 +156,6 @@ const FullStackCard = ({ data }) => {
 };
 
 const DataScienceCard = ({ data }) => {
-  // [ADDED] Dynamic Price
   const { getPrice } = useAgency();
   const displayPrice = data ? getPrice(data.id, data.price) : 7999;
 
@@ -173,27 +174,28 @@ const DataScienceCard = ({ data }) => {
       };
 
   return (
-    <div className="size-full bg-slate-900 rounded-4xl border border-slate-800 shadow-2xl shadow-slate-900/50 p-8 flex flex-col justify-between relative overflow-hidden group">
+    // [FIXED] Padding reduced
+    <div className="size-full bg-slate-900 rounded-4xl border border-slate-800 shadow-2xl shadow-slate-900/50 p-6 flex flex-col justify-between relative overflow-hidden group">
       <div className="relative z-10">
-        <div className="size-12 bg-slate-800 rounded-2xl flex items-center justify-center text-white mb-6 border border-slate-700 shadow-lg">
-          <Star className="size-6 text-[#5edff4]" />
+        <div className="size-10 bg-slate-800 rounded-2xl flex items-center justify-center text-white mb-4 border border-slate-700 shadow-lg">
+          <Star className="size-5 text-[#5edff4]" />
         </div>
         <h3 className="text-2xl font-bold text-white line-clamp-1">
           {info.title}
         </h3>
-        <p className="text-slate-400 mt-2 text-sm font-medium line-clamp-2">
+        <p className="text-slate-400 mt-2 text-sm font-medium line-clamp-2 mb-2">
           {info.desc}
         </p>
       </div>
       <div className="relative z-10">
-        <div className="flex items-baseline gap-1 mb-6">
-          <span className="text-4xl font-bold text-white">
+        <div className="flex items-baseline gap-1 mb-4">
+          <span className="text-3xl font-bold text-white">
             {info.price == 0 || info.price === "Free"
               ? "Free"
               : `₹${info.price}`}
           </span>
         </div>
-        <ul className="space-y-3 mb-8">
+        <ul className="space-y-2 mb-6">
           {info.features.map((item) => (
             <li
               key={item}
@@ -208,7 +210,7 @@ const DataScienceCard = ({ data }) => {
         </ul>
         <Link
           to={data ? `/courses/${data.id}` : "/courses"}
-          className="w-full py-3.5 rounded-xl bg-slate-800 text-white border border-slate-700 font-bold text-sm hover:bg-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3 rounded-xl bg-slate-800 text-white border border-slate-700 font-bold text-sm hover:bg-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           View Details <ArrowRight className="size-4" />
         </Link>
@@ -286,7 +288,7 @@ const SwapEngine = ({
   const childArr = useMemo(() => Children.toArray(children), [children]);
   const refs = useMemo(
     () => childArr.map(() => React.createRef()),
-    [childArr.length]
+    [childArr.length],
   );
 
   const order = useRef(Array.from({ length: childArr.length }, (_, i) => i));
@@ -300,8 +302,8 @@ const SwapEngine = ({
       placeNow(
         r.current,
         makeSlot(i, cardDistance, verticalDistance, total),
-        skewAmount
-      )
+        skewAmount,
+      ),
     );
 
     const swap = () => {
@@ -334,7 +336,7 @@ const SwapEngine = ({
             duration: config.durMove,
             ease: config.ease,
           },
-          `promote+=${i * 0.15}`
+          `promote+=${i * 0.15}`,
         );
       });
 
@@ -342,7 +344,7 @@ const SwapEngine = ({
         refs.length - 1,
         cardDistance,
         verticalDistance,
-        refs.length
+        refs.length,
       );
       tl.addLabel("return", `promote+=${config.durMove * config.returnDelay}`);
       tl.call(
@@ -354,7 +356,7 @@ const SwapEngine = ({
           });
         },
         undefined,
-        "return"
+        "return",
       );
       tl.to(
         elFront,
@@ -366,7 +368,7 @@ const SwapEngine = ({
           duration: config.durReturn,
           ease: "power2.out",
         },
-        "return"
+        "return",
       );
 
       tl.call(() => {
@@ -409,7 +411,7 @@ const SwapEngine = ({
             onCardClick?.(i);
           },
         })
-      : child
+      : child,
   );
 
   return (
@@ -456,12 +458,14 @@ const CardsSwap = () => {
   }, []);
 
   const cardWidth = isMobile ? "280px" : "320px";
-  const cardHeight = isMobile ? "400px" : "480px";
+  // [FIXED] Increased mobile height to 450px so internal content doesn't clip
+  const cardHeight = isMobile ? "450px" : "480px";
   const cardDist = isMobile ? 30 : 45;
   const vertDist = isMobile ? 40 : 55;
 
   return (
-    <section className="w-full bg-transparent pt-16 md:pt-24 pb-24 overflow-hidden">
+    // [FIXED] Reverted pb to normal (pb-24) to reduce space
+    <section className="w-full bg-transparent pt-16 md:pt-24 pb-24 md:pb-24 overflow-visible md:overflow-hidden">
       <div className="max-w-6xl mx-auto px-6">
         <div className="relative z-10">
           <div className="flex flex-col lg:grid lg:grid-cols-2 min-h-auto lg:min-h-175 items-center gap-12 lg:gap-0">
@@ -495,13 +499,13 @@ const CardsSwap = () => {
                   {
                     num: 2,
                     title: "Specialization",
-                    desc: "Master specific AI tools and frameworks.", // [UPDATED]
+                    desc: "Master specific AI tools and frameworks.",
                     color: "bg-slate-100 text-slate-600",
                   },
                   {
                     num: 3,
                     title: "Career Launch",
-                    desc: "Turn Skills Into Career with expert guidance.", // [UPDATED]
+                    desc: "Turn Skills Into Career with expert guidance.",
                     color: "bg-[#5edff4]/10 text-[#0891b2]",
                   },
                 ].map((item) => (

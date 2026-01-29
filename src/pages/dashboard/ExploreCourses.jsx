@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Star } from "lucide-react";
+import { Search, ShoppingCart, Star, CheckCircle } from "lucide-react"; // [UPDATED] Added CheckCircle
 import { Link } from "react-router-dom";
 import { useCourse } from "../../context/CourseContext";
 import { useAgency } from "../../context/AgencyContext"; // [ADDED] Import Agency Context
@@ -33,14 +33,14 @@ const ExploreCourses = () => {
     fetchLiveCourses();
   }, []);
 
-  // Filter: Show only courses that are NOT enrolled AND match search query
+  // [UPDATED] Filter: Now shows Enrolled courses too (Only filters by search)
   const availableCourses = liveCourses.filter((course) => {
-    const notEnrolled = !isEnrolled(course.id);
+    // Removed: const notEnrolled = !isEnrolled(course.id);
     const matchesSearch = (course.title || "")
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
 
-    return notEnrolled && matchesSearch;
+    return matchesSearch;
   });
 
   return (
@@ -77,23 +77,17 @@ const ExploreCourses = () => {
           <AnimatePresence mode="popLayout">
             {availableCourses.length > 0 ? (
               availableCourses.map((course) => (
-                <ExploreCard key={course.id} course={course} />
+                <ExploreCard
+                  key={course.id}
+                  course={course}
+                  isUserEnrolled={isEnrolled(course.id)} // [ADDED] Pass Enrollment Status
+                />
               ))
             ) : (
               <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
                 <p className="text-slate-500">
-                  {liveCourses.length === 0
-                    ? "No courses available in the library yet."
-                    : "You have enrolled in all available courses!"}
+                  No courses found matching your search.
                 </p>
-                {liveCourses.length > 0 && (
-                  <Link
-                    to="/dashboard/my-courses"
-                    className="inline-block mt-4 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-[#5edff4] hover:text-slate-900 transition-all"
-                  >
-                    Go to My Learning
-                  </Link>
-                )}
               </div>
             )}
           </AnimatePresence>
@@ -104,7 +98,8 @@ const ExploreCourses = () => {
 };
 
 // Specialized Card Component
-const ExploreCard = ({ course }) => {
+const ExploreCard = ({ course, isUserEnrolled }) => {
+  // [ADDED] Prop
   const { getPrice } = useAgency(); // [ADDED] Get Helper
 
   // [LOGIC] Calculate Dynamic Price
@@ -121,7 +116,11 @@ const ExploreCard = ({ course }) => {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       whileHover={{ y: -8 }}
-      className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
+      className={`bg-white rounded-3xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group ${
+        isUserEnrolled
+          ? "border-emerald-200 ring-1 ring-emerald-100"
+          : "border-slate-100"
+      }`}
     >
       {/* Image */}
       <div className="relative h-48 overflow-hidden">
@@ -134,10 +133,18 @@ const ExploreCard = ({ course }) => {
           alt={course.title}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
         />
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
-          <Star className="size-3 fill-yellow-400 text-yellow-400" />{" "}
-          {course.rating || 4.5}
-        </div>
+
+        {/* [ADDED] Enrolled Badge on Top */}
+        {isUserEnrolled ? (
+          <div className="absolute top-3 left-3 bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-lg z-10">
+            <CheckCircle className="size-3" /> Enrolled
+          </div>
+        ) : (
+          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
+            <Star className="size-3 fill-yellow-400 text-yellow-400" />{" "}
+            {course.rating || 4.5}
+          </div>
+        )}
       </div>
 
       <div className="p-6 flex flex-col flex-1">
@@ -155,26 +162,45 @@ const ExploreCard = ({ course }) => {
 
         <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
           <div>
-            <span
-              className={`block text-lg font-bold ${
-                isFree ? "text-green-600" : "text-slate-900"
-              }`}
-            >
-              {/* [UPDATED] Show Dynamic Price */}
-              {isFree ? "Free" : `₹${finalPrice}`}
-            </span>
-            {/* Show original price if exists and not free */}
-            {!isFree && course.originalPrice && (
-              <span className="text-xs text-slate-400 line-through">
-                ₹{course.originalPrice}
+            {/* [UPDATED] Hide Price if Enrolled */}
+            {isUserEnrolled ? (
+              <span className="block text-lg font-bold text-emerald-600">
+                Purchased
               </span>
+            ) : (
+              <>
+                <span
+                  className={`block text-lg font-bold ${
+                    isFree ? "text-green-600" : "text-slate-900"
+                  }`}
+                >
+                  {isFree ? "Free" : `₹${finalPrice}`}
+                </span>
+                {!isFree && course.originalPrice && (
+                  <span className="text-xs text-slate-400 line-through">
+                    ₹{course.originalPrice}
+                  </span>
+                )}
+              </>
             )}
           </div>
+
           <Link
             to={`/courses/${course.id}`}
-            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-[#5edff4] hover:text-slate-900 transition-all shadow-lg hover:shadow-[#5edff4]/20 flex items-center gap-2"
+            className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg flex items-center gap-2 ${
+              isUserEnrolled
+                ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-emerald-100"
+                : "bg-slate-900 text-white hover:bg-[#5edff4] hover:text-slate-900 hover:shadow-[#5edff4]/20"
+            }`}
           >
-            <ShoppingCart className="size-4" /> {isFree ? "Enroll" : "Buy Now"}
+            {isUserEnrolled ? (
+              <>View Course</>
+            ) : (
+              <>
+                <ShoppingCart className="size-4" />{" "}
+                {isFree ? "Enroll" : "Buy Now"}
+              </>
+            )}
           </Link>
         </div>
       </div>
