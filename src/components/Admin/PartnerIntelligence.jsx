@@ -4,20 +4,14 @@ import {
   Briefcase,
   Search,
   Filter,
-  Mail,
   Globe,
   TrendingUp,
-  Wallet,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  Download,
   Building2,
   Calendar,
   ChevronDown,
   Award,
-  CheckCircle2,
-  X,
   FileSpreadsheet,
   Loader2,
   ShoppingBag,
@@ -77,7 +71,7 @@ const PartnerIntelligence = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Partners");
     XLSX.writeFile(
       wb,
-      `Partners_Report_${new Date().toISOString().split("T")[0]}.xlsx`
+      `Partners_Report_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
   };
 
@@ -86,11 +80,8 @@ const PartnerIntelligence = () => {
     if (timeFilter === "All Time") return partners;
 
     const now = new Date();
-    // Normalize 'now' to ensure accurate day comparison if needed,
-    // but usually standard comparison is fine.
 
     return partners.filter((p) => {
-      // If no join date, exclude from time-based views
       if (!p.joinDate) return false;
       const pDate = new Date(p.joinDate);
 
@@ -104,7 +95,6 @@ const PartnerIntelligence = () => {
       if (timeFilter === "Week") {
         const weekAgo = new Date();
         weekAgo.setDate(now.getDate() - 7);
-        // Reset time to start of that day for broader inclusion
         weekAgo.setHours(0, 0, 0, 0);
         return pDate >= weekAgo;
       }
@@ -126,7 +116,6 @@ const PartnerIntelligence = () => {
         return pDate.getFullYear() === now.getFullYear();
       }
       if (timeFilter === "Custom" && customDates.start && customDates.end) {
-        // Fix: Set start date to 00:00:00 and end date to 23:59:59
         const startDate = new Date(customDates.start);
         startDate.setHours(0, 0, 0, 0);
 
@@ -170,7 +159,7 @@ const PartnerIntelligence = () => {
   const totalPages = Math.ceil(filteredLedgerData.length / itemsPerPage);
   const currentItems = filteredLedgerData.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // --- MACRO METRICS ---
@@ -179,13 +168,13 @@ const PartnerIntelligence = () => {
     active: timeFilteredPartners.filter((p) => p.status === "Active").length,
     totalVolume: timeFilteredPartners.reduce(
       (acc, curr) => acc + curr.financials.generated,
-      0
+      0,
     ),
     avgVolume:
       timeFilteredPartners.length > 0
         ? timeFilteredPartners.reduce(
             (acc, curr) => acc + curr.financials.generated,
-            0
+            0,
           ) / timeFilteredPartners.length
         : 0,
   };

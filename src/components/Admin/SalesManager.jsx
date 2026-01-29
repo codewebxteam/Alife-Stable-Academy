@@ -11,13 +11,13 @@ import {
   ChevronRight,
   ArrowUpRight,
   FileText,
-  Globe,
   Users,
   Wallet,
   XCircle,
   BookOpen,
-  CheckCircle2,
   TrendingUp,
+  Award, // [ADDED] For Top Agency
+  Star, // [ADDED] For Top Course
 } from "lucide-react";
 import { listenToAllOrders } from "../../firebase/orders.service";
 
@@ -30,7 +30,6 @@ const SalesManager = () => {
   // Filters
   const [timeFilter, setTimeFilter] = useState("All Time");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("All");
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
 
   // Pagination
@@ -39,9 +38,15 @@ const SalesManager = () => {
 
   useEffect(() => {
     const unsubscribe = listenToAllOrders((orders) => {
-      const formattedOrders = orders.map((order) => {
-        const isPartnerSale = order.partnerId && order.partnerId !== "direct";
-        const dateObj = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+      // [STRICT] Filter: Keep ONLY Partner Sales
+      const validPartnerOrders = orders.filter(
+        (order) => order.partnerId && order.partnerId !== "direct",
+      );
+
+      const formattedOrders = validPartnerOrders.map((order) => {
+        const dateObj = order.createdAt?.toDate
+          ? order.createdAt.toDate()
+          : new Date();
 
         return {
           id: order.id,
@@ -51,9 +56,9 @@ const SalesManager = () => {
           date: dateObj.toISOString().split("T")[0],
           fullDate: dateObj,
           amount: Number(order.price) || 0,
-          source: isPartnerSale ? "Partner" : "Self",
-          partnerId: isPartnerSale ? order.partnerId : null,
-          partnerName: isPartnerSale ? order.partnerName : null,
+          commission: order.commission || Number(order.price) * 0.2 || 0,
+          partnerId: order.partnerId,
+          partnerName: order.partnerName || "Unknown Agency",
           status: order.status || "Success",
           gateway: "Razorpay",
           invoiceId: `INV-${order.id.slice(0, 8).toUpperCase()}`,
@@ -84,7 +89,10 @@ const SalesManager = () => {
           return tDate >= weekAgo;
         }
         if (timeFilter === "Month") {
-          return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+          return (
+            tDate.getMonth() === now.getMonth() &&
+            tDate.getFullYear() === now.getFullYear()
+          );
         }
         if (timeFilter === "Year") {
           return tDate.getFullYear() === now.getFullYear();
@@ -100,58 +108,82 @@ const SalesManager = () => {
       });
     }
 
-    // 2. Search & Source Filter
+    // 2. Search Filter
     return data.filter((t) => {
-      const matchesSearch =
-        t.student.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.asset.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.partnerId &&
-          t.partnerId.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesSource = sourceFilter === "All" || t.source === sourceFilter;
-
-      return matchesSearch && matchesSource;
+      const query = searchQuery.toLowerCase();
+      return (
+        t.student.toLowerCase().includes(query) ||
+        t.id.toLowerCase().includes(query) ||
+        t.asset.toLowerCase().includes(query) ||
+        t.partnerName.toLowerCase().includes(query) ||
+        t.partnerId.toLowerCase().includes(query)
+      );
     });
-  }, [transactions, timeFilter, searchQuery, sourceFilter, customDates]);
+  }, [transactions, timeFilter, searchQuery, customDates]);
 
   // Pagination Slicing
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
   const currentItems = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
-  // Ensure current page is valid after filtering
   useEffect(() => {
     setCurrentPage(1);
-  }, [timeFilter, searchQuery, sourceFilter, customDates]);
+  }, [timeFilter, searchQuery, customDates]);
 
-  // --- REAL-TIME METRICS (Updated) ---
+  // --- METRICS (PERFORMANCE FOCUS) ---
   const metrics = useMemo(() => {
-    const countTypes = (data) => ({
-      courses: data.filter((t) => t.type === "Course").length,
-      ebooks: data.filter((t) => t.type === "E-Book").length,
-    });
-
-    const selfData = filteredData.filter((t) => t.source === "Self");
-    const partnerData = filteredData.filter((t) => t.source === "Partner");
     const totalRev = filteredData.reduce((acc, curr) => acc + curr.amount, 0);
 
+    // 1. Calculate Top Agency
+    const agencyRevenue = {};
+    filteredData.forEach((t) => {
+      if (t.partnerName) {
+        agencyRevenue[t.partnerName] =
+          (agencyRevenue[t.partnerName] || 0) + t.amount;
+      }
+    });
+    let topAgencyName = "N/A";
+    let topAgencyRev = 0;
+    Object.entries(agencyRevenue).forEach(([name, rev]) => {
+      if (rev > topAgencyRev) {
+        topAgencyRev = rev;
+        topAgencyName = name;
+      }
+    });
+
+    // 2. Calculate Top Selling Course
+    const courseSales = {};
+    filteredData.forEach((t) => {
+      if (t.type === "Course") {
+        courseSales[t.asset] = (courseSales[t.asset] || 0) + 1;
+      }
+    });
+    let topCourseName = "N/A";
+    let topCourseCount = 0;
+    Object.entries(courseSales).forEach(([name, count]) => {
+      if (count > topCourseCount) {
+        topCourseCount = count;
+        topCourseName = name;
+      }
+    });
+
     return {
-      total: {
-        rev: totalRev,
-        counts: countTypes(filteredData),
+      totalRev,
+      activePartners: new Set(filteredData.map((t) => t.partnerId)).size,
+      counts: {
+        courses: filteredData.filter((t) => t.type === "Course").length,
+        ebooks: filteredData.filter((t) => t.type === "E-Book").length,
       },
-      self: {
-        rev: selfData.reduce((acc, curr) => acc + curr.amount, 0),
-        counts: countTypes(selfData),
+      topAgency: {
+        name: topAgencyName,
+        revenue: topAgencyRev,
       },
-      partner: {
-        rev: partnerData.reduce((acc, curr) => acc + curr.amount, 0),
-        counts: countTypes(partnerData),
+      topCourse: {
+        name: topCourseName,
+        sales: topCourseCount,
       },
-      aov: filteredData.length > 0 ? totalRev / filteredData.length : 0,
     };
   }, [filteredData]);
 
@@ -160,7 +192,9 @@ const SalesManager = () => {
       <div className="flex h-screen items-center justify-center bg-[#F8FAFC]">
         <div className="text-center space-y-4">
           <div className="size-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Syncing Ledger...</p>
+          <p className="text-slate-500 font-black uppercase tracking-widest text-xs">
+            Syncing Ledger...
+          </p>
         </div>
       </div>
     );
@@ -176,7 +210,7 @@ const SalesManager = () => {
               Sales Intelligence
             </h1>
             <p className="text-sm text-slate-400 font-medium italic">
-              Revenue Streams & Financial Splits
+              Partner Revenue Streams & Financial Splits
             </p>
           </div>
 
@@ -212,7 +246,7 @@ const SalesManager = () => {
                     <option key={t} value={t}>
                       {t}
                     </option>
-                  )
+                  ),
                 )}
               </select>
               <ChevronDown
@@ -223,66 +257,72 @@ const SalesManager = () => {
           </div>
         </div>
 
-        {/* --- KPI CARDS (Commission Card Replaced with AOV) --- */}
+        {/* --- KPI CARDS (Performance Focus) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
-            label="Total Sales"
-            val={`₹${metrics.total.rev.toLocaleString()}`}
+            label="Total Volume"
+            val={`₹${metrics.totalRev.toLocaleString()}`}
             color="blue"
             icon={<Banknote />}
             renderSub={() => (
               <div className="flex gap-3 mt-2">
                 <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <BookOpen size={10} /> {metrics.total.counts.courses} Courses
+                  <BookOpen size={10} /> {metrics.counts.courses} C
                 </span>
                 <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <FileText size={10} /> {metrics.total.counts.ebooks} E-Books
+                  <FileText size={10} /> {metrics.counts.ebooks} E
                 </span>
               </div>
             )}
           />
+
+          {/* [UPDATED] Top Agency Card */}
           <KPICard
-            label="Self Sales"
-            val={`₹${metrics.self.rev.toLocaleString()}`}
+            label="Top Agency"
+            val={
+              metrics.topAgency.name.length > 15
+                ? metrics.topAgency.name.slice(0, 15) + "..."
+                : metrics.topAgency.name
+            }
             color="indigo"
-            icon={<Globe />}
+            icon={<Award />}
             renderSub={() => (
               <div className="flex gap-3 mt-2">
-                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <BookOpen size={10} /> {metrics.self.counts.courses} C
-                </span>
-                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <FileText size={10} /> {metrics.self.counts.ebooks} E
+                <span className="text-[9px] font-bold text-indigo-500">
+                  Revenue: ₹{metrics.topAgency.revenue.toLocaleString()}
                 </span>
               </div>
             )}
           />
+
           <KPICard
-            label="Partner Sales"
-            val={`₹${metrics.partner.rev.toLocaleString()}`}
+            label="Active Partners"
+            val={metrics.activePartners}
             color="emerald"
             icon={<Users />}
             renderSub={() => (
               <div className="flex gap-3 mt-2">
-                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <BookOpen size={10} /> {metrics.partner.counts.courses} C
-                </span>
-                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                  <FileText size={10} /> {metrics.partner.counts.ebooks} E
+                <span className="text-[9px] font-bold text-slate-500">
+                  Contributing Agencies
                 </span>
               </div>
             )}
           />
-          {/* Replaced Commission Card with Average Order Value */}
+
+          {/* [UPDATED] Top Course Card */}
           <KPICard
-            label="Average Order Value"
-            val={`₹${Math.round(metrics.aov).toLocaleString()}`}
+            label="Top Course"
+            val={
+              metrics.topCourse.name.length > 15
+                ? metrics.topCourse.name.slice(0, 15) + "..."
+                : metrics.topCourse.name
+            }
             color="orange"
-            icon={<TrendingUp />}
+            icon={<Star />}
             renderSub={() => (
               <div className="flex flex-col gap-1 mt-2">
-                <span className="text-[9px] font-bold text-orange-500 flex items-center gap-1">
-                  Per Transaction Average
+                <span className="text-[9px] font-bold text-orange-500">
+                  {metrics.topCourse.sales} Units Sold
                 </span>
               </div>
             )}
@@ -297,35 +337,17 @@ const SalesManager = () => {
                 <ArrowUpRight size={20} />
               </div>
               <h3 className="text-lg font-black text-slate-900 uppercase">
-                Live Transaction Stream
+                Partner Ledger
               </h3>
             </div>
 
-            {/* FILTERS */}
+            {/* SEARCH & EXPORT */}
             <div className="flex items-center gap-3 w-full md:w-auto">
-              {/* SOURCE FILTER */}
-              <div className="flex items-center gap-2 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
-                <Filter size={14} className="text-slate-400" />
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => {
-                    setSourceFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="bg-transparent text-[10px] font-black uppercase outline-none text-slate-600 cursor-pointer"
-                >
-                  <option value="All">All Sources</option>
-                  <option value="Self">Self Only</option>
-                  <option value="Partner">Partner Only</option>
-                </select>
-              </div>
-
-              {/* SEARCH */}
-              <div className="flex-1 md:w-64 flex items-center gap-3 bg-slate-50 px-5 py-3 rounded-xl border border-slate-100 focus-within:border-indigo-300 transition-all">
+              <div className="flex-1 md:w-72 flex items-center gap-3 bg-slate-50 px-5 py-3 rounded-xl border border-slate-100 focus-within:border-indigo-300 transition-all">
                 <Search size={16} className="text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search ID, Partner..."
+                  placeholder="Search Partner, ID..."
                   className="bg-transparent text-xs font-bold outline-none w-full placeholder:text-slate-400"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -347,10 +369,10 @@ const SalesManager = () => {
                 <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <th className="px-8 py-5">Txn ID & Date</th>
                   <th className="px-8 py-5">Student & Product</th>
-                  <th className="px-8 py-5">Source</th>
-                  <th className="px-8 py-5">Total Amount</th>
+                  <th className="px-8 py-5">Agency / Partner</th>
+                  <th className="px-8 py-5">Amount</th>
                   <th className="px-8 py-5 text-center">Status</th>
-                  <th className="px-8 py-5 text-right">Invoice</th>
+                  <th className="px-8 py-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -366,7 +388,7 @@ const SalesManager = () => {
                         </div>
                         <div>
                           <p className="text-xs font-black text-slate-900">
-                            {t.id}
+                            {t.id.slice(0, 12)}...
                           </p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">
                             {t.date}
@@ -388,20 +410,14 @@ const SalesManager = () => {
                       </p>
                     </td>
                     <td className="px-8 py-6">
-                      {t.source === "Self" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase">
-                          <Globe size={10} /> Self
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-indigo-600">
+                          {t.partnerName}
                         </span>
-                      ) : (
-                        <div className="flex flex-col">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black uppercase w-fit">
-                            <Users size={10} /> Partner
-                          </span>
-                          <span className="text-[9px] font-bold text-slate-400 mt-1 pl-1">
-                            ID: {t.partnerId}
-                          </span>
-                        </div>
-                      )}
+                        <span className="text-[9px] font-bold text-slate-400 mt-0.5">
+                          ID: {t.partnerId.slice(0, 8)}...
+                        </span>
+                      </div>
                     </td>
                     <td className="px-8 py-6">
                       <div className="space-y-1">
@@ -410,6 +426,9 @@ const SalesManager = () => {
                             ₹{t.amount.toLocaleString()}
                           </span>
                         </div>
+                        <p className="text-[9px] text-emerald-500 font-bold">
+                          Comm: ₹{t.commission.toLocaleString()}
+                        </p>
                       </div>
                     </td>
                     <td className="px-8 py-6 text-center">
@@ -497,10 +516,12 @@ const SalesManager = () => {
                   <InvoiceRow label="Asset" val={selectedTxn.asset} />
                   <InvoiceRow label="Student" val={selectedTxn.student} />
                   <InvoiceRow label="Date" val={selectedTxn.date} />
-                  <InvoiceRow label="Source" val={selectedTxn.source} />
-                  {selectedTxn.partnerName && (
-                    <InvoiceRow label="Partner" val={selectedTxn.partnerName} />
-                  )}
+                  <InvoiceRow label="Partner" val={selectedTxn.partnerName} />
+                  <InvoiceRow
+                    label="Commission"
+                    val={`₹${selectedTxn.commission}`}
+                    highlight="text-emerald-600"
+                  />
                   <InvoiceRow label="Gateway" val={selectedTxn.gateway} />
                 </div>
                 <button className="w-full py-4 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">

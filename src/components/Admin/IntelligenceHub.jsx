@@ -27,6 +27,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from "recharts";
 import {
   Users,
@@ -34,10 +35,8 @@ import {
   TrendingUp,
   Filter,
   GraduationCap,
-  ExternalLink,
   ArrowUpRight,
   Globe,
-  ChevronRight,
   Ticket,
   Plus,
   RefreshCw,
@@ -45,28 +44,37 @@ import {
   Trash2,
   Pencil,
   Tag,
-  AlertCircle,
   ChevronDown,
 } from "lucide-react";
 
-// Fallback data for graphs
+// Fallback data - Partner Only
 const FALLBACK_WEEKLY = [
-  { name: "Sun", partner: 4000, direct: 2400 },
-  { name: "Mon", partner: 3000, direct: 1398 },
-  { name: "Tue", partner: 5000, direct: 9800 },
-  { name: "Wed", partner: 2780, direct: 3908 },
-  { name: "Thu", partner: 1890, direct: 4800 },
-  { name: "Fri", partner: 2390, direct: 3800 },
-  { name: "Sat", partner: 3490, direct: 4300 },
+  { name: "Sun", sales: 0 },
+  { name: "Mon", sales: 0 },
+  { name: "Tue", sales: 0 },
+  { name: "Wed", sales: 0 },
+  { name: "Thu", sales: 0 },
+  { name: "Fri", sales: 0 },
+  { name: "Sat", sales: 0 },
 ];
 
 const FALLBACK_MONTHLY = [
-  { name: "Jan", partner: 45000, direct: 22000 },
-  { name: "Feb", partner: 52000, direct: 28000 },
-  { name: "Mar", partner: 48000, direct: 35000 },
-  { name: "Apr", partner: 61000, direct: 42000 },
-  { name: "May", partner: 55000, direct: 39000 },
-  { name: "Jun", partner: 67000, direct: 51000 },
+  { name: "Jan", sales: 0 },
+  { name: "Feb", sales: 0 },
+  { name: "Mar", sales: 0 },
+  { name: "Apr", sales: 0 },
+  { name: "May", sales: 0 },
+  { name: "Jun", sales: 0 },
+];
+
+// Colors for Pie Charts
+const COLORS = [
+  "#6366f1",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
 ];
 
 const IntelligenceHub = () => {
@@ -77,7 +85,6 @@ const IntelligenceHub = () => {
   // --- MAIN STATE ---
   const [timeRange, setTimeRange] = useState("7D");
   const [velocityToggle, setVelocityToggle] = useState("Weekly");
-  const [loading, setLoading] = useState(false);
   const [customDates, setCustomDates] = useState({ start: "", end: "" });
 
   // --- COUPON INTELLIGENCE STATE ---
@@ -94,47 +101,108 @@ const IntelligenceHub = () => {
   const [limit, setLimit] = useState("");
   const [expiry, setExpiry] = useState("");
 
-  // --- EXISTING INTELLIGENCE STATES ---
+  // --- ANALYTICS STATES (Populated directly from DB now) ---
   const [revenueData, setRevenueData] = useState({
     totalRevenue: 0,
-    directRevenue: 0,
     partnerRevenue: 0,
   });
-  const [courseData, setCourseData] = useState({
-    total: 0,
-    self: 0,
-    partner: 0,
-  });
-  const [studentData, setStudentData] = useState({
-    total: 0,
-    self: 0,
-    partner: 0,
-  });
-  const [velocityData, setVelocityData] = useState([]);
+  const [courseData, setCourseData] = useState({ total: 0, partner: 0 });
+  const [studentData, setStudentData] = useState({ total: 0, partner: 0 });
+  const [velocityData, setVelocityData] = useState(FALLBACK_WEEKLY);
+
+  // [UPDATED] Distribution States
   const [coursePieData, setCoursePieData] = useState([]);
   const [ebookPieData, setEbookPieData] = useState([]);
-  const [inactivePartners, setInactivePartners] = useState([]);
-  const [hotAsset, setHotAsset] = useState({ name: "N/A", units: 0 });
 
   // --- EFFECTS ---
 
-  // 1. Fetch Static/Service Data with instant initial values
+  // 1. Fetch Real-time Orders & Calculate Distributions
   useEffect(() => {
-    // Set default values immediately
-    setRevenueData({ totalRevenue: 0, directRevenue: 0, partnerRevenue: 0 });
-    setCourseData({ total: 0, self: 0, partner: 0 });
-    setStudentData({ total: 0, self: 0, partner: 0 });
-    setVelocityData(velocityToggle === "Weekly" ? FALLBACK_WEEKLY : FALLBACK_MONTHLY);
-    setCoursePieData([]);
-    setEbookPieData([]);
-    setInactivePartners([]);
-    setHotAsset({ name: "N/A", units: 0 });
-    
-    // Then fetch real data
-    fetchAllData();
+    if (!partnerId) return;
+
+    // Listen to ORDERS for this Partner
+    const q = query(
+      collection(db, "orders"),
+      where("partnerId", "==", partnerId),
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let totalRev = 0;
+      let coursesSold = 0;
+      let ebooksSold = 0;
+      const studentsSet = new Set();
+
+      const courseMap = {};
+      const ebookMap = {};
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        totalRev += Number(data.amount || data.price || 0);
+
+        if (data.studentId || data.userId)
+          studentsSet.add(data.studentId || data.userId);
+
+        // Distributions Logic
+        const assetName =
+          data.courseTitle ||
+          data.ebookTitle ||
+          data.assetName ||
+          "Unknown Item";
+        const type = data.type || "course"; // Default to course if type missing
+
+        if (type === "course") {
+          coursesSold++;
+          courseMap[assetName] = (courseMap[assetName] || 0) + 1;
+        } else if (type === "ebook") {
+          ebooksSold++;
+          ebookMap[assetName] = (ebookMap[assetName] || 0) + 1;
+        }
+      });
+
+      // Update Macro Stats
+      setRevenueData({ totalRevenue: totalRev, partnerRevenue: totalRev });
+      setCourseData({ total: coursesSold, partner: coursesSold }); // Assuming 'Acquisitions' tracks courses
+      setStudentData({ total: studentsSet.size, partner: studentsSet.size });
+
+      // Update Pie Charts
+      const formatPieData = (map) =>
+        Object.keys(map).map((key) => ({ name: key, value: map[key] }));
+
+      setCoursePieData(formatPieData(courseMap));
+      setEbookPieData(formatPieData(ebookMap));
+    });
+
+    return () => unsubscribe();
+  }, [partnerId]);
+
+  // 2. Fetch Velocity Data (Kept Service for complex date logic, or fallbacks)
+  useEffect(() => {
+    // This part can be enhanced to use the same 'orders' listener if needed,
+    // but sticking to service for velocity aggregation logic is often cleaner
+    // unless you want that raw too. For now, we update it via service or fallback.
+    intelligenceService
+      .getRevenueVelocity(velocityToggle, timeRange, customDates)
+      .then((velocity) => {
+        if (velocity.length > 0) {
+          const partnerOnlyVelocity = velocity.map((v) => ({
+            name: v.name,
+            sales: v.partner || v.sales || 0,
+          }));
+          setVelocityData(partnerOnlyVelocity);
+        } else {
+          setVelocityData(
+            velocityToggle === "Weekly" ? FALLBACK_WEEKLY : FALLBACK_MONTHLY,
+          );
+        }
+      })
+      .catch(() =>
+        setVelocityData(
+          velocityToggle === "Weekly" ? FALLBACK_WEEKLY : FALLBACK_MONTHLY,
+        ),
+      );
   }, [timeRange, velocityToggle, customDates]);
 
-  // 2. Fetch Real-time Coupon Data (Firestore)
+  // 3. Fetch Real-time Coupon Data & Redemptions
   useEffect(() => {
     if (!partnerId) return;
 
@@ -142,7 +210,7 @@ const IntelligenceHub = () => {
     const couponRef = query(
       collection(db, "coupons"),
       where("partnerId", "==", partnerId),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const unsubCoupons = onSnapshot(couponRef, (snap) => {
@@ -152,27 +220,25 @@ const IntelligenceHub = () => {
         return {
           id: doc.id,
           ...data,
-          // Auto-calculate status based on expiry
           status: data.expiry?.toDate?.() < now ? "Expired" : "Active",
         };
       });
       setCoupons(raw);
     });
 
-    // Listen for Redemptions
+    // Listen for Redemptions (Functional Audit Log)
     const redemptionRef = query(
       collection(db, "couponRedemptions"),
       where("partnerId", "==", partnerId),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const unsubRedemptions = onSnapshot(redemptionRef, (snap) => {
-      setRedemptions(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-      );
+      const rawRedemptions = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setRedemptions(rawRedemptions);
     });
 
     return () => {
@@ -182,25 +248,6 @@ const IntelligenceHub = () => {
   }, [partnerId]);
 
   // --- HANDLERS ---
-
-  const fetchAllData = async () => {
-    if (timeRange === "Custom" && (!customDates.start || !customDates.end)) return;
-
-    try {
-      intelligenceService.getRevenueData(timeRange, customDates).then(setRevenueData).catch(() => {});
-      intelligenceService.getCourseAcquisitions(timeRange, customDates).then(setCourseData).catch(() => {});
-      intelligenceService.getStudentCount(timeRange, customDates).then(setStudentData).catch(() => {});
-      intelligenceService.getRevenueVelocity(velocityToggle, timeRange, customDates).then(velocity => {
-        if (velocity.length > 0) setVelocityData(velocity);
-      }).catch(() => {});
-      intelligenceService.getCourseSalesDistribution(timeRange, customDates).then(setCoursePieData).catch(() => {});
-      intelligenceService.getEbookSalesDistribution(timeRange, customDates).then(setEbookPieData).catch(() => {});
-      intelligenceService.getInactivePartners().then(setInactivePartners).catch(() => {});
-      intelligenceService.getHotAssetSpotlight(timeRange, customDates).then(setHotAsset).catch(() => {});
-    } catch (error) {
-      console.error("Error fetching intelligence data:", error);
-    }
-  };
 
   // Coupon Handlers
   const generateRandomCode = () => {
@@ -275,21 +322,19 @@ const IntelligenceHub = () => {
     }
   };
 
-  // Helper
   const formatDate = (ts) =>
     ts?.toDate?.().toLocaleDateString("en-IN") || "N/A";
 
   return (
     <div className="space-y-8 pb-10 relative">
-
-      {/* --- OMNI-FILTER (FIXED) --- */}
+      {/* --- OMNI-FILTER --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
             Intelligence Neural Hub
           </h2>
           <p className="text-sm text-slate-400 font-medium italic">
-            Analytics & Campaign Management
+            Partner Performance & Analytics
           </p>
         </div>
 
@@ -326,7 +371,7 @@ const IntelligenceHub = () => {
                   <option key={opt} value={opt}>
                     {opt}
                   </option>
-                )
+                ),
               )}
             </select>
             <Filter
@@ -341,24 +386,18 @@ const IntelligenceHub = () => {
         </div>
       </div>
 
-      {/* --- 1. MACRO KPI ARCHITECTURE (WITH COUPON CARD) --- */}
+      {/* --- 1. MACRO KPI ARCHITECTURE --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MacroCard
-          title="Net Revenue"
+          title="Total Revenue"
           val={
             revenueData.totalRevenue >= 100000
               ? `₹${(revenueData.totalRevenue / 100000).toFixed(1)}L`
               : `₹${revenueData.totalRevenue.toLocaleString()}`
           }
           subData={[
-            {
-              label: "Direct",
-              value: `₹${(revenueData.directRevenue / 1000).toFixed(1)}k`,
-            },
-            {
-              label: "Partner",
-              value: `₹${(revenueData.partnerRevenue / 1000).toFixed(1)}k`,
-            },
+            { label: "Partner Sales", value: "100%" },
+            { label: "Status", value: "Verified" },
           ]}
           icon={<Globe size={20} />}
           color="indigo"
@@ -367,14 +406,17 @@ const IntelligenceHub = () => {
           title="Acquisitions"
           val={courseData.total.toLocaleString()}
           subData={[
-            { label: "Self", value: courseData.self.toLocaleString() },
-            { label: "Partner", value: courseData.partner.toLocaleString() },
+            { label: "Courses", value: courseData.total },
+            {
+              label: "E-Books",
+              value: ebookPieData.reduce((acc, curr) => acc + curr.value, 0),
+            },
           ]}
           icon={<GraduationCap size={20} />}
           color="emerald"
         />
 
-        {/* ✨ REPLACED GROWTH PARTNERS WITH ACTIVE CAMPAIGNS CARD ✨ */}
+        {/* ACTIVE CAMPAIGNS CARD */}
         <div
           onClick={() => {
             setEditingCoupon(null);
@@ -416,8 +458,8 @@ const IntelligenceHub = () => {
           title="Students"
           val={studentData.total.toLocaleString()}
           subData={[
-            { label: "Active", value: studentData.self },
-            { label: "New", value: "+12" }, // Example dynamic
+            { label: "Active", value: studentData.total },
+            { label: "Type", value: "Partner" },
           ]}
           icon={<Users size={20} />}
           color="blue"
@@ -426,15 +468,14 @@ const IntelligenceHub = () => {
 
       {/* --- 2 & 3. VELOCITY & COUPON MONITOR --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Velocity Chart */}
         <div className="lg:col-span-2 bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm">
           <div className="flex justify-between items-center mb-10">
             <div>
               <h3 className="text-lg font-black uppercase tracking-widest">
-                Revenue Velocity
+                Partner Performance
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                Direct vs Partner Performance
+                Sales Velocity Overview
               </p>
             </div>
             <div className="flex p-1.5 bg-slate-100 rounded-2xl">
@@ -464,13 +505,9 @@ const IntelligenceHub = () => {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={velocityData}>
                 <defs>
-                  <linearGradient id="colorPartner" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
                     <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorDirect" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -500,26 +537,18 @@ const IntelligenceHub = () => {
                 />
                 <Area
                   type="monotone"
-                  dataKey="partner"
+                  dataKey="sales"
                   stroke="#6366f1"
                   strokeWidth={4}
                   fillOpacity={1}
-                  fill="url(#colorPartner)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="direct"
-                  stroke="#10b981"
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorDirect)"
+                  fill="url(#colorSales)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* ✨ COUPON MONITOR (REPLACED LIQUIDITY DESK) ✨ */}
+        {/* COUPON MONITOR */}
         <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm flex flex-col h-full">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
@@ -567,7 +596,6 @@ const IntelligenceHub = () => {
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
                   <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2">
                     <div
                       className={`h-full ${
@@ -578,7 +606,7 @@ const IntelligenceHub = () => {
                       style={{
                         width: `${Math.min(
                           (coupon.used / coupon.limit) * 100,
-                          100
+                          100,
                         )}%`,
                       }}
                     />
@@ -616,7 +644,7 @@ const IntelligenceHub = () => {
 
       {/* --- 4 & 5. REDEMPTION AUDIT & SALES DISTRIBUTION --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ✨ REDEMPTION AUDIT (REPLACED ACADEMIC INTELLIGENCE) ✨ */}
+        {/* REDEMPTION AUDIT (FUNCTIONAL) */}
         <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-lg font-black uppercase tracking-widest">
@@ -637,7 +665,7 @@ const IntelligenceHub = () => {
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-black text-slate-800">
-                      {r.studentName}
+                      {r.studentName || "Student"}
                     </p>
                     <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
                       Used{" "}
@@ -647,7 +675,7 @@ const IntelligenceHub = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-black text-slate-900">
-                      {r.discountValue}
+                      -₹{r.discountValue}
                     </p>
                     <p className="text-[8px] font-bold text-slate-400 uppercase">
                       {formatDate(r.createdAt)}
@@ -671,7 +699,7 @@ const IntelligenceHub = () => {
           </button>
         </div>
 
-        {/* E-Book Sales (Existing) */}
+        {/* E-Book Sales (FUNCTIONAL) */}
         <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm">
           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-10 text-center">
             E-Book Distribution
@@ -682,90 +710,86 @@ const IntelligenceHub = () => {
                 <PieChart>
                   <Pie
                     data={ebookPieData}
-                    innerRadius={0}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
                     outerRadius={80}
-                    paddingAngle={0}
+                    paddingAngle={5}
                     dataKey="value"
                   >
                     {ebookPieData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                    }}
+                    itemStyle={{ fontSize: "12px", fontWeight: "bold" }}
+                  />
+                  <Legend
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: "10px", paddingTop: "10px" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-xs text-slate-400 font-bold">
-                  No ebook data
-                </p>
+              <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs">
+                No E-Book Sales Yet
               </div>
             )}
-          </div>
-          <div className="space-y-3 mt-6">
-            {ebookPieData.slice(0, 3).map((e) => (
-              <div
-                key={e.name}
-                className="flex justify-between items-center text-[10px] font-black uppercase"
-              >
-                <span className="text-slate-500 flex items-center gap-2">
-                  <div
-                    className="size-2 rounded-full"
-                    style={{ backgroundColor: e.color }}
-                  />{" "}
-                  {e.name}
-                </span>
-                <span className="text-slate-900">{e.value} Units</span>
-              </div>
-            ))}
           </div>
         </div>
 
-        {/* Alerts (Existing) */}
-        <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm flex flex-col">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="size-10 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center animate-pulse shadow-inner">
-              <AlertCircle size={20} />
-            </div>
-            <h3 className="text-md font-black uppercase tracking-widest text-red-600">
-              Alerts
-            </h3>
-          </div>
-
-          <div className="flex-1 space-y-4">
-            {inactivePartners.length > 0 ? (
-              inactivePartners.slice(0, 2).map((p, index) => (
-                <div
-                  key={`partner-${index}`}
-                  className="flex justify-between items-center p-4 bg-red-50/50 border border-red-100 rounded-[20px]"
-                >
-                  <span className="text-[10px] font-black text-slate-800">
-                    {p}
-                  </span>
-                  <ExternalLink size={12} className="text-red-400" />
-                </div>
-              ))
+        {/* Course Sales (FUNCTIONAL) */}
+        <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm">
+          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-10 text-center">
+            Course Distribution
+          </h3>
+          <div className="h-[200px]">
+            {coursePieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={coursePieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {coursePieData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                    }}
+                    itemStyle={{ fontSize: "12px", fontWeight: "bold" }}
+                  />
+                  <Legend
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: "10px", paddingTop: "10px" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
-              <p className="text-[10px] text-slate-400 font-bold uppercase">
-                No Critical Alerts
-              </p>
-            )}
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-slate-50">
-            <div className="bg-indigo-50 p-5 rounded-[24px] border border-indigo-100">
-              <p className="text-[9px] font-black text-indigo-400 uppercase mb-1">
-                Spotlight Asset
-              </p>
-              <div className="flex justify-between items-end">
-                <h4 className="text-sm font-black text-slate-900">
-                  {hotAsset.name}
-                </h4>
-                <span className="text-xl font-black text-indigo-600">
-                  {hotAsset.units}
-                </span>
+              <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs">
+                No Course Sales Yet
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -773,86 +797,84 @@ const IntelligenceHub = () => {
       {/* --- CREATE COUPON MODAL --- */}
       <AnimatePresence>
         {showCreateModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowCreateModal(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[40px] p-8 shadow-2xl relative z-10 overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl relative"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-black tracking-tighter uppercase text-slate-900">
-                  {editingCoupon ? "Edit Campaign" : "Forge Campaign"}
-                </h3>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"
-                >
-                  <X size={20} className="text-slate-400" />
-                </button>
-              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="absolute top-6 right-6 p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} className="text-slate-400" />
+              </button>
 
-              <div className="space-y-6">
-                {/* Discount Type Toggle */}
-                <div className="bg-slate-100 p-1 rounded-2xl flex relative">
-                  <motion.div
-                    className="absolute top-1 bottom-1 bg-white rounded-xl shadow-sm z-0"
-                    initial={false}
-                    animate={{
-                      left: discountType === "percentage" ? "4px" : "50%",
-                      width: "calc(50% - 4px)",
-                    }}
-                  />
-                  {["percentage", "flat"].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setDiscountType(type)}
-                      className={`flex-1 py-3 text-[10px] font-black uppercase relative z-10 transition-colors ${
-                        discountType === type
-                          ? "text-slate-900"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      {type === "percentage"
-                        ? "Percentage (%)"
-                        : "Flat Amount (₹)"}
-                    </button>
-                  ))}
-                </div>
+              <h3 className="text-2xl font-black text-slate-900 mb-1">
+                {editingCoupon ? "Edit Campaign" : "New Campaign"}
+              </h3>
+              <p className="text-sm text-slate-400 mb-6">
+                Create a high-conversion discount strategy.
+              </p>
 
+              <div className="space-y-5">
                 {/* Code Input */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    Coupon Code
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                    Campaign Code
                   </label>
                   <div className="flex gap-2">
                     <input
+                      type="text"
                       value={couponCode}
                       onChange={(e) =>
                         setCouponCode(e.target.value.toUpperCase())
                       }
-                      placeholder="SUMMER50"
-                      className="flex-1 bg-slate-50 border-2 border-transparent focus:border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold uppercase outline-none transition-all"
+                      placeholder="SUMMER2025"
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 transition-all uppercase placeholder:text-slate-300"
                     />
                     <button
                       onClick={generateRandomCode}
-                      className="px-4 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors"
+                      className="p-3 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 transition-colors"
+                      title="Generate Random Code"
                     >
-                      <RefreshCw size={18} />
+                      <RefreshCw size={20} />
                     </button>
                   </div>
                 </div>
 
+                {/* Type & Value */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                      Discount Type
+                    </label>
+                    <div className="flex p-1 bg-slate-100 rounded-xl">
+                      <button
+                        onClick={() => setDiscountType("percentage")}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                          discountType === "percentage"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        % Off
+                      </button>
+                      <button
+                        onClick={() => setDiscountType("flat")}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                          discountType === "flat"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        Flat ₹
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
                       Value
                     </label>
                     <input
@@ -860,45 +882,48 @@ const IntelligenceHub = () => {
                       value={value}
                       onChange={(e) => setValue(e.target.value)}
                       placeholder={discountType === "percentage" ? "20" : "500"}
-                      className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                      Limit
+                </div>
+
+                {/* Limit & Expiry */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                      Usage Limit
                     </label>
                     <input
                       type="number"
                       value={limit}
                       onChange={(e) => setLimit(e.target.value)}
                       placeholder="100"
-                      className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    value={expiry}
-                    onChange={(e) => setExpiry(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none transition-all text-slate-600"
-                  />
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                      Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      value={expiry}
+                      onChange={(e) => setExpiry(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 transition-all"
+                    />
+                  </div>
                 </div>
 
                 <button
                   onClick={handleCreateCoupon}
                   disabled={isSaving}
-                  className="w-full bg-slate-950 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-xl shadow-indigo-200 mt-4 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSaving
                     ? "Processing..."
                     : editingCoupon
-                    ? "Update Campaign"
-                    : "Launch Campaign"}
+                      ? "Update Campaign"
+                      : "Launch Campaign"}
                 </button>
               </div>
             </motion.div>
@@ -935,12 +960,12 @@ const MacroCard = ({ title, val, subData, icon, color, onClick }) => {
         {val}
       </h3>
       <div className="mt-4 flex gap-2">
-        {subData.map((s, i) => (
+        {subData.map((item, index) => (
           <span
-            key={i}
+            key={index}
             className="text-[9px] font-black px-2.5 py-1.5 bg-slate-50 text-slate-500 rounded-xl border border-slate-100 uppercase tracking-tighter"
           >
-            {s.label}: {s.value}
+            {item.label}: <span className="text-slate-900">{item.value}</span>
           </span>
         ))}
       </div>
