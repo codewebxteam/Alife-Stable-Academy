@@ -17,7 +17,8 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import PartnerProfile from "./PartnerProfile";
-import { listenToPartners } from "../../firebase/partners.service";
+import { db } from "../../firebase/config";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import * as XLSX from "xlsx";
 
 const PartnerIntelligence = () => {
@@ -36,15 +37,70 @@ const PartnerIntelligence = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // --- REAL-TIME FIREBASE CONNECTION ---
+  // --- REAL-TIME FIREBASE CONNECTION (UPDATED FOR ADMIN) ---
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = listenToPartners((data) => {
-      setPartners(data);
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
+    // 1. Listen to 'agencies' collection (Primary Source)
+    const unsubAgencies = onSnapshot(
+      collection(db, "agencies"),
+      (agencySnap) => {
+        // 2. Listen to 'orders' to calculate metrics
+        const unsubOrders = onSnapshot(
+          collection(db, "orders"),
+          (ordersSnap) => {
+            const allOrders = ordersSnap.docs.map((d) => ({
+              id: d.id,
+              ...d.data(),
+            }));
+
+            const formattedPartners = agencySnap.docs.map((doc) => {
+              const data = doc.data();
+              const pId = doc.id;
+
+              // Match orders where partnerId == agency Document ID
+              const partnerOrders = allOrders.filter(
+                (o) => o.partnerId === pId,
+              );
+
+              return {
+                id: pId,
+                agency: data.name || "Unnamed Academy",
+                owner: data.ownerId || "N/A",
+                email: data.email || "N/A",
+                phone: data.whatsapp || "N/A",
+                domain: data.subdomain || "N/A",
+                status: data.status || "Active",
+                joinDate: data.updatedAt?.toDate
+                  ? data.updatedAt.toDate()
+                  : new Date(),
+                sales: {
+                  courses: partnerOrders.filter(
+                    (o) => o.productType === "Course",
+                  ).length,
+                  ebooks: partnerOrders.filter(
+                    (o) => o.productType === "E-Book",
+                  ).length,
+                  totalUnits: partnerOrders.length,
+                },
+                financials: {
+                  generated: partnerOrders.reduce(
+                    (acc, curr) => acc + Number(curr.sellingPrice || 0),
+                    0,
+                  ),
+                },
+              };
+            });
+
+            setPartners(formattedPartners);
+            setLoading(false);
+          },
+        );
+        return () => unsubOrders();
+      },
+    );
+
+    return () => unsubAgencies();
   }, []);
 
   // --- EXCEL EXPORT FUNCTION ---
@@ -75,7 +131,7 @@ const PartnerIntelligence = () => {
     );
   };
 
-  // --- 1. TIME FILTER LOGIC (FIXED) ---
+  // --- 1. TIME FILTER LOGIC ---
   const timeFilteredPartners = useMemo(() => {
     if (timeFilter === "All Time") return partners;
 
@@ -86,16 +142,11 @@ const PartnerIntelligence = () => {
       const pDate = new Date(p.joinDate);
 
       if (timeFilter === "Today") {
-        return (
-          pDate.getDate() === now.getDate() &&
-          pDate.getMonth() === now.getMonth() &&
-          pDate.getFullYear() === now.getFullYear()
-        );
+        return pDate.toDateString() === now.toDateString();
       }
       if (timeFilter === "Week") {
         const weekAgo = new Date();
         weekAgo.setDate(now.getDate() - 7);
-        weekAgo.setHours(0, 0, 0, 0);
         return pDate >= weekAgo;
       }
       if (timeFilter === "Month") {
@@ -117,11 +168,8 @@ const PartnerIntelligence = () => {
       }
       if (timeFilter === "Custom" && customDates.start && customDates.end) {
         const startDate = new Date(customDates.start);
-        startDate.setHours(0, 0, 0, 0);
-
         const endDate = new Date(customDates.end);
         endDate.setHours(23, 59, 59, 999);
-
         return pDate >= startDate && pDate <= endDate;
       }
       return true;
@@ -139,8 +187,6 @@ const PartnerIntelligence = () => {
   const filteredLedgerData = useMemo(() => {
     return timeFilteredPartners.filter((p) => {
       const searchLower = searchQuery.toLowerCase();
-
-      // Safe checks for strings
       const agencyName = p.agency ? p.agency.toLowerCase() : "";
       const email = p.email ? p.email.toLowerCase() : "";
       const id = p.id ? p.id.toLowerCase() : "";
@@ -156,13 +202,17 @@ const PartnerIntelligence = () => {
     });
   }, [timeFilteredPartners, searchQuery, statusFilter]);
 
-  const totalPages = Math.ceil(filteredLedgerData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredLedgerData.length / itemsPerPage) || 1;
   const currentItems = filteredLedgerData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
 
-  // --- MACRO METRICS ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeFilter, searchQuery, statusFilter]);
+
+  // --- MACRO METRICS (CHANGED TO DIRECT RS) ---
   const metrics = {
     total: timeFilteredPartners.length,
     active: timeFilteredPartners.filter((p) => p.status === "Active").length,
@@ -259,7 +309,7 @@ const PartnerIntelligence = () => {
             </div>
           </div>
 
-          {/* --- MACRO CARDS --- */}
+          {/* --- MACRO CARDS (VALUES IN RS) --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <KPICard
               label="Total Agencies"
@@ -277,14 +327,14 @@ const PartnerIntelligence = () => {
             />
             <KPICard
               label="Total Business Volume"
-              val={`₹${(metrics.totalVolume / 100000).toFixed(2)}L`}
+              val={`₹${Math.round(metrics.totalVolume).toLocaleString()}`}
               sub="Total Purchases"
               icon={<Globe />}
               color="indigo"
             />
             <KPICard
               label="Avg. Agency Vol."
-              val={`₹${(metrics.avgVolume / 1000).toFixed(1)}k`}
+              val={`₹${Math.round(metrics.avgVolume).toLocaleString()}`}
               sub="Per Partner"
               icon={<ShoppingBag />}
               color="orange"
@@ -356,7 +406,6 @@ const PartnerIntelligence = () => {
                     value={statusFilter}
                     onChange={(e) => {
                       setStatusFilter(e.target.value);
-                      setCurrentPage(1);
                     }}
                     className="bg-transparent text-[10px] font-black uppercase outline-none text-slate-600 cursor-pointer"
                   >
@@ -415,7 +464,7 @@ const PartnerIntelligence = () => {
                               {p.agency}
                             </p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">
-                              {p.id}
+                              {p.id.slice(0, 10)}...
                             </p>
                           </div>
                         </div>
@@ -462,6 +511,11 @@ const PartnerIntelligence = () => {
                   ))}
                 </tbody>
               </table>
+              {currentItems.length === 0 && (
+                <div className="p-20 text-center font-black text-slate-300">
+                  NO PARTNER DATA SYNCED
+                </div>
+              )}
             </div>
 
             {/* Pagination */}
@@ -526,7 +580,9 @@ const KPICard = ({ label, val, sub, icon, color }) => {
         {label}
       </p>
       <h3 className="text-2xl font-black text-slate-900 mt-1">{val}</h3>
-      <p className="text-[10px] font-bold text-slate-400 mt-1">{sub}</p>
+      <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">
+        {sub}
+      </p>
     </div>
   );
 };
